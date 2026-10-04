@@ -1,0 +1,47 @@
+{
+  "name": "cue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CUE — The Heart of Your Business",
+  "scripts": {
+    "dev": "next dev -p 3210",
+    "build": "prisma generate && next build",
+    "vercel-build": "prisma generate --schema prisma/schema.postgres.prisma && next build",
+    "start": "next start -p 3210",
+    "typecheck": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "setup": "prisma db push && tsx prisma/seed.ts",
+    "db:pg:schema": "node scripts/pg-schema.cjs",
+    "db:pg:push": "prisma db push --schema prisma/schema.postgres.prisma",
+    "db:pg:generate": "prisma generate --schema prisma/schema.postgres.prisma",
+    "db:export": "node scripts/export-sqlite.cjs",
+    "db:pg:import": "node scripts/import-postgres.cjs",
+    "db:migrate-to-pg": "npm run db:pg:schema && npm run db:export && npm run db:pg:push && npm run db:pg:import",
+    "export:share": "node scripts/export-share.cjs",
+    "test:rls": "tsx --env-file=.env scripts/rls-org-policies.ts",
+    "test:anon": "tsx --env-file=.env scripts/probe-rest-exposure.ts",
+    "test:secrets": "node scripts/scan-tracked-secrets.cjs"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.2",
+    "next": "15.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prisma": "^6.16.2",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,33 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local databases (SQLite dev DB lives at prisma/db/custom.db — the file: URL
+# in schema.prisma is relative to prisma/, so `db/custom.db` rules miss it)
+*.db
+*.db-journal
+
+# Env
+.env
+.env.local
+.env.production
+
+# Uploads (local dev storage)
+/uploads/*
+!/uploads/.gitkeep
+
+# Logs
+*.log
+
+# Vercel
+.vercel/
+
+# Freebuff local tool state (dev-server logs, project id)
+.freebuff/*.log*
+.freebuff/project-id
+
+# OS
+.DS_Store
+Thumbs.db

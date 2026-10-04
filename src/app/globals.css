@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ink-950 text-navy-900 antialiased;
+  background-image:
+    radial-gradient(70rem 40rem at 15% -10%, rgba(59, 130, 246, 0.12) 0%, transparent 60%),
+    radial-gradient(60rem 40rem at 110% 20%, rgba(139, 92, 246, 0.10) 0%, transparent 55%),
+    radial-gradient(50rem 30rem at 50% 120%, rgba(249, 115, 22, 0.06) 0%, transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+}
+
+/* ── RTL support (Arabic) ─────────────────────────────
+   When <html dir="rtl">, mirror the sidebar + content offsets.
+   Tailwind's left/right utilities are physical, so we override
+   with logical ones under [dir="rtl"]. */
+[dir="rtl"] .rtl-side {
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+}
+[dir="rtl"] .rtl-main {
+  padding-inline-start: 0;
+}
+@media (min-width: 1024px) {
+  [dir="rtl"] .rtl-main {
+    padding-inline-start: 16rem;
+    padding-inline-end: 0;
+  }
+}
+[dir="rtl"] .rtl-translate-open {
+  transform: translateX(0);
+}
+[dir="rtl"] .rtl-translate-closed {
+  transform: translateX(100%);
+}
+
+/* ── Cards: dark glass ─────────────────────────────── */
+.card {
+  @apply bg-white/[0.03] rounded-2xl border border-navy-100 shadow-card backdrop-blur-sm;
+}
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-raised hover:-translate-y-0.5 hover:border-navy-200 cursor-pointer;
+}
+
+/* ── Buttons ───────────────────────────────────────── */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent-blue/40 disabled:opacity-50 disabled:pointer-events-none;
+}
+.btn-primary {
+  @apply btn bg-accent-blue text-white hover:bg-blue-500 shadow-glow;
+}
+.btn-purple {
+  @apply btn bg-gradient-to-r from-accent-blue to-accent-purple text-white hover:opacity-90 shadow-glow;
+}
+.btn-orange {
+  @apply btn bg-accent-orange text-white hover:bg-orange-500;
+}
+.btn-secondary {
+  @apply btn bg-white/[0.04] border border-navy-200 text-navy-800 hover:bg-white/[0.08];
+}
+.btn-ghost {
+  @apply btn text-navy-500 hover:bg-white/[0.05];
+}
+.btn-danger {
+  @apply btn bg-transparent border border-red-500/30 text-red-400 hover:bg-red-500/10;
+}
+.btn-sm {
+  @apply px-3 py-1.5 text-xs rounded-lg;
+}
+
+/* ── Badges ────────────────────────────────────────── */
+.badge {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+}
+.badge-high {
+  @apply badge bg-red-500/10 text-red-300 border border-red-500/30;
+}
+.badge-medium {
+  @apply badge bg-amber-500/10 text-amber-300 border border-amber-500/30;
+}
+.badge-low {
+  @apply badge bg-white/[0.05] text-navy-500 border border-navy-200;
+}
+.badge-green {
+  @apply badge bg-emerald-500/10 text-emerald-300 border border-emerald-500/30;
+}
+.badge-blue {
+  @apply badge bg-blue-500/10 text-blue-300 border border-blue-500/30;
+}
+.badge-purple {
+  @apply badge bg-violet-500/10 text-violet-300 border border-violet-500/30;
+}
+
+/* ── Forms ─────────────────────────────────────────── */
+.input {
+  @apply w-full rounded-xl border border-navy-200 bg-white/[0.04] px-3.5 py-2.5 text-sm text-navy-900 placeholder:text-navy-300 focus:outline-none focus:ring-2 focus:ring-accent-blue/30 focus:border-accent-blue;
+}
+.label {
+  @apply block text-xs font-semibold uppercase tracking-wide text-navy-400 mb-1.5;
+}
+
+/* ── Tables ────────────────────────────────────────── */
+.th {
+  @apply text-left text-xs font-semibold uppercase tracking-wider text-navy-400 px-4 py-3 border-b border-navy-100;
+}
+.td {
+  @apply px-4 py-3 text-sm border-b border-navy-50;
+}
+
+/* ── Drawer & modal ────────────────────────────────── */
+.drawer-overlay {
+  @apply fixed inset-0 bg-black/60 backdrop-blur-[2px] z-40;
+}
+.drawer {
+  @apply fixed right-0 top-0 h-full w-full max-w-xl bg-ink-900 shadow-raised z-50 overflow-y-auto border-l border-navy-100;
+}
+.modal-panel {
+  @apply bg-ink-900 rounded-2xl shadow-raised max-w-lg w-full p-6 border border-navy-100;
+}
+
+/* ── Misc ──────────────────────────────────────────── */
+.divider {
+  @apply border-t border-navy-100;
+}
+.section-title {
+  @apply text-lg font-semibold text-navy-900;
+}
+.muted {
+  @apply text-navy-400 text-sm;
+}
+.ai-chip {
+  @apply inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-accent-blue/15 to-accent-purple/15 border border-accent-blue/30 px-2.5 py-0.5 text-xs font-medium text-blue-200;
+}
