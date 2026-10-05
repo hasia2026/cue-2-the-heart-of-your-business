@@ -42,7 +42,7 @@ export default async function PilotReportPage() {
       -- unbilled completed work that existed at pilot start and is now invoiced
       (select coalesce(sum(amount),0) from service_orders
         where organization_id = ${orgId} and status='COMPLETED' and invoiced_at is not null
-        and invoiced_at > created_at + interval '30 days')::float as invoiced_late,
+        and invoiced_at > opened_at + interval '30 days')::float as invoiced_late,
       -- invoices collected that were previously overdue
       (select coalesce(sum(amount),0) from invoices
         where organization_id = ${orgId} and status='PAID' and paid_at > due_at)::float as collected_late,

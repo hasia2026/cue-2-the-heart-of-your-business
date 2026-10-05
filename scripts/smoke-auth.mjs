@@ -47,6 +47,7 @@ try {
   await check("/knowledge", 200);
   await check("/pipeline", 200);
   await check("/execute", 200);
+  await check("/report", 200);
   await check("/people", 200);
   await check("/expand", 200);
   await check("/enhance", 200);
