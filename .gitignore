@@ -6,3 +6,5 @@ out/
 *.tsbuildinfo
 server.log
 .vercel
+tools/
+.freebuff/
