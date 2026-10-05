@@ -1,52 +1,62 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { verifyPassword } from "@/lib/password";
-import { SESSION_COOKIE, signSession } from "@/lib/session";
+import { sql } from "@/lib/db";
+import { hashPassword, verifyPassword, createSessionCookie, destroySession, requireSessionAction } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
-import { rateLimit, clientIp } from "@/lib/ratelimit";
+import { runDetectors } from "@/lib/intelligence";
 
-export async function signIn(formData: FormData) {
+export async function signUpAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const orgName = String(formData.get("orgName") ?? "").trim();
+  if (!name || !email || !password || !orgName) throw new Error("All fields are required");
+  if (password.length < 8) throw new Error("Password must be at least 8 characters");
 
-  // Brute-force protection: 10 attempts/min per IP, 5 per targeted account.
-  const ip = clientIp(await (await import("next/headers")).headers());
-  if (!rateLimit(`signin:ip:${ip}`, 10, 60).ok) redirect("/signin?error=slow");
-  if (email) {
-    const acct = rateLimit(`signin:acct:${email}`, 5, 300);
-    if (!acct.ok) redirect(`/signin?error=slow&retry=${acct.retryAfterSec}`);
-  }
+  const [existing] = await sql`select id from users where email = ${email}`;
+  if (existing) throw new Error("An account with that email already exists");
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    redirect("/signin?error=invalid");
-  }
-
-  const membership = await prisma.member.findFirst({
-    where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!membership) redirect("/signin?error=org");
-
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, signSession(user.id), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30,
-    path: "/",
-  });
-
-  await logAudit({
-    organizationId: membership.organizationId,
-    actorType: "USER",
-    actorId: user.id,
-    action: "USER_SIGNED_IN",
-    detail: `${user.name} signed in`,
-  });
-
+  const [user] = await sql`
+    insert into users (email, name, password_hash) values (${email}, ${name}, ${hashPassword(password)})
+    returning id`;
+  const [org] = await sql`
+    insert into organizations (name) values (${orgName}) returning id`;
+  await sql`insert into members (organization_id, user_id, role) values (${org.id}, ${user.id}, 'OWNER')`;
+  await sql`
+    insert into business_profiles (organization_id, name) values (${org.id}, ${orgName})`;
+  await sql`insert into ai_settings (organization_id) values (${org.id})`;
+  await logAudit({ organizationId: org.id, actorId: user.id, action: "ORG_CREATED", detail: orgName });
+  await createSessionCookie(user.id);
   redirect("/dashboard");
+}
+
+export async function signInAction(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const [user] = await sql`select id, password_hash from users where email = ${email}`;
+  if (!user || !verifyPassword(password, user.password_hash)) {
+    throw new Error("Invalid email or password");
+  }
+  await createSessionCookie(user.id);
+  redirect("/dashboard");
+}
+
+export async function signOut() {
+  await requireSessionAction();
+  await destroySession();
+  redirect("/signin");
+}
+
+/** Compute intelligence for the caller's org (used after onboarding or by button). */
+export async function refreshIntelligenceAction() {
+  const session = await requireSessionAction();
+  const created = await runDetectors(session.organizationId);
+  await logAudit({
+    organizationId: session.organizationId,
+    actorId: session.user.id,
+    action: "INTELLIGENCE_REFRESHED",
+    detail: `${created} new insight(s)`,
+  });
+  return created;
 }

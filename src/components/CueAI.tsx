@@ -2,118 +2,107 @@
 
 import { useState } from "react";
 
-type Msg = { role: "user" | "assistant"; text: string; sources?: { label: string; kind: string }[]; suggested?: { label: string; href: string }[] };
+type Msg = { role: "user" | "cue"; text: string };
 
-export default function CUEAI({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [messages, setMessages] = useState<Msg[]>([
+export default function CueAI() {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [msgs, setMsgs] = useState<Msg[]>([
     {
-      role: "assistant",
-      text: "Hi — I'm CUE AI. I answer from your company's actual records, and I'll tell you plainly when I don't know something. Try: “What should I focus on today?” or “What's our refund policy?”",
+      role: "cue",
+      text: "Hi — I'm CUE AI. I answer from your actual business records, and I'll tell you plainly when I don't know. Try: “What should I focus on today?”",
     },
   ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  if (!open) return null;
+  // Mascot states: idle → scanning → found something (mirrors the Revi brand book)
+  const state = open ? (busy ? "scanning" : "active") : "idle";
+  const mascot = {
+    idle: { glyph: "✦", pulse: "" },
+    scanning: { glyph: "◐", pulse: "animate-pulse" },
+    active: { glyph: "✦", pulse: "" },
+  }[state] ?? { glyph: "✦", pulse: "" };
 
   async function send(text?: string) {
-    const q = (text ?? input).trim();
-    if (!q || loading) return;
-    setInput("");
-    setMessages((m) => [...m, { role: "user", text: q }]);
-    setLoading(true);
+    const question = (text ?? q).trim();
+    if (!question || busy) return;
+    setQ("");
+    setMsgs((m) => [...m, { role: "user", text: question }]);
+    setBusy(true);
     try {
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ question }),
       });
       const data = await res.json();
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: data.answer ?? "Something went wrong.", sources: data.sources, suggested: data.suggested },
-      ]);
+      setMsgs((m) => [...m, { role: "cue", text: data.answer ?? data.error ?? "…" }]);
     } catch {
-      setMessages((m) => [...m, { role: "assistant", text: "I couldn't reach the CUE intelligence layer just now. Try again in a moment." }]);
+      setMsgs((m) => [...m, { role: "cue", text: "Network hiccup — try again." }]);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="drawer-overlay" onClick={onClose} />
-      <div className="drawer max-w-md flex flex-col" role="dialog" aria-label="CUE AI">
-        <div className="sticky top-0 bg-gradient-to-r from-accent-blue/80 to-accent-purple/80 text-white px-5 py-4 flex items-center gap-3 border-b border-navy-100">
-          <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center text-lg">✦</div>
-          <div>
-            <div className="font-semibold leading-tight">CUE AI</div>
-            <div className="text-xs text-white/80">Grounded in your company's data — never invented</div>
-          </div>
-          <button onClick={onClose} className="ml-auto text-white/90 hover:text-white text-lg" aria-label="Close">✕</button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
-              <div
-                className={`rounded-2xl px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap ${
-                  m.role === "user"
-                    ? "bg-accent-blue text-white"
-                    : "bg-white/[0.05] text-navy-800 border border-navy-100"
-                }`}
-              >
-                {m.text}
-                {m.sources && m.sources.length > 0 && (
-                  <div className="mt-3 border-t border-navy-200/60 pt-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-navy-400 mb-1">Sources</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {m.sources.map((s, j) => (
-                        <span key={j} className="badge-low">❑ {s.label}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {m.suggested && m.suggested.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {m.suggested.map((s, j) => (
-                      <a key={j} href={s.href} onClick={onClose} className="btn-secondary btn-sm">{s.label} →</a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="rounded-2xl bg-navy-50 px-4 py-3 text-sm text-navy-500 animate-pulse max-w-[85%]">
-              Checking your records…
-            </div>
-          )}
-        </div>
-
-        <div className="border-t border-navy-100 p-3">
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {["What should I focus on today?", "What's happening with sales?", "What's our refund policy?"].map((s) => (
-              <button key={s} onClick={() => send(s)} className="badge-low hover:bg-navy-100 transition-colors">{s}</button>
-            ))}
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              send();
-            }}
-            className="flex gap-2"
+    <>
+      <button onClick={() => setOpen(true)} className="btn-primary !px-3 !py-1.5 text-xs" aria-label="Open CUE AI">
+        <span className={mascot.pulse}>{mascot.glyph}</span> CUE AI
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={() => setOpen(false)}>
+          <div
+            className="flex h-full w-full max-w-md flex-col border-s border-white/10 bg-ink-900"
+            onClick={(e) => e.stopPropagation()}
           >
-            <input
-              className="input flex-1"
-              placeholder="Ask about your business…"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-            />
-            <button type="submit" disabled={loading || !input.trim()} className="btn-primary">Ask</button>
-          </form>
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div className="flex items-center gap-2 font-semibold text-white">
+                <span className={`text-cue-purple ${mascot.pulse}`}>{mascot.glyph}</span>
+                CUE AI
+                {busy && <span className="text-xs font-normal text-navy-300">checking the records…</span>}
+              </div>
+              <button onClick={() => setOpen(false)} className="text-navy-300 hover:text-white" aria-label="Close">✕</button>
+            </div>
+            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+              {msgs.map((m, i) => (
+                <div
+                  key={i}
+                  className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm ${
+                    m.role === "user"
+                      ? "ms-auto bg-cue-blue/20 text-white"
+                      : "bg-white/[0.05] text-navy-100"
+                  }`}
+                >
+                  {m.text}
+                </div>
+              ))}
+              {busy && <div className="text-xs text-navy-300">CUE is checking the records…</div>}
+            </div>
+            <div className="border-t border-white/10 p-3">
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {["What should I focus on today?", "What's unbilled in service?", "Which leads need follow-up?"].map((s) => (
+                  <button key={s} onClick={() => send(s)} className="badge-low hover:bg-white/[0.1]">{s}</button>
+                ))}
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  send();
+                }}
+                className="flex gap-2"
+              >
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Ask about your business…"
+                  className="input"
+                />
+                <button className="btn-primary !px-3" disabled={busy}>→</button>
+              </form>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

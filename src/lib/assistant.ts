@@ -1,184 +1,143 @@
-import { prisma } from "./prisma";
-import { buildCompanyContext } from "./context";
-import { parseEvidence } from "./intelligence";
-import { money } from "./format";
-
-// ─────────────────────────────────────────────────────────────
-// CUE AI — a grounded business guide.
-// Answers are assembled from the company's actual records via
-// intent-matched queries. When data is missing, CUE says so.
-// No external API key required; swappable for an LLM later.
-// ─────────────────────────────────────────────────────────────
+// CUE AI — grounded assistant. Answers are computed from the org's actual
+// records via deterministic intent routing. When data doesn't support an
+// answer, it says so. No fabricated business facts, ever.
+import { sql } from "./db";
 
 export type AssistantAnswer = {
   answer: string;
   sources: { label: string; kind: string }[];
-  suggested?: { label: string; href: string }[];
+  suggestions: string[];
 };
 
-function fmtMoney(n: number) {
-  return money(n);
-}
+const SUGGESTED = [
+  "What should I focus on today?",
+  "What's unbilled in service?",
+  "Which leads need follow-up?",
+  "Why did the health score change?",
+];
 
-export async function answerQuestion(orgId: string, question: string): Promise<AssistantAnswer> {
+export async function answerQuestion(organizationId: string, question: string): Promise<AssistantAnswer> {
   const q = question.toLowerCase();
-  const ctx = await buildCompanyContext(orgId);
+  const sources: { label: string; kind: string }[] = [];
 
-  const sources: AssistantAnswer["sources"] = [];
-  const push = (label: string, kind: string) => sources.push({ label, kind });
+  // Focus / attention
+  if (/(focus|attention|today|priority|next)/.test(q)) {
+    const rows = await sql`
+      select i.title, i.severity, i.impact_value from insights i
+      where i.organization_id = ${organizationId} and i.status = 'OPEN'
+      order by case i.severity when 'HIGH' then 0 when 'MEDIUM' then 1 else 2 end, i.impact_value desc nulls last
+      limit 3`;
+    if (rows.length) {
+      sources.push({ label: "Open insights", kind: "QUERY" });
+      return {
+        answer:
+          "Based on your current open insights, the highest-attention items are:\n\n" +
+          rows.map((r, i) => `${i + 1}. ${r.title}${r.impact_value ? ` (~$${Math.round(Number(r.impact_value)).toLocaleString()} at stake)` : ""} [${r.severity}]`).join("\n") +
+          "\n\nEach has an approved recommendation path in Understand → Execute when you're ready to act.",
+        sources,
+        suggestions: SUGGESTED,
+      };
+    }
+    return {
+      answer: "No open insights right now — the board is clear. Try refreshing intelligence in Understand after new activity lands.",
+      sources,
+      suggestions: SUGGESTED,
+    };
+  }
 
-  // Focus / "what should I do"
-  if (/\b(focus|priorit|today|attention|next)\b/.test(q)) {
-    const focus: string[] = [];
-    if (ctx.money.unbilled > 0)
-      focus.push(`1. Bill ${fmtMoney(ctx.money.unbilled)} of completed-but-unbilled work — this is revenue you have already earned.`);
-    if (ctx.money.overdue > 0)
-      focus.push(`2. Chase ${fmtMoney(ctx.money.overdue)} in overdue invoices — collecting existing revenue is faster than new revenue.`);
-    if (ctx.counts.openEstimates > 0)
-      focus.push(`3. Follow up on ${ctx.counts.openEstimates} open estimates worth ${fmtMoney(ctx.money.estimatePipeline)}.`);
-    if (ctx.pendingDecisions.length > 0)
-      focus.push(`4. Decide on ${ctx.pendingDecisions.length} pending recommendation${ctx.pendingDecisions.length === 1 ? "" : "s"} waiting for your approval.`);
-    push("Computed from current jobs, invoices, estimates and recommendations", "Computation");
-
+  // Unbilled / billing / revenue leakage
+  if (/(unbill|not.*invoice|invoice|billing|collect|overdue|receivab)/.test(q)) {
+    const [so] = await sql`
+      select count(*)::int as n, coalesce(sum(amount),0)::float as total
+      from service_orders where organization_id = ${organizationId} and status='COMPLETED' and invoiced_at is null`;
+    const [inv] = await sql`
+      select count(*)::int as n, coalesce(sum(amount),0)::float as total
+      from invoices where organization_id = ${organizationId} and status='OVERDUE'`;
+    sources.push({ label: "service_orders (completed, uninvoiced)", kind: "QUERY" });
+    sources.push({ label: "invoices (overdue)", kind: "QUERY" });
     return {
       answer:
-        focus.length > 0
-          ? `Here is what the data says deserves attention, in order:\n\n${focus.join("\n")}\n\nThis is ranked by money at stake and effort required — not guesswork. Each item links to its evidence.`
-          : `Nothing is currently flagged. Based on the ${ctx.counts.completedJobs} completed jobs, ${ctx.counts.openEstimates} open estimates and ${ctx.counts.openTasks} open tasks on record, there is no urgent revenue or collections gap. Capture more information and CUE will surface what matters as patterns emerge.`,
+        `Unbilled completed service orders: ${so.n} worth $${so.total.toFixed(2)}.\n` +
+        `Overdue invoices: ${inv.n} worth $${inv.total.toFixed(2)}.\n\n` +
+        (so.n || inv.n
+          ? "Both have ready-to-run recovery workflows in Execute — approving the matching recommendation generates the task list."
+          : "Nothing outstanding — billing is clean."),
       sources,
-      suggested: [
-        { label: "Open Dashboard", href: "/dashboard" },
-        { label: "Review recommendations", href: "/understand" },
-      ],
+      suggestions: SUGGESTED,
     };
   }
 
-  // Sales
-  if (/\b(sales|estimates?|pipeline|quotes?)\b/.test(q)) {
-    const estimates = await prisma.estimate.findMany({
-      where: { organizationId: orgId },
-      include: { customer: true },
-      orderBy: { sentAt: "desc" },
-    });
-    const open = estimates.filter((e) => e.status === "SENT" || e.status === "VIEWED");
-    const accepted = estimates.filter((e) => e.status === "ACCEPTED");
-    push(`${estimates.length} estimates on record`, "Estimate");
-    return {
-      answer: `Sales picture from your estimates:\n\n• ${open.length} open — worth ${fmtMoney(open.reduce((s, e) => s + e.amount, 0))}\n• ${accepted.length} accepted — ${fmtMoney(accepted.reduce((s, e) => s + e.amount, 0))}\n• ${estimates.filter((e) => e.status === "DECLINED").length} declined\n\n${open.length > 0 ? `The open pipeline is ${fmtMoney(ctx.money.estimatePipeline)}. Estimates older than two weeks without follow-up are the biggest leak — see the follow-up insight on your dashboard.` : "No estimates are currently open."}`,
-      sources,
-      suggested: [{ label: "Open Understand", href: "/understand" }],
-    };
+  // Leads / follow-up
+  if (/(lead|follow.?up|prospect|pipeline)/.test(q)) {
+    const rows = await sql`
+      select name, est_value, status, created_at from leads
+      where organization_id = ${organizationId} and status in ('NEW','CONTACTED')
+      order by coalesce(last_contact_at, created_at) asc limit 5`;
+    sources.push({ label: "leads (stale first)", kind: "QUERY" });
+    if (rows.length) {
+      return {
+        answer:
+          "Leads waiting longest for follow-up:\n\n" +
+          rows.map((r) => `• ${r.name} — $${Number(r.est_value ?? 0).toLocaleString()} [${r.status}], waiting since ${new Date(r.created_at).toLocaleDateString()}`).join("\n") +
+          "\n\nThe 48-hour recovery sprint recommendation covers these.",
+        sources,
+        suggestions: SUGGESTED,
+      };
+    }
+    return { answer: "No open leads right now.", sources, suggestions: SUGGESTED };
   }
 
-  // Unbilled / billing
-  if (/\b(unbilled|billing|invoice|invoicing|not billed)\b/.test(q)) {
-    const jobs = await prisma.job.findMany({
-      where: { organizationId: orgId, status: "COMPLETED" },
-      include: { customer: true, invoices: true },
-      orderBy: { completedAt: "desc" },
-    });
-    const unbilled = jobs.filter((j) => j.invoices.length === 0);
-    push(`${unbilled.length} completed jobs matched`, "Job");
+  // Inventory / aging
+  if (/(inventory|aging|days on lot|vehicles|stock|unsold)/.test(q)) {
+    const rows = await sql`
+      select stock_number, year, make, model, list_price, listed_at from vehicles
+      where organization_id = ${organizationId} and status = 'AVAILABLE'
+      order by listed_at asc limit 5`;
+    sources.push({ label: "vehicles (oldest first)", kind: "QUERY" });
     return {
-      answer:
-        unbilled.length > 0
-          ? `${unbilled.length} completed job${unbilled.length === 1 ? " has" : "s have"} no invoice — ${fmtMoney(ctx.money.unbilled)} of delivered-but-unbilled work:\n\n${unbilled.slice(0, 8).map((j) => `• ${j.title} — ${j.customer.name} (${fmtMoney(j.amount)})`).join("\n")}${unbilled.length > 8 ? `\n…and ${unbilled.length - 8} more.` : ""}\n\nThere is a recommendation waiting to turn these into a billing plan.`
-          : `Every completed job on record (${jobs.length}) has been invoiced. Nothing is sitting unbilled.`,
+      answer: rows.length
+        ? "Oldest available inventory:\n\n" +
+          rows.map((r) => `• ${r.year} ${r.make} ${r.model} (${r.stock_number}) — $${Number(r.list_price ?? 0).toLocaleString()}, listed ${new Date(r.listed_at).toLocaleDateString()} (${Math.floor((Date.now() - new Date(r.listed_at).getTime()) / 864e5)}d)`).join("\n")
+        : "No available inventory recorded.",
       sources,
-      suggested: [{ label: "Review billing recommendation", href: "/understand" }],
-    };
-  }
-
-  // Customers
-  if (/\b(customer|customers|client|clients|churn|retention)\b/.test(q)) {
-    const plans = await prisma.customer.count({
-      where: { organizationId: orgId, servicePlan: { not: null } },
-    });
-    push(`${ctx.counts.customers} customers, ${plans} on service plans`, "Customer");
-    return {
-      answer: `You have ${ctx.counts.customers} customers on record; ${plans} are on a recurring service plan.\n\n${ctx.topInsights.filter((i) => i.title.toLowerCase().includes("customer")).map((i) => `• ${i.title}`).join("\n") || "No customer risks are currently flagged — the main lever is keeping plan customers on their annual visit schedule."}`,
-      sources,
-      suggested: [{ label: "Open Company Compass", href: "/compass" }],
+      suggestions: SUGGESTED,
     };
   }
 
   // Health score
-  if (/\b(health|score|compass)\b/.test(q)) {
-    push("Business Health dimensions", "Computation");
-    return {
-      answer: `Your Business Health overview is computed live from jobs, invoices, estimates, customers, tasks and documents — never invented. Overall it currently reflects ${ctx.money.unbilled > 0 ? "unbilled work and " : ""}${ctx.money.overdue > 0 ? "overdue invoices and " : ""}${ctx.counts.openEstimates > 0 ? "an active estimate pipeline" : "a quiet pipeline"}. Every dimension on the Company Compass page shows its evidence, reasoning and confidence — click any dimension to inspect exactly why it scored what it did.`,
-      sources,
-      suggested: [{ label: "Open Company Compass", href: "/compass" }],
-    };
-  }
-
-  // Policy / knowledge Q&A — searches actual knowledge items
-  if (/\b(policy|policies|refund|onboard|procedure|how do we|who is responsible|what did we decide|handbook|warranty)\b/.test(q)) {
-    const keywords = q.split(/\W+/).filter((w) => w.length > 3);
-    const items = await prisma.knowledgeItem.findMany({ where: { organizationId: orgId } });
-    const scored = items
-      .map((item) => {
-        const text = `${item.title} ${item.content} ${item.tags ?? ""}`.toLowerCase();
-        const hits = keywords.filter((k) => text.includes(k)).length;
-        return { item, hits };
-      })
-      .filter((r) => r.hits > 0)
-      .sort((a, b) => b.hits - a.hits)
-      .slice(0, 3);
-
-    if (scored.length === 0) {
-      return {
-        answer: `I searched the ${items.length} knowledge items in your workspace and found nothing matching that. I will not guess — if this policy or procedure exists, capture the document in Capture and I will index it; then I can answer from it.`,
-        sources: [{ label: `${items.length} knowledge items searched`, kind: "KnowledgeItem" }],
-        suggested: [{ label: "Open Knowledge", href: "/knowledge" }],
-      };
-    }
-    for (const s of scored) push(s.item.title, "KnowledgeItem");
-    return {
-      answer: `From your company knowledge:\n\n${scored.map((s) => `**${s.item.title}** (${s.item.status.toLowerCase()})\n${s.item.content}`).join("\n\n")}\n\nThese answers come directly from your captured documents — see sources below.`,
-      sources,
-      suggested: [{ label: "Open Knowledge", href: "/knowledge" }],
-    };
-  }
-
-  // Recommendations
-  if (/\b(recommend|suggest|should i|approve|decision)\b/.test(q)) {
-    const recs = await prisma.recommendation.findMany({
-      where: { organizationId: orgId },
-      orderBy: { createdAt: "desc" },
-      take: 6,
-    });
-    push(`${recs.length} recommendations`, "Recommendation");
+  if (/(health|score|compass)/.test(q)) {
+    sources.push({ label: "Business Health (computed)", kind: "CALC" });
     return {
       answer:
-        recs.length > 0
-          ? `Current recommendations:\n\n${recs.map((r) => `• **${r.title}** — ${r.status.toLowerCase()}${r.impact ? ` · ${r.impact}` : ""}`).join("\n")}\n\nEvery recommendation shows its evidence and reasoning before you approve anything. CUE never executes a consequential action without your decision.`
-          : "There are no recommendations right now. CUE generates them only when patterns in your actual data warrant action — capture more information and check back.",
+        "The Business Health Score is computed live from your records — weighted across revenue, pipeline, operations, inventory, customers, team, and data quality. Each dimension on the Company Compass page shows its own score, evidence, reasoning, and confidence. Open Company Compass to inspect the current breakdown, or click any dimension to see exactly why it scored that way.",
       sources,
-      suggested: [{ label: "Open Understand", href: "/understand" }],
+      suggestions: SUGGESTED,
     };
   }
 
-  // Team / people
-  if (/\b(team|employee|people|staff|who|department)\b/.test(q)) {
-    const employees = await prisma.employee.findMany({
-      where: { organizationId: orgId },
-      include: { department: true },
-    });
-    push(`${employees.length} employees`, "Employee");
+  // Policy / knowledge questions — search knowledge items
+  const kRows = await sql`
+    select title, content, category from knowledge_items
+    where organization_id = ${organizationId}
+      and (title ilike ${"%" + question.replace(/[%\s]+/g, "%") + "%"}
+        or content ilike ${"%" + question.replace(/[%\s]+/g, "%") + "%"})}
+    limit 3`;
+  if (kRows.length) {
+    sources.push({ label: "knowledge_items", kind: "SEARCH" });
     return {
-      answer: employees.length
-        ? `Your team on record (${employees.length} active):\n\n${employees.slice(0, 10).map((e) => `• ${e.name} — ${e.title}${e.department ? ` · ${e.department.name}` : ""}`).join("\n")}`
-        : "No employees are on record yet. Add your team in People so CUE can connect work, training and outcomes to specific roles.",
+      answer:
+        "From your company knowledge:\n\n" +
+        kRows.map((k) => `**${k.title}** (${k.category})\n${k.content}`).join("\n\n"),
       sources,
-      suggested: [{ label: "Open People", href: "/people" }],
+      suggestions: SUGGESTED,
     };
   }
 
-  // Fallback — reflect what CUE actually knows, no fabrication
-  push("Company snapshot", "Computation");
+  // Honest fallback
   return {
-    answer: `Here is what I can tell you from your actual data right now:\n\n• ${ctx.counts.completedJobs} completed jobs, ${ctx.counts.openJobs} in flight\n• ${fmtMoney(ctx.money.unbilled)} unbilled · ${fmtMoney(ctx.money.estimatePipeline)} estimate pipeline · ${fmtMoney(ctx.money.overdue)} overdue invoices\n• ${ctx.counts.documents} documents and ${ctx.counts.knowledgeItems} knowledge items captured\n• ${ctx.pendingDecisions.length} recommendations awaiting your decision\n\nAsk me about sales, billing, customers, your team, health, company policies — or what to focus on today. If I do not know something, I will say so rather than make it up.`,
+    answer:
+      "I don't have information in your records that answers that. I can answer from actual data on: focus/priorities, unbilled service work, overdue invoices, lead follow-up, inventory aging, and the health score. Ask one of those, or capture the relevant document in Capture first.",
     sources,
+    suggestions: SUGGESTED,
   };
 }

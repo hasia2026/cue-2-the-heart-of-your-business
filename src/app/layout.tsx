@@ -1,22 +1,16 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { getLocale } from "@/lib/locale";
-import { isRtl } from "@/lib/i18n";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "CUE — The Heart of Your Business",
   description:
-    "CUE turns scattered business information into understanding, recommendations, and action. Real-Time Intelligence. Real Business Impact.",
+    "CUE is an AI Business Operating System: capture what your business knows, understand what is happening, improve how it operates, execute decisions, and expand.",
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang={locale} dir={isRtl(locale) ? "rtl" : "ltr"}>
-      <body className={inter.className}>{children}</body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 }

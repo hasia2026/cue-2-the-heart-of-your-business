@@ -1,28 +1,23 @@
-import { prisma } from "./prisma";
+import { sql } from "./db";
 
-export type AuditInput = {
+/** Append to the organization's audit trail. Never throws into caller. */
+export async function logAudit(opts: {
   organizationId: string;
   actorType?: "USER" | "AI" | "SYSTEM";
-  actorId?: string;
+  actorId?: string | null;
   action: string;
   targetType?: string;
   targetId?: string;
   detail?: string;
-  metadata?: Record<string, unknown>;
-};
-
-/** Central audit log. Every consequential action must call this. */
-export async function logAudit(input: AuditInput) {
-  await prisma.auditEvent.create({
-    data: {
-      organizationId: input.organizationId,
-      actorType: input.actorType ?? "USER",
-      actorId: input.actorId,
-      action: input.action,
-      targetType: input.targetType,
-      targetId: input.targetId,
-      detail: input.detail,
-      metadata: input.metadata ? JSON.stringify(input.metadata) : undefined,
-    },
-  });
+  metadata?: unknown;
+}) {
+  try {
+    await sql`
+      insert into audit_events (organization_id, actor_type, actor_id, action, target_type, target_id, detail, metadata)
+      values (${opts.organizationId}, ${opts.actorType ?? "USER"}, ${opts.actorId ?? null}, ${opts.action},
+        ${opts.targetType ?? null}, ${opts.targetId ?? null}, ${opts.detail ?? null},
+        ${opts.metadata ? JSON.stringify(opts.metadata) : null})`;
+  } catch (e) {
+    console.error("audit write failed", e);
+  }
 }

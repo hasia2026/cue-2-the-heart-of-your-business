@@ -1,71 +1,76 @@
-import { requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { countUnreadThreads } from "@/lib/messages";
-import { getLocale } from "@/lib/locale";
-import { isRtl } from "@/lib/i18n";
-import NavClient from "./NavClient";
+import { getSession } from "@/lib/auth";
+import { getT } from "@/lib/locale";
+import NavClient, { LogoMark } from "./NavClient";
 import LanguageSwitcher from "./LanguageSwitcher";
+import CueAI from "./CueAI";
+import { signOut } from "@/app/signin/actions";
 
-export default async function AppShell({
-  children,
-  crumb,
-}: {
-  children: React.ReactNode;
-  crumb?: string;
-}) {
-  const session = await requireSession();
-  const locale = await getLocale();
-  const rtl = isRtl(locale);
+export default async function AppShell({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+  const { t } = await getT();
 
-  const [pendingRecs, openTasks, unreadMsgs, newSignals, leadsWaiting] = await Promise.all([
-    prisma.recommendation.count({
-      where: { organizationId: session.organizationId, status: "PENDING" },
-    }),
-    prisma.task.count({
-      where: {
-        organizationId: session.organizationId,
-        status: { in: ["OPEN", "IN_PROGRESS"] },
-      },
-    }),
-    countUnreadThreads(session.organizationId),
-    prisma.marketSignal.count({ where: { organizationId: session.organizationId, status: "NEW" } }),
-    prisma.lead.count({
-      where: { organizationId: session.organizationId, status: "NEW", lastContactAt: null },
-    }),
-  ]);
+  const groups = [
+    {
+      title: "Command",
+      items: [
+        { href: "/dashboard", label: t("nav.dashboard"), icon: "◎" },
+        { href: "/compass", label: t("nav.compass"), icon: "✧" },
+        { href: "/signals", label: t("nav.signals"), icon: "◉" },
+      ],
+    },
+    {
+      title: "Knowledge loop",
+      items: [
+        { href: "/capture", label: t("nav.capture"), icon: "⤓" },
+        { href: "/understand", label: t("nav.understand"), icon: "◈" },
+        { href: "/knowledge", label: t("nav.knowledge"), icon: "❑" },
+        { href: "/enhance", label: t("nav.enhance"), icon: "✦" },
+      ],
+    },
+    {
+      title: "Operate",
+      items: [
+        { href: "/pipeline", label: t("nav.pipeline"), icon: "⇉" },
+        { href: "/execute", label: t("nav.execute"), icon: "▶" },
+        { href: "/report", label: "Pilot Report", icon: "▤" },
+        { href: "/people", label: t("nav.people"), icon: "☰" },
+        { href: "/expand", label: t("nav.expand"), icon: "↑" },
+      ],
+    },
+    {
+      title: "System",
+      items: [
+        { href: "/lab", label: t("nav.lab"), icon: "⚗" },
+        { href: "/ecosystem", label: t("nav.ecosystem"), icon: "⊂" },
+        { href: "/settings", label: t("nav.settings"), icon: "⚙" },
+      ],
+    },
+  ];
 
   return (
-    <div className="min-h-screen flex">
-      <NavClient
-        orgName={session.organizationName}
-        userName={session.user.name}
-        pendingRecs={pendingRecs}
-        openTasks={openTasks}
-        unreadMsgs={unreadMsgs}
-        newSignals={newSignals}
-        leadsWaiting={leadsWaiting}
-        locale={locale}
-      />
-      <div className={`flex-1 min-w-0 flex flex-col lg:pl-64 ${rtl ? "rtl-main" : ""}`}>
-        <header className="sticky top-0 z-30 bg-ink-950/70 backdrop-blur-md border-b border-navy-100">
-          <div className="flex items-center gap-3 px-4 sm:px-8 h-14">
-            <div className="text-sm text-navy-400">
-              CUE <span className="mx-1.5 text-navy-300">/</span>
-              <span className="text-navy-800 font-medium">
-                {crumb ?? "Dashboard"}
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <LanguageSwitcher current={locale} compact />
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent-blue to-accent-purple text-white text-xs font-semibold flex items-center justify-center">
-                {session.user.name.split(" ").map((p) => p[0]).join("")}
-              </div>
-            </div>
+    <div className="flex min-h-screen" dir="ltr">
+      <NavClient groups={groups} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 hidden items-center gap-3 border-b border-white/[0.07] bg-ink-950/70 px-6 py-3 backdrop-blur lg:flex">
+          <div className="text-sm text-navy-300">{t("app.tagline")}</div>
+          <div className="ms-auto flex items-center gap-2">
+            <LanguageSwitcher />
+            <CueAI />
+            {session ? (
+              <form action={signOut}>
+                <button className="btn-ghost !px-3 !py-1.5 text-xs">{t("app.signOut")}</button>
+              </form>
+            ) : (
+              <a href="/signin" className="btn-primary !px-3 !py-1.5 text-xs">Sign in</a>
+            )}
           </div>
         </header>
-        <main className="flex-1 px-4 sm:px-8 py-6 max-w-7xl w-full mx-auto">
-          {children}
-        </main>
+        <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+        <footer className="border-t border-white/[0.06] px-6 py-4 text-xs text-navy-300/60">
+          <div className="flex items-center gap-2">
+            <LogoMark className="h-4 w-4" /> CUE — Built by HASI Technologies
+          </div>
+        </footer>
       </div>
     </div>
   );

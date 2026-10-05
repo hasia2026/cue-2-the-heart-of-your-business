@@ -1,218 +1,185 @@
-import { prisma } from "./prisma";
-import type { EvidenceRef } from "./intelligence";
+// Business Health — deterministic, explainable, computed from actual records.
+// Not scientific: every dimension returns score → evidence → reasoning → confidence.
+import { sql } from "./db";
 
-export type HealthDimension = {
+export type Dimension = {
   key: string;
   label: string;
   score: number; // 0-100
-  confidence: "HIGH" | "MEDIUM" | "LOW";
-  basis: string; // what data the score is computed from
+  evidence: string;
   reasoning: string;
-  evidenceCount: number;
-  recommendation?: string;
+  confidence: number; // 0-1
 };
 
-export type HealthReport = {
-  overall: number | null;
-  confidence: "HIGH" | "MEDIUM" | "LOW";
-  dimensions: HealthDimension[];
-  disclaimer: string;
+export type Health = {
+  overall: number;
+  grade: "HEALTHY" | "WATCH" | "AT_RISK";
+  dataQuality: number; // % of dimensions with enough data to score
+  dimensions: Dimension[];
+  computedAt: string;
 };
 
-function clamp(n: number): number {
-  return Math.max(0, Math.min(100, Math.round(n)));
+type OrgCounts = {
+  customers: number;
+  vehicles: number;
+  deals: number;
+  serviceOrders: number;
+  invoices: number;
+  leads: number;
+  employees: number;
+  documents: number;
+  knowledgeItems: number;
+};
+
+async function counts(organizationId: string): Promise<OrgCounts> {
+  const [r] = await sql`
+    select
+      (select count(*) from customers where organization_id = ${organizationId})::int as customers,
+      (select count(*) from vehicles where organization_id = ${organizationId})::int as vehicles,
+      (select count(*) from deals where organization_id = ${organizationId})::int as deals,
+      (select count(*) from service_orders where organization_id = ${organizationId})::int as "serviceOrders",
+      (select count(*) from invoices where organization_id = ${organizationId})::int as invoices,
+      (select count(*) from leads where organization_id = ${organizationId})::int as leads,
+      (select count(*) from employees where organization_id = ${organizationId})::int as employees,
+      (select count(*) from documents where organization_id = ${organizationId})::int as documents,
+      (select count(*) from knowledge_items where organization_id = ${organizationId})::int as "knowledgeItems"`;
+  return r as unknown as OrgCounts;
 }
 
-function confidenceFor(count: number): "HIGH" | "MEDIUM" | "LOW" {
-  if (count >= 20) return "HIGH";
-  if (count >= 5) return "MEDIUM";
-  return "LOW";
-}
+export async function computeHealth(organizationId: string): Promise<Health> {
+  const c = await counts(organizationId);
+  const dims: Dimension[] = [];
+  const push = (key: string, label: string, score: number | null, evidence: string, reasoning: string, confidence: number) => {
+    dims.push({
+      key,
+      label,
+      score: score == null ? 50 : Math.max(0, Math.min(100, Math.round(score))),
+      evidence,
+      reasoning,
+      confidence,
+    });
+  };
 
-export async function computeHealth(orgId: string): Promise<HealthReport> {
-  const [jobs, invoices, estimates, customers, employees, tasks, payments, documents, recs, comms] =
-    await Promise.all([
-      prisma.job.findMany({ where: { organizationId: orgId } }),
-      prisma.invoice.findMany({ where: { organizationId: orgId } }),
-      prisma.estimate.findMany({ where: { organizationId: orgId } }),
-      prisma.customer.findMany({ where: { organizationId: orgId } }),
-      prisma.employee.findMany({ where: { organizationId: orgId } }),
-      prisma.task.findMany({ where: { organizationId: orgId } }),
-      prisma.payment.findMany({ where: { organizationId: orgId } }),
-      prisma.document.findMany({ where: { organizationId: orgId } }),
-      prisma.recommendation.findMany({ where: { organizationId: orgId } }),
-      prisma.communication.findMany({ where: { organizationId: orgId } }),
-    ]);
+  // Revenue: invoice collection health
+  if (c.invoices > 0) {
+    const [inv] = await sql`
+      select
+        count(*)::int as total,
+        sum(case when status = 'PAID' then 1 else 0 end)::int as paid,
+        sum(case when status = 'OVERDUE' then 1 else 0 end)::int as overdue,
+        coalesce(sum(case when status = 'PAID' then amount else 0 end), 0)::float as collected
+      from invoices where organization_id = ${organizationId}`;
+    const rate = inv.total ? inv.paid / inv.total : 0;
+    const score = 100 * rate - (inv.overdue ?? 0) * 5;
+    push("revenue", "Revenue", score,
+      `${inv.paid}/${inv.total} invoices paid; ${inv.overdue ?? 0} overdue; $${Math.round(inv.collected)} collected.`,
+      "Collection rate drives the score; each overdue invoice subtracts.", 0.9);
+  } else {
+    push("revenue", "Revenue", null, "No invoices recorded yet.", "Score neutral until billing data exists.", 0.2);
+  }
 
-  const dimensions: HealthDimension[] = [];
+  // Sales pipeline: deal velocity + lead freshness
+  if (c.deals > 0 || c.leads > 0) {
+    const [d] = await sql`
+      select
+        sum(case when status = 'WON' then 1 else 0 end)::int as won,
+        sum(case when status = 'PENDING_FINANCE' then 1 else 0 end)::int as pending,
+        sum(case when status in ('NEGOTIATING','PENDING_FINANCE') then amount else 0 end)::float as activeValue,
+        (select count(*) from leads where organization_id = ${organizationId} and status = 'NEW' and created_at < now() - interval '7 days')::int as staleLeads
+      from deals where organization_id = ${organizationId}`;
+    const stale = d.staleLeads ?? 0;
+    const score = 55 + (d.won ?? 0) * 6 - stale * 4 - (d.pending ?? 0) * 2 + Math.min(15, (d.activeValue ?? 0) / 20000);
+    push("pipeline", "Sales pipeline", score,
+      `${d.won ?? 0} won · ${d.pending ?? 0} in finance · $${Math.round(d.activeValue ?? 0)} active · ${stale} stale leads (>7d untouched).`,
+      "Won deals raise it; untouched leads and stuck finance deals lower it.", 0.75);
+  } else {
+    push("pipeline", "Sales pipeline", null, "No deals or leads recorded yet.", "Neutral until sales data exists.", 0.2);
+  }
 
-  // Revenue — share of completed work that has been billed and paid
-  const completed = jobs.filter((j) => j.status === "COMPLETED");
-  const billedJobIds = new Set(invoices.map((i) => i.jobId));
-  const billed = completed.filter((j) => billedJobIds.has(j.id)).length;
-  const paidCount = invoices.filter((i) => i.status === "PAID").length;
-  const revenueBase = completed.length + paidCount;
-  dimensions.push({
-    key: "revenue",
-    label: "Revenue",
-    score: revenueBase === 0 ? 0 : clamp((billed + paidCount) / revenueBase * 100),
-    confidence: confidenceFor(revenueBase),
-    basis: `${completed.length} completed jobs, ${invoices.length} invoices, ${paidCount} paid`,
-    reasoning:
-      billed === completed.length
-        ? "All completed work has been invoiced."
-        : `${completed.length - billed} completed job(s) are still unbilled, which lowers this score.`,
-    evidenceCount: revenueBase,
-    recommendation:
-      billed === completed.length ? undefined : "Invoice all completed jobs to raise this dimension.",
-  });
+  // Operations: service billing discipline (dealership fixed-ops proxy)
+  if (c.serviceOrders > 0) {
+    const [s] = await sql`
+      select
+        count(*)::int as total,
+        sum(case when status = 'COMPLETED' and invoiced_at is null then 1 else 0 end)::int as unbilled,
+        coalesce(sum(case when status = 'COMPLETED' and invoiced_at is null then amount else 0 end), 0)::float as unbilledValue,
+        avg(case when completed_at is not null and invoiced_at is not null then extract(epoch from (invoiced_at - completed_at))/3600 end)::float as avgBillHours
+      from service_orders where organization_id = ${organizationId}`;
+    const unbilled = s.unbilled ?? 0;
+    const billPenalty = s.avgBillHours != null ? Math.min(30, s.avgBillHours) : 10;
+    const score = 90 - unbilled * 8 - billPenalty;
+    push("operations", "Operations", score,
+      `${s.total} service orders · ${unbilled} completed-but-unbilled ($${Math.round(s.unbilledValue ?? 0)}) · avg billing lag ${s.avgBillHours ? s.avgBillHours.toFixed(1) + "h" : "n/a"}.`,
+      "Unbilled completed work and slow billing directly reduce the score.", 0.9);
+  } else {
+    push("operations", "Operations", null, "No service orders recorded yet.", "Neutral until fixed-ops data exists.", 0.2);
+  }
 
-  // Sales pipeline — open estimates and how stale they are
-  const open = estimates.filter((e) => e.status === "SENT" || e.status === "VIEWED");
-  const stale = open.filter(
-    (e) =>
-      !e.lastFollowUpAt ||
-      Date.now() - new Date(e.lastFollowUpAt).getTime() > 14 * 86_400_000
-  );
-  const staleShare = open.length === 0 ? 0 : stale.length / open.length;
-  dimensions.push({
-    key: "pipeline",
-    label: "Sales pipeline",
-    score: clamp(100 - staleShare * 100),
-    confidence: confidenceFor(estimates.length),
-    basis: `${estimates.length} estimates total, ${open.length} open, ${stale.length} without recent follow-up`,
-    reasoning:
-      stale.length === 0
-        ? "Open estimates are being actively followed up."
-        : `${stale.length} of ${open.length} open estimates have had no follow-up in 14+ days.`,
-    evidenceCount: estimates.length,
-    recommendation: stale.length > 0 ? "Work the estimate follow-up plan in Execute." : undefined,
-  });
+  // Inventory health (dealership): aging stock
+  if (c.vehicles > 0) {
+    const [v] = await sql`
+      select count(*)::int as available,
+        sum(case when listed_at < now() - interval '60 days' then 1 else 0 end)::int as aging,
+        coalesce(sum(case when listed_at < now() - interval '60 days' then list_price else 0 end), 0)::float as agingValue
+      from vehicles where organization_id = ${organizationId} and status = 'AVAILABLE'`;
+    const aging = v.aging ?? 0;
+    const ratio = v.available ? aging / v.available : 0;
+    const score = 90 - ratio * 60 - aging * 2;
+    push("inventory", "Inventory", score,
+      `${v.available} available units · ${aging} past 60 days on lot ($${Math.round(v.agingValue ?? 0)}).`,
+      "Aging stock ties up floorplan capital; ratio drives the score.", 0.8);
+  } else {
+    push("inventory", "Inventory", null, "No vehicles recorded yet.", "Neutral until inventory data exists.", 0.2);
+  }
 
-  // Cash flow — payments collected vs invoiced
-  const invoicedTotal = invoices
-    .filter((i) => i.status !== "VOID" && i.status !== "DRAFT")
-    .reduce((s, i) => s + i.amount, 0);
-  const paidTotal = payments.reduce((s, p) => s + p.amount, 0);
-  const collectionRate = invoicedTotal === 0 ? 0 : paidTotal / invoicedTotal;
-  dimensions.push({
-    key: "cashflow",
-    label: "Cash flow",
-    score: clamp(collectionRate * 100),
-    confidence: confidenceFor(invoices.length),
-    basis: `$${Math.round(invoicedTotal).toLocaleString()} invoiced, $${Math.round(paidTotal).toLocaleString()} collected`,
-    reasoning:
-      collectionRate >= 0.8
-        ? "Most invoiced value has been collected."
-        : `Only ${Math.round(collectionRate * 100)}% of invoiced value has been collected so far.`,
-    evidenceCount: invoices.length + payments.length,
-    recommendation: collectionRate < 0.8 ? "Chase overdue invoices to improve collections." : undefined,
-  });
+  // Customers: base growth + overdue receivables
+  if (c.customers > 0) {
+    const [cu] = await sql`
+      select count(*)::int as total,
+        (select count(*) from communications where organization_id = ${organizationId})::int as touches,
+        (select count(*) from invoices where organization_id = ${organizationId} and status = 'OVERDUE')::int as overdueInvoices`;
+    const score = 60 + Math.min(20, cu.touches) - (cu.overdueInvoices ?? 0) * 4;
+    push("customers", "Customers", score,
+      `${cu.total} customers · ${cu.touches} logged interactions · ${cu.overdueInvoices ?? 0} overdue invoices.`,
+      "Engagement history raises the score; unpaid invoices lower it.", 0.7);
+  } else {
+    push("customers", "Customers", null, "No customers recorded yet.", "Neutral until customer data exists.", 0.2);
+  }
 
-  // Customers — repeat rate
-  const customersWithJobs = new Set(jobs.map((j) => j.customerId));
-  const repeatRate =
-    customers.length === 0
-      ? 0
-      : customersWithJobs.size / customers.length;
-  dimensions.push({
-    key: "customers",
-    label: "Customers",
-    score: clamp(repeatRate * 100),
-    confidence: confidenceFor(customers.length),
-    basis: `${customers.length} customers, ${customersWithJobs.size} with recorded jobs, ${comms.length} communications`,
-    reasoning:
-      "Score reflects how much of the customer book has real engagement records. Customers with no activity history are unknown quantities.",
-    evidenceCount: customers.length + comms.length,
-  });
+  // Team: structure and coverage
+  if (c.employees > 0) {
+    const [e] = await sql`
+      select count(*)::int as total,
+        (select count(distinct department_id) from employees where organization_id = ${organizationId} and department_id is not null)::int as depts,
+        (select count(*) from training_assignments ta join employees e2 on e2.id = ta.employee_id where e2.organization_id = ${organizationId})::int as assignments`;
+    const score = 55 + Math.min(25, e.depts * 5) + Math.min(20, e.assignments * 3);
+    push("team", "Team", score,
+      `${e.total} employees across ${e.depts} departments · ${e.assignments} training assignments.`,
+      "Departmental structure and active training lift the score.", 0.65);
+  } else {
+    push("team", "Team", null, "No employees recorded yet.", "Neutral until people data exists.", 0.2);
+  }
 
-  // Operations — task throughput
-  const openTasks = tasks.filter((t) => t.status === "OPEN" || t.status === "IN_PROGRESS");
-  const doneTasks = tasks.filter((t) => t.status === "DONE");
-  const overdueTasks = openTasks.filter((t) => t.dueAt && new Date(t.dueAt).getTime() < Date.now());
-  const opScore = tasks.length === 0 ? 0 : clamp((doneTasks.length / tasks.length) * 100 - overdueTasks.length * 10);
-  dimensions.push({
-    key: "operations",
-    label: "Operations",
-    score: opScore,
-    confidence: confidenceFor(tasks.length),
-    basis: `${openTasks.length} open tasks, ${doneTasks.length} completed, ${overdueTasks.length} overdue`,
-    reasoning:
-      overdueTasks.length > 0
-        ? `${overdueTasks.length} overdue task(s) are dragging execution down.`
-        : "Tasks are being completed without a large backlog.",
-    evidenceCount: tasks.length,
-    recommendation: overdueTasks.length > 0 ? "Clear overdue tasks in Execute." : undefined,
-  });
+  // Knowledge / data quality: captured docs + knowledge items
+  {
+    const score = Math.min(100, c.documents * 8 + c.knowledgeItems * 6);
+    push("data", "Data & knowledge", score,
+      `${c.documents} documents captured · ${c.knowledgeItems} knowledge items.`,
+      "Captured, classified information makes every other score more trustworthy.", c.knowledgeItems > 5 ? 0.8 : 0.4);
+  }
 
-  // Team
-  const active = employees.filter((e) => e.status === "ACTIVE");
-  const withSkills = active.filter((e) => (e.skills ?? "").length > 0);
-  const teamScore = active.length === 0 ? 0 : clamp((withSkills.length / active.length) * 100);
-  dimensions.push({
-    key: "team",
-    label: "Team",
-    score: teamScore,
-    confidence: confidenceFor(employees.length),
-    basis: `${active.length} active employees, ${withSkills.length} with recorded skills`,
-    reasoning:
-      "Based on how much CUE knows about your team — skills, responsibilities and departments on record.",
-    evidenceCount: employees.length,
-    recommendation:
-      teamScore < 70 ? "Fill in employee skills and responsibilities in People to improve visibility." : undefined,
-  });
-
-  // Data quality — how much CUE actually knows
-  const knowledgeCount = await prisma.knowledgeItem.count({ where: { organizationId: orgId } });
-  const dataPoints = documents.length + knowledgeCount + comms.length;
-  const dataScore = clamp(Math.min(100, dataPoints * 4));
-  dimensions.push({
-    key: "data",
-    label: "Data quality",
-    score: dataScore,
-    confidence: dataScore > 50 ? "HIGH" : "MEDIUM",
-    basis: `${documents.length} documents, ${knowledgeCount} knowledge items, ${comms.length} communications`,
-    reasoning:
-      "This score measures how much information CUE has to work with — more captured information makes every other score more reliable.",
-    evidenceCount: dataPoints,
-    recommendation: dataScore < 60 ? "Capture more documents and records to sharpen CUE's intelligence." : undefined,
-  });
-
-  // Strategic progress — goals set vs tracked, decisions made
-  const profile = await prisma.businessProfile.findUnique({
-    where: { organizationId: orgId },
-    include: { goals: true },
-  });
-  const goalCount = profile?.goals.length ?? 0;
-  const decided = recs.filter((r) => r.status !== "PENDING").length;
-  const strategyScore = clamp(Math.min(100, goalCount * 20 + decided * 10));
-  dimensions.push({
-    key: "strategy",
-    label: "Strategic progress",
-    score: strategyScore,
-    confidence: goalCount > 0 ? "MEDIUM" : "LOW",
-    basis: `${goalCount} goals defined, ${decided} recommendation decisions made`,
-    reasoning:
-      "Reflects whether the business is actively setting goals and acting on intelligence rather than letting recommendations sit.",
-    evidenceCount: goalCount + decided,
-    recommendation: goalCount === 0 ? "Define goals in Company Compass." : undefined,
-  });
-
-  const scored = dimensions.filter((d) => d.confidence !== "LOW");
-  const allLow = scored.length === 0;
-  const overall = allLow
-    ? null
-    : Math.round(scored.reduce((s, d) => s + d.score, 0) / scored.length);
-
-  const lowConfidenceShare = dimensions.filter((d) => d.confidence === "LOW").length / dimensions.length;
-  const confidence: "HIGH" | "MEDIUM" | "LOW" =
-    lowConfidenceShare > 0.5 ? "LOW" : lowConfidenceShare > 0.2 ? "MEDIUM" : "HIGH";
+  const scored = dims.filter((d) => d.confidence >= 0.5);
+  const dataQuality = dims.length ? scored.length / dims.length : 0;
+  const overall = scored.length
+    ? Math.round(scored.reduce((a, d) => a + d.score * d.confidence, 0) / scored.reduce((a, d) => a + d.confidence, 0))
+    : 50;
+  const grade = overall >= 75 ? "HEALTHY" : overall >= 55 ? "WATCH" : "AT_RISK";
 
   return {
     overall,
-    confidence,
-    dimensions,
-    disclaimer:
-      "This score is CUE's transparent reading of the data currently in your workspace. It is a decision aid, not an objective scientific rating — every dimension shows exactly what it is computed from.",
+    grade,
+    dataQuality: Math.round(dataQuality * 100) / 100,
+    dimensions: dims.sort((a, b) => a.score - b.score),
+    computedAt: new Date().toISOString(),
   };
 }

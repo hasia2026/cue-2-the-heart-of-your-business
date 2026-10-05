@@ -1,0 +1,354 @@
+
+> cue@0.1.0 dev
+> next dev -p 3210
+
+   ▲ Next.js 15.5.4
+   - Local:        http://localhost:3210
+   - Network:      http://192.168.1.33:3210
+   - Environments: .env
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 15.5s
+ ○ Compiling /api/health ...
+ ✓ Compiled /api/health in 842ms (303 modules)
+ GET /api/health 200 in 2829ms
+ GET /api/health 200 in 1227ms
+ ○ Compiling /api/ingest/signals ...
+ ✓ Compiled /api/ingest/signals in 625ms (309 modules)
+ POST /api/ingest/signals 200 in 3094ms
+ POST /api/ingest/signals 200 in 2335ms
+ POST /api/ingest/signals 200 in 2400ms
+ POST /api/ingest/signals 200 in 2401ms
+ POST /api/ingest/signals 200 in 2417ms
+ POST /api/ingest/signals 200 in 2551ms
+ POST /api/ingest/signals 200 in 2362ms
+ POST /api/ingest/signals 200 in 2444ms
+ POST /api/ingest/signals 200 in 2373ms
+ POST /api/ingest/signals 200 in 2379ms
+ POST /api/ingest/signals 200 in 2448ms
+ POST /api/ingest/signals 200 in 2459ms
+ POST /api/ingest/signals 200 in 2403ms
+ POST /api/ingest/signals 200 in 2429ms
+ POST /api/ingest/signals 200 in 2409ms
+ POST /api/ingest/signals 200 in 2378ms
+ POST /api/ingest/signals 200 in 2355ms
+ POST /api/ingest/signals 200 in 2400ms
+ POST /api/ingest/signals 200 in 2485ms
+ POST /api/ingest/signals 200 in 2375ms
+ POST /api/ingest/signals 200 in 2408ms
+ POST /api/ingest/signals 200 in 2362ms
+ POST /api/ingest/signals 200 in 2382ms
+ POST /api/ingest/signals 200 in 2398ms
+ POST /api/ingest/signals 200 in 2520ms
+ POST /api/ingest/signals 200 in 2397ms
+ POST /api/ingest/signals 200 in 2357ms
+ POST /api/ingest/signals 200 in 2415ms
+ POST /api/ingest/signals 200 in 2398ms
+ POST /api/ingest/signals 200 in 2362ms
+ POST /api/ingest/signals 200 in 2413ms
+ POST /api/ingest/signals 200 in 2489ms
+ POST /api/ingest/signals 200 in 2477ms
+ POST /api/ingest/signals 200 in 2370ms
+ POST /api/ingest/signals 200 in 2357ms
+ POST /api/ingest/signals 200 in 2396ms
+ POST /api/ingest/signals 200 in 2429ms
+ POST /api/ingest/signals 200 in 2506ms
+ POST /api/ingest/signals 200 in 2378ms
+ POST /api/ingest/signals 200 in 2382ms
+ POST /api/ingest/signals 200 in 2387ms
+ POST /api/ingest/signals 200 in 2470ms
+ POST /api/ingest/signals 200 in 2422ms
+ POST /api/ingest/signals 200 in 2506ms
+ POST /api/ingest/signals 200 in 2393ms
+ POST /api/ingest/signals 200 in 2430ms
+ POST /api/ingest/signals 200 in 2399ms
+ POST /api/ingest/signals 200 in 2400ms
+ POST /api/ingest/signals 200 in 2368ms
+ POST /api/ingest/signals 200 in 2350ms
+ POST /api/ingest/signals 200 in 2507ms
+ POST /api/ingest/signals 200 in 2384ms
+ POST /api/ingest/signals 200 in 2392ms
+ POST /api/ingest/signals 200 in 2394ms
+ POST /api/ingest/signals 200 in 2401ms
+ POST /api/ingest/signals 200 in 2413ms
+ POST /api/ingest/signals 200 in 2489ms
+ POST /api/ingest/signals 200 in 2410ms
+ POST /api/ingest/signals 200 in 2448ms
+ POST /api/ingest/signals 200 in 2403ms
+ POST /api/ingest/signals 200 in 2427ms
+ POST /api/ingest/signals 200 in 2415ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1295ms (769 modules)
+ ✓ Compiled in 16.5s (252 modules)
+ GET /dashboard 200 in 20841ms
+ ○ Compiling /compass ...
+ ✓ Compiled /compass in 680ms (789 modules)
+ GET /compass 200 in 6136ms
+ ✓ Compiled /capture in 407ms (799 modules)
+ GET /capture 200 in 4409ms
+ ✓ Compiled /people in 311ms (811 modules)
+ GET /people 200 in 4750ms
+ ✓ Compiled /pipeline in 436ms (824 modules)
+ GET /pipeline 200 in 4471ms
+ ✓ Compiled /pipeline/lead/[id] in 448ms (832 modules)
+ GET /pipeline/lead/cmun2rxcz002htuqo06k7zbyh 200 in 5371ms
+ GET /pipeline/lead/cmun2rz4v0041tuqosu805yq4 200 in 4054ms
+ ✓ Compiled /pipeline/customer/[id] in 485ms (840 modules)
+ GET /pipeline/customer/cmun2rvca000stuqo5cleu6zg 200 in 6186ms
+ ○ Compiling /expand ...
+ ✓ Compiled /expand in 1058ms (844 modules)
+ GET /expand 200 in 5926ms
+ ○ Compiling /messages ...
+ ✓ Compiled /messages in 598ms (856 modules)
+ GET /messages 200 in 4913ms
+ GET /dashboard 200 in 7302ms
+ ✓ Compiled /api/ingest/signals in 323ms (610 modules)
+ POST /api/ingest/signals 401 in 491ms
+ POST /api/ingest/signals 401 in 473ms
+ POST /api/ingest/signals 200 in 2864ms
+ POST /api/ingest/signals 200 in 1869ms
+ ○ Compiling /api/ingest/google ...
+ ✓ Compiled /api/ingest/google in 638ms (857 modules)
+ POST /api/ingest/google 200 in 4964ms
+ ○ Compiling /signals ...
+ ✓ Compiled /signals in 536ms (861 modules)
+ GET /signals 200 in 4755ms
+ POST /api/ingest/signals 200 in 3004ms
+ POST /api/ingest/signals 200 in 2333ms
+ POST /api/ingest/signals 200 in 2301ms
+ POST /api/ingest/signals 200 in 2349ms
+ POST /api/ingest/signals 200 in 2318ms
+ POST /api/ingest/signals 200 in 2317ms
+ POST /api/ingest/signals 200 in 2416ms
+ POST /api/ingest/signals 200 in 2339ms
+ POST /api/ingest/signals 200 in 2450ms
+ POST /api/ingest/signals 200 in 2348ms
+ POST /api/ingest/signals 200 in 2350ms
+ POST /api/ingest/signals 200 in 2300ms
+ POST /api/ingest/signals 200 in 2348ms
+ POST /api/ingest/signals 200 in 2323ms
+ POST /api/ingest/signals 200 in 2399ms
+ POST /api/ingest/signals 200 in 2333ms
+ POST /api/ingest/signals 200 in 2319ms
+ POST /api/ingest/signals 200 in 2480ms
+ POST /api/ingest/signals 200 in 2492ms
+ POST /api/ingest/signals 200 in 2328ms
+ POST /api/ingest/signals 200 in 2342ms
+ POST /api/ingest/signals 200 in 2422ms
+ POST /api/ingest/signals 200 in 2364ms
+ POST /api/ingest/signals 200 in 2335ms
+ POST /api/ingest/signals 200 in 2343ms
+ POST /api/ingest/signals 200 in 2351ms
+ POST /api/ingest/signals 200 in 2378ms
+ POST /api/ingest/signals 200 in 2416ms
+ POST /api/ingest/signals 200 in 2328ms
+ POST /api/ingest/signals 200 in 2333ms
+ POST /api/ingest/signals 200 in 2325ms
+ POST /api/ingest/signals 200 in 2319ms
+ POST /api/ingest/signals 200 in 2300ms
+ POST /api/ingest/signals 200 in 2359ms
+ POST /api/ingest/signals 200 in 2408ms
+ POST /api/ingest/signals 200 in 2343ms
+ POST /api/ingest/signals 200 in 2302ms
+ POST /api/ingest/signals 200 in 2317ms
+ POST /api/ingest/signals 200 in 2469ms
+ POST /api/ingest/signals 200 in 2312ms
+ POST /api/ingest/signals 200 in 2469ms
+ POST /api/ingest/signals 200 in 2402ms
+ POST /api/ingest/signals 200 in 2327ms
+ POST /api/ingest/signals 200 in 2378ms
+ POST /api/ingest/signals 200 in 2368ms
+ POST /api/ingest/signals 200 in 2321ms
+ POST /api/ingest/signals 200 in 2407ms
+ POST /api/ingest/signals 200 in 2295ms
+ POST /api/ingest/signals 200 in 2317ms
+ POST /api/ingest/signals 200 in 2314ms
+ POST /api/ingest/signals 200 in 2309ms
+ POST /api/ingest/signals 200 in 2345ms
+ POST /api/ingest/signals 200 in 2320ms
+ POST /api/ingest/signals 200 in 2417ms
+ POST /api/ingest/signals 200 in 2309ms
+ POST /api/ingest/signals 200 in 2341ms
+ POST /api/ingest/signals 200 in 2348ms
+ POST /api/ingest/signals 200 in 2342ms
+ POST /api/ingest/signals 200 in 2466ms
+ POST /api/ingest/signals 200 in 2437ms
+ POST /api/ingest/signals 200 in 2452ms
+ POST /api/ingest/signals 200 in 2444ms
+ POST /api/ingest/signals 200 in 2399ms
+ POST /api/ingest/signals 200 in 2423ms
+ POST /api/ingest/signals 200 in 2422ms
+ POST /api/ingest/signals 200 in 2363ms
+ POST /api/ingest/signals 200 in 2458ms
+ POST /api/ingest/signals 200 in 2350ms
+ POST /api/ingest/signals 200 in 2403ms
+ POST /api/ingest/signals 200 in 2394ms
+ POST /api/ingest/signals 200 in 2380ms
+ POST /api/ingest/signals 200 in 2421ms
+ POST /api/ingest/signals 200 in 2513ms
+ ✓ Compiled /api/health in 217ms (108 modules)
+ GET /api/health 200 in 1660ms
+ ✓ Compiled /api/ingest/signals in 103ms (114 modules)
+ POST /api/ingest/signals 429 in 1199ms
+ POST /api/ingest/signals 429 in 1199ms
+ POST /api/ingest/signals 429 in 1199ms
+ POST /api/ingest/signals 429 in 1199ms
+ POST /api/ingest/signals 429 in 1273ms
+ POST /api/ingest/signals 200 in 19427ms
+ POST /api/ingest/signals 200 in 19642ms
+ POST /api/ingest/signals 200 in 19681ms
+ POST /api/ingest/signals 200 in 19688ms
+ POST /api/ingest/signals 200 in 19755ms
+ POST /api/ingest/signals 200 in 19880ms
+ POST /api/ingest/signals 200 in 20079ms
+ POST /api/ingest/signals 200 in 20113ms
+ POST /api/ingest/signals 200 in 20118ms
+ POST /api/ingest/signals 200 in 20186ms
+ POST /api/ingest/signals 200 in 20332ms
+ POST /api/ingest/signals 200 in 20545ms
+ POST /api/ingest/signals 200 in 20578ms
+ POST /api/ingest/signals 200 in 20581ms
+ POST /api/ingest/signals 200 in 20642ms
+ POST /api/ingest/signals 200 in 20815ms
+ POST /api/ingest/signals 200 in 21004ms
+ POST /api/ingest/signals 200 in 21011ms
+ POST /api/ingest/signals 200 in 21036ms
+ POST /api/ingest/signals 200 in 21074ms
+ POST /api/ingest/signals 200 in 21264ms
+ POST /api/ingest/signals 200 in 21465ms
+ POST /api/ingest/signals 200 in 21471ms
+ POST /api/ingest/signals 200 in 21532ms
+ POST /api/ingest/signals 200 in 21534ms
+ POST /api/ingest/signals 200 in 21730ms
+ POST /api/ingest/signals 200 in 21923ms
+ POST /api/ingest/signals 200 in 21926ms
+ POST /api/ingest/signals 200 in 21987ms
+ POST /api/ingest/signals 200 in 21993ms
+ POST /api/ingest/signals 200 in 22191ms
+ POST /api/ingest/signals 200 in 22372ms
+ POST /api/ingest/signals 200 in 22379ms
+ POST /api/ingest/signals 200 in 22447ms
+ POST /api/ingest/signals 200 in 22451ms
+ POST /api/ingest/signals 200 in 22654ms
+ POST /api/ingest/signals 200 in 22829ms
+ POST /api/ingest/signals 200 in 22837ms
+ POST /api/ingest/signals 200 in 22901ms
+ POST /api/ingest/signals 200 in 22909ms
+ POST /api/ingest/signals 200 in 23168ms
+ POST /api/ingest/signals 200 in 23289ms
+ POST /api/ingest/signals 200 in 23302ms
+ POST /api/ingest/signals 200 in 23365ms
+ POST /api/ingest/signals 200 in 23374ms
+ POST /api/ingest/signals 200 in 23632ms
+ POST /api/ingest/signals 200 in 23743ms
+ POST /api/ingest/signals 200 in 23758ms
+ POST /api/ingest/signals 200 in 23816ms
+ POST /api/ingest/signals 200 in 23828ms
+ POST /api/ingest/signals 200 in 24083ms
+ POST /api/ingest/signals 200 in 24196ms
+ POST /api/ingest/signals 200 in 24225ms
+ POST /api/ingest/signals 200 in 24274ms
+ POST /api/ingest/signals 200 in 24276ms
+ POST /api/ingest/signals 200 in 24540ms
+ POST /api/ingest/signals 200 in 24647ms
+ POST /api/ingest/signals 200 in 24684ms
+ POST /api/ingest/signals 200 in 24731ms
+ POST /api/ingest/signals 200 in 24735ms
+ ✓ Compiled /api/uploads/sign in 338ms (401 modules)
+ POST /api/uploads/sign 307 in 502ms
+ ○ Compiling /signin/forgot ...
+ ✓ Compiled /signin/forgot in 1002ms (677 modules)
+ POST /signin/forgot 200 in 1413ms
+ POST /signin/forgot 200 in 79ms
+ GET /signin/forgot 200 in 138ms
+[mailer:console] to=gm@riversideauto.demo subject="Reset your CUE password"
+Hi Vic Moreno,
+
+Use this link to choose a new password. It expires in 30 minutes and can be used once:
+
+http://localhost:3210/signin/reset?token=cmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE
+
+If you didn't ask for this, you can ignore the email — your password is unchanged.
+ GET /signin/forgot?sent=1&devlink=http%3A%2F%2Flocalhost%3A3210%2Fsignin%2Freset%3Ftoken%3Dcmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE 200 in 68ms
+ POST /signin/forgot 303 in 1697ms
+ ○ Compiling /signin/reset ...
+ ✓ Compiled /signin/reset in 1181ms (674 modules)
+ GET /signin/forgot?sent=1&devlink=http%3A%2F%2Flocalhost%3A3210%2Fsignin%2Freset%3Ftoken%3Dcmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE 200 in 535ms
+ GET /signin/reset?token=cmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE 200 in 1951ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1014ms (525 modules)
+ GET /dashboard 200 in 8680ms
+ POST /signin/reset?token=cmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE 303 in 11293ms
+ GET /signin/reset?token=cmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE 200 in 488ms
+ ✓ Compiled /api/health in 331ms (546 modules)
+ GET /api/health 200 in 1692ms
+ GET /dashboard 200 in 7092ms
+ ○ Compiling /compass ...
+ ✓ Compiled /compass in 541ms (551 modules)
+ GET /compass 200 in 6118ms
+ ✓ Compiled /capture in 336ms (568 modules)
+ GET /capture 200 in 4168ms
+ ✓ Compiled /people in 322ms (577 modules)
+ GET /people 200 in 4630ms
+ ✓ Compiled /pipeline in 501ms (536 modules)
+ GET /pipeline 200 in 4984ms
+ ✓ Compiled /pipeline/lead/[id] in 347ms (542 modules)
+ GET /pipeline/lead/cmun2rxcz002htuqo06k7zbyh 200 in 4591ms
+ GET /pipeline/lead/cmun2rz4v0041tuqosu805yq4 200 in 3981ms
+ ✓ Compiled /pipeline/customer/[id] in 213ms (548 modules)
+ GET /pipeline/customer/cmun2rvca000stuqo5cleu6zg 200 in 5064ms
+ ✓ Compiled /api/ingest/signals in 347ms (568 modules)
+ POST /api/ingest/signals 401 in 515ms
+ POST /api/ingest/signals 401 in 575ms
+ POST /api/ingest/signals 200 in 2783ms
+ POST /api/ingest/signals 200 in 1887ms
+ ✓ Compiled /api/ingest/google in 305ms (570 modules)
+ POST /api/ingest/google 200 in 4507ms
+ ✓ Compiled /signals in 244ms (580 modules)
+ GET /signals 200 in 4336ms
+ GET /signin/reset?error=invalid 200 in 70ms
+ POST /signin/reset?token=cmun2ruat0000tuqo2cx5xcae.1790720010611.aury6okv.b3YEY_k_2LRvEmmoNsIosv0DvhRy1vS8qGT0VQtAIUE 303 in 175ms
+ GET /signin/forgot 200 in 98ms
+ ✓ Compiled /api/health in 323ms (546 modules)
+ GET /api/health 200 in 1549ms
+ GET /dashboard 200 in 7244ms
+ ✓ Compiled /compass in 467ms (551 modules)
+ GET /signin/forgot?sent=1 200 in 65ms
+ POST /signin/forgot 303 in 1117ms
+ GET /compass 200 in 6041ms
+ ✓ Compiled /capture in 357ms (568 modules)
+ GET /capture 200 in 4337ms
+ ✓ Compiled /people in 312ms (577 modules)
+ GET /people 200 in 4703ms
+ ○ Compiling /pipeline ...
+ ✓ Compiled /pipeline in 541ms (536 modules)
+ GET /pipeline 200 in 5080ms
+ ✓ Compiled /pipeline/lead/[id] in 363ms (542 modules)
+ GET /pipeline/lead/cmun2rxcz002htuqo06k7zbyh 200 in 4748ms
+ GET /pipeline/lead/cmun2rz4v0041tuqosu805yq4 200 in 4127ms
+ ✓ Compiled /pipeline/customer/[id] in 226ms (548 modules)
+ GET /pipeline/customer/cmun2rvca000stuqo5cleu6zg 200 in 5150ms
+ ✓ Compiled /api/ingest/signals in 326ms (568 modules)
+ POST /api/ingest/signals 401 in 503ms
+ POST /api/ingest/signals 401 in 582ms
+ POST /api/ingest/signals 200 in 2873ms
+ POST /api/ingest/signals 200 in 1942ms
+ ✓ Compiled /api/ingest/google in 354ms (570 modules)
+ POST /api/ingest/google 200 in 4697ms
+ ✓ Compiled /signals in 285ms (580 modules)
+ GET /signals 200 in 4432ms
+ GET /signin/forgot?sent=1 200 in 1576ms
+ GET /signin/forgot?sent=1 200 in 619ms
+ GET /signin/forgot?sent=1 200 in 768ms
+ ✓ Compiled in 2.2s (280 modules)
+ GET /signin/forgot?sent=1 200 in 133ms
+ GET /signin/forgot?sent=1 200 in 301ms
+ GET /signin/forgot?sent=1 200 in 576ms
+ GET /signin/forgot?sent=1 200 in 392ms
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
