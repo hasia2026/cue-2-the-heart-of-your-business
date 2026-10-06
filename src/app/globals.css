@@ -6,50 +6,95 @@
   color-scheme: dark;
 }
 
+/* Deep-space nebula field: violet core glow up top, cyan basin low-left,
+   warm ember far right — reads like the CUE brand galaxy without images. */
 body {
   @apply bg-ink-950 text-navy-100 antialiased;
   background-image:
-    radial-gradient(1200px 500px at 80% -10%, rgb(46 139 255 / 0.08), transparent),
-    radial-gradient(900px 400px at 10% 110%, rgb(139 92 246 / 0.07), transparent);
+    radial-gradient(1100px 520px at 50% -12%, rgb(139 92 246 / 0.22), transparent 70%),
+    radial-gradient(900px 480px at 8% 108%, rgb(56 189 248 / 0.12), transparent 70%),
+    radial-gradient(700px 420px at 96% 88%, rgb(251 146 60 / 0.07), transparent 70%),
+    radial-gradient(500px 300px at 88% 6%, rgb(56 189 248 / 0.06), transparent 70%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgb(168 85 247 / 0.35);
 }
 
 @layer components {
+  /* Glass panel with a lit top edge — the brand's "holographic card". */
   .card {
-    @apply rounded-2xl border border-white/[0.07] bg-white/[0.03] shadow-card;
+    @apply rounded-2xl border border-white/[0.08] shadow-card;
+    background-image: linear-gradient(160deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.02) 55%, rgb(139 92 246 / 0.04));
+    border-top-color: rgb(255 255 255 / 0.16);
   }
   .card-hover {
-    @apply transition-colors hover:bg-white/[0.05] hover:border-white/[0.12];
+    @apply transition-all duration-200 hover:border-white/[0.18] hover:shadow-glow;
   }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-cue-blue px-4 py-2 text-sm font-semibold text-white shadow-glow transition hover:brightness-110 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50;
+    background-image: linear-gradient(120deg, #7c3aed, #a855f7 45%, #38bdf8);
+    box-shadow: 0 0 24px -6px rgb(139 92 246 / 0.65), inset 0 1px 0 rgb(255 255 255 / 0.25);
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-navy-100 transition hover:bg-white/[0.06] disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.12] px-4 py-2 text-sm font-medium text-navy-100 transition hover:border-violet-400/40 hover:bg-violet-500/10 hover:text-white disabled:opacity-50;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-cue-red/40 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/10 disabled:opacity-50;
   }
   .btn-green {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-cue-green/90 px-4 py-2 text-sm font-semibold text-ink-950 transition hover:brightness-110 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-ink-950 transition hover:brightness-110 disabled:opacity-50;
+    background-image: linear-gradient(120deg, #34d399, #38bdf8);
+    box-shadow: 0 0 20px -6px rgb(52 211 153 / 0.5);
   }
   .input {
-    @apply w-full rounded-xl border border-white/10 bg-ink-900/70 px-3 py-2 text-sm text-navy-100 placeholder:text-navy-300/50 focus:border-cue-blue/60 focus:outline-none;
+    @apply w-full rounded-xl border border-white/10 bg-ink-900/70 px-3 py-2 text-sm text-navy-100 placeholder:text-navy-300/50 focus:border-violet-400/60 focus:outline-none;
   }
   .label {
     @apply mb-1 block text-xs font-medium text-navy-300;
   }
+
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider;
   }
   .badge-blue { @apply badge bg-cue-blue/15 text-cue-blue border border-cue-blue/30; }
   .badge-green { @apply badge bg-cue-green/15 text-cue-green border border-cue-green/30; }
   .badge-orange { @apply badge bg-cue-orange/15 text-cue-orange border border-cue-orange/30; }
   .badge-red { @apply badge bg-cue-red/15 text-red-300 border border-cue-red/30; }
-  .badge-purple { @apply badge bg-cue-purple/15 text-purple-300 border border-cue-purple/30; }
+  .badge-purple { @apply badge bg-cue-purple/15 text-violet-300 border border-cue-purple/30; }
   .badge-low { @apply badge bg-white/[0.06] text-navy-300 border border-white/10; }
+
   .section-title { @apply text-lg font-semibold text-white; }
   .muted { @apply text-sm text-navy-300; }
+
+  /* Brand voice: tracked-out uppercase headline support */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.35em] text-violet-300/80;
+  }
+  .hero-gradient {
+    @apply bg-gradient-to-r from-cue-blue via-violet-400 to-cue-orange bg-clip-text text-transparent;
+  }
   .page-title { @apply text-2xl font-bold text-white md:text-3xl; }
   .page-sub { @apply mt-1 text-sm text-navy-300; }
-  .kpi { @apply text-2xl font-bold text-white md:text-3xl; }
+  .kpi {
+    @apply text-2xl font-bold md:text-3xl bg-gradient-to-r from-white via-violet-100 to-cyan-100 bg-clip-text text-transparent;
+  }
+
+  /* Soft halo ring used behind hero marks and the mascot */
+  .cue-halo {
+    position: relative;
+  }
+  .cue-halo::before {
+    content: "";
+    position: absolute;
+    inset: -28%;
+    border-radius: 9999px;
+    background:
+      radial-gradient(closest-side, rgb(168 85 247 / 0.28), transparent 72%),
+      radial-gradient(closest-side, rgb(56 189 248 / 0.18), transparent 85%);
+    filter: blur(6px);
+    pointer-events: none;
+  }
 }

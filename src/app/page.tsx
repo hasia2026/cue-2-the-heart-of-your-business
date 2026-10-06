@@ -1,73 +1,78 @@
 import { getSession } from "@/lib/auth";
+import { getT } from "@/lib/locale";
+import { LogoMark } from "@/components/NavClient";
+import type { DictKey } from "@/lib/i18n";
 
-const LOOP = [
-  { icon: "⤓", title: "Capture", desc: "Every document, note, and record — classified and connected." },
-  { icon: "◈", title: "Understand", desc: "Evidence-first intelligence computed from your actual data." },
-  { icon: "✦", title: "Enhance", desc: "Brand, customer experience, and process improvements." },
-  { icon: "▶", title: "Execute", desc: "Approved recommendations become workflows and tasks." },
-  { icon: "↑", title: "Expand", desc: "Training from your own knowledge. Measured outcomes." },
+const LOOP: { n: string; titleKey: DictKey; descKey: DictKey; accent: string; glow: string }[] = [
+  { n: "01", titleKey: "nav.capture", descKey: "home.captureDesc", accent: "text-cyan-300", glow: "from-cyan-500/20" },
+  { n: "02", titleKey: "nav.understand", descKey: "home.understandDesc", accent: "text-violet-300", glow: "from-violet-500/20" },
+  { n: "03", titleKey: "nav.enhance", descKey: "home.enhanceDesc", accent: "text-fuchsia-300", glow: "from-fuchsia-500/20" },
+  { n: "04", titleKey: "nav.execute", descKey: "home.executeDesc", accent: "text-orange-300", glow: "from-orange-500/20" },
+  { n: "05", titleKey: "nav.expand", descKey: "home.expandDesc", accent: "text-emerald-300", glow: "from-emerald-500/20" },
 ];
 
 export default async function Home() {
   const session = await getSession();
+  const { t } = await getT();
   return (
     <div className="mx-auto max-w-5xl px-4 py-16 md:py-24">
       <div className="text-center">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs text-navy-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-cue-green" /> AI Business Operating System
+        <div className="cue-halo mx-auto mb-6 inline-flex">
+          <LogoMark className="h-20 w-20" />
         </div>
+        <div className="eyebrow mb-4">{t("home.eyebrow")}</div>
         <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight text-white md:text-6xl">
-          The Heart of <span className="bg-gradient-to-r from-cue-blue via-cue-purple to-cue-orange bg-clip-text text-transparent">Your Business</span>
+          {t("home.titleA")}{" "}
+          <span className="hero-gradient">{t("home.titleB")}</span>
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-navy-300 md:text-lg">
-          An AI operating system connecting the people, knowledge, workflows and systems
-          that keep a business moving. Everything your business knows. Everything it does.
-          One intelligent system.
+        <p className="mx-auto mt-5 max-w-2xl text-navy-300 md:text-lg">
+          {t("home.sub")}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {session ? (
-            <a href="/dashboard" className="btn-primary">Open your command center →</a>
+            <a href="/dashboard" className="btn-primary">{t("home.ctaOpen")}</a>
           ) : (
             <>
-              <a href="/signup" className="btn-primary">Start with your company</a>
-              <a href="/signin" className="btn-ghost">Sign in</a>
+              <a href="/signup" className="btn-primary">{t("home.ctaStart")}</a>
+              <a href="/signin" className="btn-ghost">{t("app.signIn")}</a>
             </>
           )}
         </div>
       </div>
 
-      <div className="mt-16 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {LOOP.map((s, i) => (
-          <div key={s.title} className="card p-5">
-            <div className="text-2xl">{s.icon}</div>
-            <div className="mt-2 font-semibold text-white">
-              {i + 1}. {s.title}
-            </div>
-            <p className="muted mt-1 text-xs">{s.desc}</p>
+      <div className="eyebrow mt-16 mb-4 text-center">{t("home.loopHead")}</div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {LOOP.map((s) => (
+          <div key={s.n} className="card card-hover relative overflow-hidden p-5">
+            <div
+              className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${s.glow} to-transparent blur-xl`}
+            />
+            <div className={`text-[11px] font-semibold tracking-[0.3em] ${s.accent}`}>{s.n}</div>
+            <div className="mt-2 font-semibold text-white">{t(s.titleKey)}</div>
+            <p className="muted mt-1 text-xs">{t(s.descKey)}</p>
           </div>
         ))}
       </div>
 
       <div className="card mt-12 p-6 text-center">
         <p className="muted text-sm">
-          Industry Packs: CUE adapts to your business — <span className="text-white">Auto Dealership</span> ships first,
-          with Home Services, Hospitality and more on the same core.
+          <span className="text-white">{t("home.packs").split("—")[0]}</span>
+          {t("home.packs").includes("—") ? <>— {t("home.packs").split("—").slice(1).join("—")}</> : null}
         </p>
       </div>
 
       {/* The pledge */}
       <div className="card mt-6 p-6 text-center">
         <p className="text-sm text-navy-100">
-          <span className="font-semibold text-white">Our pledge:</span> $3 from every subscription goes to
-          <span className="text-cue-purple"> Revi Rescue</span>, <span className="text-cue-blue">HASI Foundation</span>,
-          <span className="text-cue-blue"> HASI Academy</span>, and <span className="text-cue-green">Open Resource</span>.
+          <span className="font-semibold text-white">{t("home.pledgeLead")}</span>{" "}
+          {t("home.pledgeBody")}
         </p>
-        <p className="muted mt-1 text-xs">Your business grows. Your community grows with it.</p>
+        <p className="muted mt-1 text-xs">{t("home.pledgeTail")}</p>
       </div>
 
       {/* Public leak-score hook */}
       <div className="mt-10 text-center">
-        <a href="/score" className="btn-primary">Find your Revenue Leak Score — free, 60 seconds →</a>
+        <a href="/score" className="btn-primary">{t("home.scoreCta")}</a>
       </div>
     </div>
   );

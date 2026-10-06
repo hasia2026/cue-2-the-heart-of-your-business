@@ -5,36 +5,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Deep-space backgrounds (violet-tinted near-black, like the brand deck)
         ink: {
-          950: "#050914",
-          900: "#0A1020",
-          800: "#101830",
-          700: "#182242",
-          600: "#243056",
+          950: "#050113",
+          900: "#0B0721",
+          800: "#130B30",
+          700: "#1C1244",
+          600: "#2A1D5E",
         },
+        // Text neutrals (lavender-tinted)
         navy: {
-          900: "#0D1B2E",
-          700: "#1E3A5F",
-          500: "#3E6B99",
-          300: "#8FB3D1",
-          100: "#D7E7F5",
-          50: "#EEF6FC",
+          900: "#171233",
+          700: "#2A2255",
+          500: "#5B4FA8",
+          300: "#A79FD4",
+          100: "#E7E4F8",
+          50: "#F4F2FD",
         },
         cue: {
-          blue: "#2E8BFF",
-          purple: "#8B5CF6",
-          orange: "#F97316",
-          red: "#EF4444",
-          green: "#10B981",
-          yellow: "#F59E0B",
+          blue: "#38BDF8", // neon cyan — Capture
+          purple: "#A855F7", // violet — Understand / brand core
+          orange: "#FB923C", // warm neon — Execute
+          red: "#F87171",
+          green: "#34D399",
+          yellow: "#FBBF24",
         },
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px rgb(0 0 0 / 0.28), 0 8px 24px -8px rgb(0 0 0 / 0.4)",
-        glow: "0 0 24px -4px rgb(46 139 255 / 0.35)",
+        card: "0 1px 2px rgb(0 0 0 / 0.45), 0 12px 32px -12px rgb(0 0 0 / 0.55)",
+        glow: "0 0 28px -6px rgb(139 92 246 / 0.5)",
       },
     },
   },

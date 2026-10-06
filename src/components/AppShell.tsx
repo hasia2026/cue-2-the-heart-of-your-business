@@ -2,12 +2,11 @@ import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import NavClient, { LogoMark } from "./NavClient";
 import LanguageSwitcher from "./LanguageSwitcher";
-import CueAI from "./CueAI";
 import { signOut } from "@/app/signin/actions";
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  const { t } = await getT();
+  const { locale, rtl, t } = await getT();
 
   const groups = [
     {
@@ -32,7 +31,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       items: [
         { href: "/pipeline", label: t("nav.pipeline"), icon: "⇉" },
         { href: "/execute", label: t("nav.execute"), icon: "▶" },
-        { href: "/report", label: "Pilot Report", icon: "▤" },
+        { href: "/report", label: t("nav.report"), icon: "▤" },
         { href: "/people", label: t("nav.people"), icon: "☰" },
         { href: "/expand", label: t("nav.expand"), icon: "↑" },
       ],
@@ -48,20 +47,19 @@ export default async function AppShell({ children }: { children: React.ReactNode
   ];
 
   return (
-    <div className="flex min-h-screen" dir="ltr">
+    <div className="flex min-h-screen" dir={rtl ? "rtl" : "ltr"} lang={locale}>
       <NavClient groups={groups} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 hidden items-center gap-3 border-b border-white/[0.07] bg-ink-950/70 px-6 py-3 backdrop-blur lg:flex">
           <div className="text-sm text-navy-300">{t("app.tagline")}</div>
           <div className="ms-auto flex items-center gap-2">
             <LanguageSwitcher />
-            <CueAI />
             {session ? (
               <form action={signOut}>
                 <button className="btn-ghost !px-3 !py-1.5 text-xs">{t("app.signOut")}</button>
               </form>
             ) : (
-              <a href="/signin" className="btn-primary !px-3 !py-1.5 text-xs">Sign in</a>
+              <a href="/signin" className="btn-primary !px-3 !py-1.5 text-xs">{t("app.signIn")}</a>
             )}
           </div>
         </header>

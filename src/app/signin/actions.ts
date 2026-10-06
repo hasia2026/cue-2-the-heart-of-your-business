@@ -11,6 +11,7 @@ export async function signUpAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const orgName = String(formData.get("orgName") ?? "").trim();
+  const ref = String(formData.get("ref") ?? "").trim().toUpperCase();
   if (!name || !email || !password || !orgName) throw new Error("All fields are required");
   if (password.length < 8) throw new Error("Password must be at least 8 characters");
 
@@ -26,6 +27,18 @@ export async function signUpAction(formData: FormData) {
   await sql`
     insert into business_profiles (organization_id, name) values (${org.id}, ${orgName})`;
   await sql`insert into ai_settings (organization_id) values (${org.id})`;
+
+  // Partner referral attribution — first link wins (unique per org)
+  if (ref) {
+    await sql`update organizations set referred_by_code = ${ref} where id = ${org.id}`;
+    const [partner] = await sql`select id from partners where code = ${ref} and status = 'ACTIVE'`;
+    if (partner) {
+      await sql`
+        insert into referrals (partner_id, organization_id, code)
+        values (${partner.id}, ${org.id}, ${ref}) on conflict (organization_id) do nothing`;
+    }
+  }
+
   await logAudit({ organizationId: org.id, actorId: user.id, action: "ORG_CREATED", detail: orgName });
   await createSessionCookie(user.id);
   redirect("/dashboard");
