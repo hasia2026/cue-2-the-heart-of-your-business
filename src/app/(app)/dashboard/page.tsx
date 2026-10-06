@@ -76,10 +76,10 @@ export default async function DashboardPage() {
           </div>
           <div className="card space-y-4 p-5">
             {[
-              { icon: "✦", color: "text-violet-300", ring: "border-violet-400/50", title: t("nav.understand"), desc: t("home.understandDesc") },
-              { icon: "◎", color: "text-cyan-300", ring: "border-cyan-400/50", title: t("nav.execute"), desc: t("home.executeDesc") },
-              { icon: "⚡", color: "text-emerald-300", ring: "border-emerald-400/50", title: t("nav.enhance"), desc: t("home.enhanceDesc") },
-              { icon: "▤", color: "text-orange-300", ring: "border-orange-400/50", title: t("nav.expand"), desc: t("home.expandDesc") },
+              { icon: "✦", color: "text-violet-300", ring: "border-violet-400/50", title: t("pillar.understand"), desc: t("home.understandDesc") },
+              { icon: "◎", color: "text-cyan-300", ring: "border-cyan-400/50", title: t("pillar.execute"), desc: t("home.executeDesc") },
+              { icon: "⚡", color: "text-emerald-300", ring: "border-emerald-400/50", title: t("pillar.enhance"), desc: t("home.enhanceDesc") },
+              { icon: "▤", color: "text-orange-300", ring: "border-orange-400/50", title: t("pillar.expand"), desc: t("home.expandDesc") },
             ].map((p) => (
               <div key={p.title} className="flex items-start gap-3">
                 <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${p.ring} bg-white/[0.03] text-lg ${p.color}`}>{p.icon}</span>

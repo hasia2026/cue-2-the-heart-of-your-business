@@ -107,7 +107,7 @@ async function buildTasks(organizationId: string, workflowId: string, recId: str
 
   // Fallback: single action task from the recommendation itself
   if (made.length === 0) {
-    made.push({ title, detail: "Execute the approved recommendation. See the linked insight for evidence." });
+    made.push({ title, detail: "Run the approved recommendation. See the linked insight for evidence." });
   }
 
   const [lead] = await sql`

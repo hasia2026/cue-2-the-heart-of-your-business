@@ -26,7 +26,7 @@ export default async function SettingsPage({
     ["observe", "Observe", "CUE can analyze information."],
     ["recommend", "Recommend", "CUE can suggest actions with evidence."],
     ["prepare", "Prepare", "CUE can draft workflows for approval."],
-    ["execute", "Execute", "CUE can run approved actions."],
+    ["execute", "Run", "CUE can run approved actions."],
     ["automate", "Automate", "CUE can run predefined rules without asking."],
   ] as const;
 

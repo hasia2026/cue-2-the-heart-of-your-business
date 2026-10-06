@@ -27,12 +27,12 @@ const T = {
   en: {
     focusHead: "Based on your current open insights, the highest-attention items are:",
     atStake: "at stake",
-    focusTail: "Each has an approved recommendation path in Understand → Execute when you're ready to act.",
-    noInsights: "No open insights right now — the board is clear. Try refreshing intelligence in Understand after new activity lands.",
+    focusTail: "Each one carries evidence and an approved path you can turn into a task list when you're ready to act.",
+    noInsights: "No open insights right now — the board is clear. New intelligence computes automatically as activity lands.",
     unbilled: "Unbilled completed service orders:",
     overdue: "Overdue invoices:",
     worth: "worth",
-    billingDirty: "Both have ready-to-run recovery workflows in Execute — approving the matching recommendation generates the task list.",
+    billingDirty: "Both come with ready-to-run recovery workflows — approving the matching recommendation generates the task list.",
     billingClean: "Nothing outstanding — billing is clean.",
     leadsHead: "Leads waiting longest for follow-up:",
     waitingSince: "waiting since",
@@ -44,9 +44,9 @@ const T = {
     healthHead: "The Business Health Score is computed live from your records — weighted across revenue, pipeline, operations, inventory, customers, team, and data quality. Each dimension on the Company Compass page shows its own score, evidence, reasoning, and confidence. Open Company Compass to inspect the current breakdown, or click any dimension to see exactly why it scored that way.",
     knowledgeHead: "From your company knowledge:",
     fallback:
-      "I don't have information in your records that answers that. I can answer from actual data on: what CUE is and how it helps, revenue it could recover, connecting disconnected systems, focus/priorities, unbilled service work, overdue invoices, lead follow-up, inventory aging, and the health score. Ask one of those, or capture the relevant document in Capture first.",
+      "I don't have information in your records that answers that. I can answer from actual data on: what CUE is and how it helps, revenue it could recover, connecting disconnected systems, focus/priorities, unbilled service work, overdue invoices, lead follow-up, inventory aging, and the health score. Ask one of those, or capture the relevant document first.",
     cueWhat:
-      "CUE is an AI Business Operating System — one intelligent loop for your whole company: Capture (every document, conversation, and record — organized and searchable), Understand (evidence-first intelligence from your actual data), Enhance (brand, customer experience, process), Execute (approved recommendations become workflows and tasks), and Expand (growth measured from your own knowledge).",
+      "CUE is an AI Business Operating System: it collects every document, conversation, and record into one searchable source of truth, reads your actual numbers with evidence for every claim, sharpens how your business runs, turns approved recommendations into concrete task lists, and keeps learning from your own knowledge to uncover growth.",
     cueHelp:
       "How it helps: it replaces guesswork with evidence. Every insight shows its numbers, every recommendation carries proof, and nothing runs without your approval — CUE prepares, you decide.",
     cueRevenue:
@@ -61,12 +61,12 @@ const T = {
   es: {
     focusHead: "Según tus observaciones abiertas, lo que más atención requiere es:",
     atStake: "en juego",
-    focusTail: "Cada una tiene una ruta de recomendación aprobada en Entender → Ejecutar cuando estés listo para actuar.",
-    noInsights: "No hay observaciones abiertas — el tablero está limpio. Prueba actualizar la inteligencia en Entender tras nueva actividad.",
+    focusTail: "Cada una lleva evidencia y una ruta aprobada que puedes convertir en tareas cuando estés listo para actuar.",
+    noInsights: "No hay observaciones abiertas — el tablero está limpio. La nueva inteligencia se calcula a medida que llega actividad.",
     unbilled: "Órdenes de servicio completadas sin facturar:",
     overdue: "Facturas vencidas:",
     worth: "valoradas en",
-    billingDirty: "Ambas tienen flujos de recuperación listos en Ejecutar — aprobar la recomendación correspondiente genera la lista de tareas.",
+    billingDirty: "Ambas vienen con flujos de recuperación listos para ejecutarse — aprobar la recomendación correspondiente genera la lista de tareas.",
     billingClean: "Nada pendiente — la facturación está limpia.",
     leadsHead: "Leads que más esperan un seguimiento:",
     waitingSince: "en espera desde",
@@ -78,9 +78,9 @@ const T = {
     healthHead: "La Puntuación de Salud del Negocio se calcula en vivo desde tus registros — ponderada entre ingresos, embudo, operaciones, inventario, clientes, equipo y calidad de datos. Cada dimensión en la Brújula de empresa muestra su propia puntuación, evidencia, razonamiento y confianza. Abre la Brújula de empresa para ver el desglose actual.",
     knowledgeHead: "Del conocimiento de tu empresa:",
     fallback:
-      "No tengo información en tus registros que responda eso. Puedo responder con datos reales sobre: qué es CUE y cómo ayuda, ingresos que podría recuperar, cómo conecta sistemas desconectados, prioridades, trabajo de servicio sin facturar, facturas vencidas, seguimiento de leads, antigüedad de inventario y la puntuación de salud. Pregunta por uno de esos, o captura el documento correspondiente en Capturar.",
+      "No tengo información en tus registros que responda eso. Puedo responder con datos reales sobre: qué es CUE y cómo ayuda, ingresos que podría recuperar, cómo conecta sistemas desconectados, prioridades, trabajo de servicio sin facturar, facturas vencidas, seguimiento de leads, antigüedad de inventario y la puntuación de salud. Pregunta por uno de esos, o captura el documento correspondiente primero.",
     cueWhat:
-      "CUE es un sistema operativo de negocio con IA — un ciclo inteligente para toda tu empresa: Capturar (cada documento, conversación y registro, organizado y buscable), Entender (inteligencia con evidencia desde tus datos reales), Mejorar (marca, experiencia del cliente, procesos), Ejecutar (las recomendaciones aprobadas se vuelven flujos y tareas) y Expandir (crecimiento medido desde tu propio conocimiento).",
+      "CUE es un sistema operativo de negocio con IA: reúne cada documento, conversación y registro en una sola fuente de verdad buscable, lee tus números reales con evidencia para cada conclusión, afina cómo opera tu empresa, convierte recomendaciones aprobadas en listas de tareas concretas y sigue aprendiendo de tu propio conocimiento para descubrir crecimiento.",
     cueHelp:
       "Cómo ayuda: reemplaza las suposiciones por evidencia. Cada observación muestra sus números, cada recomendación lleva prueba, y nada se ejecuta sin tu aprobación — CUE prepara, tú decides.",
     cueRevenue:
@@ -95,12 +95,12 @@ const T = {
   vi: {
     focusHead: "Dựa trên các nhận định đang mở của bạn, những mục cần chú ý nhất là:",
     atStake: "đang chịu rủi ro",
-    focusTail: "Mỗi mục đều có lộ trình đề xuất đã duyệt trong Hiểu → Thực thi khi bạn sẵn sàng hành động.",
-    noInsights: "Chưa có nhận định nào — bảng đang trống. Hãy làm mới trí tuệ trong Hiểu sau khi có hoạt động mới.",
+    focusTail: "Mỗi mục đều có bằng chứng và lộ trình đã duyệt mà bạn có thể biến thành danh sách công việc khi sẵn sàng hành động.",
+    noInsights: "Chưa có nhận định nào — bảng đang trống. Trí tuệ mới sẽ được tính tự động khi có hoạt động mới.",
     unbilled: "Đơn dịch vụ đã hoàn thành chưa xuất hóa đơn:",
     overdue: "Hóa đơn quá hạn:",
     worth: "trị giá",
-    billingDirty: "Cả hai đều có quy trình khôi phục sẵn trong Thực thi — duyệt đề xuất tương ứng sẽ tạo danh sách công việc.",
+    billingDirty: "Cả hai đều có quy trình khôi phục sẵn sàng chạy — duyệt đề xuất tương ứng sẽ tạo danh sách công việc.",
     billingClean: "Không có gì tồn đọng — thanh toán sạch sẽ.",
     leadsHead: "Khách hàng chờ liên hệ lâu nhất:",
     waitingSince: "chờ từ",
@@ -112,9 +112,9 @@ const T = {
     healthHead: "Điểm Sức khỏe Doanh nghiệp được tính trực tiếp từ hồ sơ của bạn — trọng số qua doanh thu, quy trình bán hàng, vận hành, tồn kho, khách hàng, đội ngũ và chất lượng dữ liệu. Mỗi chiều trên La bàn công ty hiển thị điểm, bằng chứng, lý do và độ tin cậy riêng. Mở La bàn công ty để xem chi tiết.",
     knowledgeHead: "Từ kiến thức công ty của bạn:",
     fallback:
-      "Tôi không có thông tin trong hồ sơ của bạn để trả lời điều đó. Tôi có thể trả lời từ dữ liệu thực tế về: CUE là gì và giúp thế nào, doanh thu có thể thu hồi, cách kết nối hệ thống rời rạc, ưu tiên, công việc dịch vụ chưa xuất hóa đơn, hóa đơn quá hạn, theo dõi khách hàng, tồn kho lâu, và điểm sức khỏe. Hãy hỏi một trong những chủ đề đó, hoặc thu thập tài liệu liên quan trong Thu thập trước.",
+      "Tôi không có thông tin trong hồ sơ của bạn để trả lời điều đó. Tôi có thể trả lời từ dữ liệu thực tế về: CUE là gì và giúp thế nào, doanh thu có thể thu hồi, cách kết nối hệ thống rời rạc, ưu tiên, công việc dịch vụ chưa xuất hóa đơn, hóa đơn quá hạn, theo dõi khách hàng, tồn kho lâu, và điểm sức khỏe. Hãy hỏi một trong những chủ đề đó, hoặc thu thập tài liệu liên quan trước.",
     cueWhat:
-      "CUE là hệ điều hành doanh nghiệp bằng AI — một vòng lặp thông minh cho cả công ty: Thu thập (mọi tài liệu, cuộc trò chuyện và hồ sơ, có tổ chức và tìm được), Hiểu (trí tuệ có bằng chứng từ dữ liệu thực), Nâng cao (thương hiệu, trải nghiệm khách hàng, quy trình), Thực thi (đề xuất được duyệt trở thành quy trình và công việc) và Mở rộng (tăng trưởng đo từ kiến thức của bạn).",
+      "CUE là hệ điều hành doanh nghiệp bằng AI: thu thập mọi tài liệu, hội thoại và hồ sơ thành một nguồn sự thật tìm được, đọc số liệu thực của bạn với bằng chứng cho mỗi kết luận, tinh chỉnh cách doanh nghiệp vận hành, biến đề xuất đã duyệt thành danh sách công việc cụ thể, và tiếp tục học từ kiến thức của chính bạn để tìm cơ hội tăng trưởng.",
     cueHelp:
       "Cách giúp bạn: thay phỏng đoán bằng bằng chứng. Mỗi nhận định đều có số liệu, mỗi đề xuất đều có căn cứ, và không gì chạy khi chưa có bạn duyệt — CUE chuẩn bị, bạn quyết định.",
     cueRevenue:
@@ -129,12 +129,12 @@ const T = {
   ar: {
     focusHead: "بناءً على رؤيتك المفتوحة حالياً، العناصر الأكثر أهمية هي:",
     atStake: "على المحك",
-    focusTail: "كل عنصر لديه مسار توصية معتمد في الفهم ← التنفيذ عندما تكون مستعداً للتحرك.",
-    noInsights: "لا توجد رؤى مفتوحة — اللوحة واضحة. جرّب تحديث الذكاء في الفهم بعد نشاط جديد.",
+    focusTail: "كل عنصر يحمل دليلاً ومساراً معتمداً يمكنك تحويله إلى قائمة مهام عندما تكون مستعداً للتحرك.",
+    noInsights: "لا توجد رؤى مفتوحة — اللوحة واضحة. يُحسب الذكاء الجديد تلقائياً مع كل نشاط جديد.",
     unbilled: "أوامر الخدمة المكتملة غير المفوترة:",
     overdue: "الفواتير المتأخرة:",
     worth: "بقيمة",
-    billingDirty: "كلاهما لديه سير عمل جاهز في التنفيذ — الموافقة على التوصية المطابقة تنشئ قائمة المهام.",
+    billingDirty: "كلاهما يأتي بسير عمل جاهز للتنفيذ — الموافقة على التوصية المطابقة تنشئ قائمة المهام.",
     billingClean: "لا يوجد شيء مستحق — الفوترة نظيفة.",
     leadsHead: "العملاء الذين ينتظرون المتابعة منذ أطول فترة:",
     waitingSince: "ينتظر منذ",
@@ -146,9 +146,9 @@ const T = {
     healthHead: "تُحسب درجة صحة الأعمال مباشرة من سجلاتك — موزونة عبر الإيرادات وخط المبيعات والعمليات والمخزون والعملاء والفريق وجودة البيانات. كل بعد في صفحة بوصلة الشركة يعرض درجته ودليله ومنطقه وثقته. افتح بوصلة الشركة لرؤية التفاصيل الحالية.",
     knowledgeHead: "من معرفة شركتك:",
     fallback:
-      "لا أملك معلومات في سجلاتك تجيب على ذلك. أستطيع الإجابة من بيانات فعلية عن: ما هو CUE وكيف يساعد، الإيرادات التي يمكن استردادها، ربط الأنظمة المفككة، الأولويات، عمل الصيانة غير المفوتر، الفواتير المتأخرة، متابعة العملاء، تقادم المخزون، ودرجة الصحة. اسأل عن أحدها، أو التق المستند ذا الصلة في التقاط أولاً.",
+      "لا أملك معلومات في سجلاتك تجيب على ذلك. أستطيع الإجابة من بيانات فعلية عن: ما هو CUE وكيف يساعد، الإيرادات التي يمكن استردادها، ربط الأنظمة المفككة، الأولويات، عمل الصيانة غير المفوتر، الفواتير المتأخرة، متابعة العملاء، تقادم المخزون، ودرجة الصحة. اسأل عن أحدها، أو التقط المستند ذا الصلة أولاً.",
     cueWhat:
-      "CUE هو نظام تشغيل الأعمال بالذكاء الاصطناعي — حلقة ذكية واحدة لكل شركتك: التقاط (كل مستند ومحادثة وسجل، منظم وقابل للبحث)، الفهم (ذكاء مدعوم بالأدلة من بياناتك الفعلية)، التحسين (العلامة وتجربة العملاء والعمليات)، التنفيذ (التوصيات المعتمدة تصبح سير عمل ومهام)، والتوسع (نمو مقاس من معرفتك الخاصة).",
+      "CUE هو نظام تشغيل الأعمال بالذكاء الاصطناعي: يجمع كل مستند ومحادثة وسجل في مصدر حقيقة واحد قابل للبحث، ويقرأ أرقامك الفعلية بدليل لكل استنتاج، ويصقل طريقة عمل شركتك، ويحوّل التوصيات المعتمدة إلى قوائم مهام ملموسة، ويواصل التعلم من معرفتك الخاصة ليكتشف النمو.",
     cueHelp:
       "كيف يساعد: يستبدل التخمين بالأدلة. كل رؤية تُظهر أرقامها، كل توصية تحمل إثباتها، ولا شيء يُنفّذ دون موافقتك — CUE يجهّز وأنت تقرر.",
     cueRevenue:

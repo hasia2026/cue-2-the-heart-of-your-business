@@ -4,11 +4,11 @@ import { LogoMark } from "@/components/NavClient";
 import type { DictKey } from "@/lib/i18n";
 
 const LOOP: { n: string; titleKey: DictKey; descKey: DictKey; accent: string; glow: string }[] = [
-  { n: "01", titleKey: "nav.capture", descKey: "home.captureDesc", accent: "text-cyan-300", glow: "from-cyan-500/20" },
-  { n: "02", titleKey: "nav.understand", descKey: "home.understandDesc", accent: "text-violet-300", glow: "from-violet-500/20" },
-  { n: "03", titleKey: "nav.enhance", descKey: "home.enhanceDesc", accent: "text-fuchsia-300", glow: "from-fuchsia-500/20" },
-  { n: "04", titleKey: "nav.execute", descKey: "home.executeDesc", accent: "text-orange-300", glow: "from-orange-500/20" },
-  { n: "05", titleKey: "nav.expand", descKey: "home.expandDesc", accent: "text-emerald-300", glow: "from-emerald-500/20" },
+  { n: "01", titleKey: "pillar.capture", descKey: "home.captureDesc", accent: "text-cyan-300", glow: "from-cyan-500/20" },
+  { n: "02", titleKey: "pillar.understand", descKey: "home.understandDesc", accent: "text-violet-300", glow: "from-violet-500/20" },
+  { n: "03", titleKey: "pillar.enhance", descKey: "home.enhanceDesc", accent: "text-fuchsia-300", glow: "from-fuchsia-500/20" },
+  { n: "04", titleKey: "pillar.execute", descKey: "home.executeDesc", accent: "text-orange-300", glow: "from-orange-500/20" },
+  { n: "05", titleKey: "pillar.expand", descKey: "home.expandDesc", accent: "text-emerald-300", glow: "from-emerald-500/20" },
 ];
 
 export default async function Home() {
