@@ -3,11 +3,12 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { captureDocument } from "./actions";
-
-const STEPS = ["Capture", "Classify", "Extract", "Organize", "Searchable"];
+import { useLocale } from "@/components/useLocale";
 
 export default function CaptureClient() {
   const router = useRouter();
+  const { t } = useLocale();
+  const STEPS = [t("capture.s1"), t("capture.s2"), t("capture.s3"), t("capture.s4"), t("capture.s5")];
   const formRef = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(0);
@@ -26,12 +27,13 @@ export default function CaptureClient() {
     try {
       const res = await captureDocument(fd);
       setStep(5);
-      setDone(`Captured & classified as ${res.kind}${res.tags.length ? ` · connected to ${res.tags.join(", ")}` : ""}. It is now searchable in Knowledge and visible to CUE AI.`);
+      const tpl = res.tags.length ? t("capture.doneTags") : t("capture.donePlain");
+      setDone(tpl.replace("{kind}", res.kind).replace("{tags}", res.tags.join(", ")));
       formRef.current?.reset();
       router.refresh();
     } catch (err) {
       setFail(true);
-      setDone(err instanceof Error ? err.message : "Capture failed");
+      setDone(err instanceof Error ? err.message : t("capture.failed"));
     } finally {
       clearInterval(timer);
       setBusy(false);
@@ -40,25 +42,25 @@ export default function CaptureClient() {
 
   return (
     <section className="card p-6">
-      <h2 className="section-title mb-1">Bring information in</h2>
+      <h2 className="section-title mb-1">{t("capture.bringTitle")}</h2>
       <p className="muted mb-4">
-        Files or notes. CUE identifies what the information is, connects it, and makes it searchable — not a dumping ground.
+        {t("capture.bringSub")}
       </p>
       <form ref={formRef} onSubmit={submit} className="grid gap-4 md:grid-cols-[1fr_auto]">
         <div className="grid gap-4">
           <div>
-            <label className="label" htmlFor="file">Upload document</label>
+            <label className="label" htmlFor="file">{t("capture.upload")}</label>
             <input id="file" name="file" type="file" className="input file:mr-3 file:rounded-lg file:border-0 file:bg-cue-blue/20 file:px-3 file:py-1.5 file:text-sm file:text-white" />
           </div>
           <div>
-            <label className="label" htmlFor="note">…or capture a note / conversation</label>
-            <textarea id="note" name="note" rows={3} className="input" placeholder="e.g. Met the Hendersons — they want a trade-in appraisal before Friday." />
+            <label className="label" htmlFor="note">{t("capture.note")}</label>
+            <textarea id="note" name="note" rows={3} className="input" placeholder={t("capture.notePlaceholder")} />
           </div>
         </div>
         <div className="flex flex-col gap-2 md:w-44">
-          <button type="submit" disabled={busy} className="btn-primary">{busy ? "Processing…" : "Capture"}</button>
+          <button type="submit" disabled={busy} className="btn-primary">{busy ? t("capture.processing") : t("capture.button")}</button>
           <div className="text-xs text-navy-300/70">
-            Documents, PDFs, images, audio, video, spreadsheets, forms, emails and conversations.
+            {t("capture.fileTypes")}
           </div>
         </div>
       </form>

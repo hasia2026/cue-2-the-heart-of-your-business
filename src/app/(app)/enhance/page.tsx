@@ -1,11 +1,30 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { getT } from "@/lib/locale";
+import { PRICING_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
+import PricingStudio from "./PricingStudio";
 
 export const dynamic = "force-dynamic";
 
 export default async function EnhancePage() {
   const session = await requireSession();
+  const { t } = await getT();
   const orgId = session.organizationId;
+  const [profile] = await sql`select industry from business_profiles where organization_id = ${orgId}`;
+  const vehRows = await sql`
+    select id, stock_number, year, make, model, trim,
+      coalesce(cost, 0)::float as cost, coalesce(list_price, 0)::float as list_price,
+      extract(epoch from (now() - listed_at)) / 86400 as days
+    from vehicles
+    where organization_id = ${orgId} and status = 'AVAILABLE' and listed_at is not null
+    order by listed_at asc limit 12`;
+  const vehicles = vehRows.map((v) => ({
+    id: v.id as string,
+    label: [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ") + ` (${v.stock_number})`,
+    cost: Number(v.cost) || 0,
+    days: Math.max(0, Math.round(Number(v.days))),
+    listPrice: Number(v.list_price) || 0,
+  }));
 
   const assets = await sql`
     select id, name, kind, description, status from brand_assets
@@ -22,9 +41,15 @@ export default async function EnhancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="page-title">Enhance</h1>
-        <p className="page-sub">Improve brand, customer experience, and how the work actually flows.</p>
+        <h1 className="page-title">{t("enhance.title")}</h1>
+        <p className="page-sub">{t("enhance.subtitle")}</p>
       </div>
+
+      <PricingStudio
+        industry={(profile?.industry as string) ?? ""}
+        vehicles={vehicles}
+        labels={buildLabels(PRICING_LABEL_KEYS, t)}
+      />
 
       <section>
         <h2 className="section-title mb-3">Brand Studio</h2>

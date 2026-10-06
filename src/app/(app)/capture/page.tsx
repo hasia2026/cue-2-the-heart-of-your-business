@@ -1,11 +1,13 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { getT } from "@/lib/locale";
 import CaptureClient from "./CaptureClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function CapturePage() {
   const session = await requireSession();
+  const { t } = await getT();
   const orgId = session.organizationId;
   const docs = await sql`
     select d.id, d.title, d.kind, d.status, d.uploaded_at, d.size_bytes,
@@ -21,30 +23,30 @@ export default async function CapturePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="page-title">Capture</h1>
-        <p className="page-sub">Bring information in. CUE classifies, extracts, organizes, connects, and makes it searchable.</p>
+        <h1 className="page-title">{t("capture.title")}</h1>
+        <p className="page-sub">{t("capture.subtitle")}</p>
       </div>
 
       <CaptureClient />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">Documents</div><div className="kpi mt-1">{stats?.docs ?? 0}</div></div>
-        <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">Entities identified</div><div className="kpi mt-1">{stats?.entities ?? 0}</div></div>
-        <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">Facts extracted</div><div className="kpi mt-1">{stats?.facts ?? 0}</div></div>
+        <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">{t("capture.docs")}</div><div className="kpi mt-1">{stats?.docs ?? 0}</div></div>
+        <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">{t("capture.entities")}</div><div className="kpi mt-1">{stats?.entities ?? 0}</div></div>
+        <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">{t("capture.facts")}</div><div className="kpi mt-1">{stats?.facts ?? 0}</div></div>
       </div>
 
       <section className="card p-5">
-        <h2 className="section-title mb-3">Captured items ({docs.length})</h2>
+        <h2 className="section-title mb-3">{t("capture.capturedHead")} ({docs.length})</h2>
         <div className="space-y-2">
           {docs.map((d) => (
             <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] px-4 py-2.5 text-sm">
               <span className="badge-blue">{d.kind}</span>
               <span className="font-medium text-navy-100">{d.title}</span>
               <span className="text-xs text-navy-300/60">{new Date(d.uploaded_at).toLocaleDateString()} · {Math.max(1, Math.round(Number(d.size_bytes) / 1024))} KB</span>
-              {Number(d.knowledge_count) > 0 && <span className="badge-green ms-auto">{d.knowledge_count} knowledge</span>}
+              {Number(d.knowledge_count) > 0 && <span className="badge-green ms-auto">{d.knowledge_count} {t("capture.knowledge")}</span>}
             </div>
           ))}
-          {docs.length === 0 && <p className="muted">Nothing captured yet — upload something above.</p>}
+          {docs.length === 0 && <p className="muted">{t("capture.empty")}</p>}
         </div>
       </section>
     </div>
