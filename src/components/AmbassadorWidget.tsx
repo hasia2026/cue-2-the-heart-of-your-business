@@ -99,7 +99,7 @@ export default function AmbassadorWidget() {
 
           <div className="border-t border-white/10 p-3">
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {(["amb.s1", "amb.s2", "amb.s3", "amb.s4"] as const).map((k) => (
+              {(["amb.s1", "amb.s2", "amb.s3", "amb.s4", "amb.s5"] as const).map((k) => (
                 <button key={k} onClick={() => send(t(k))} className="badge-low hover:bg-white/[0.1] !normal-case !text-xs">
                   {t(k)}
                 </button>
