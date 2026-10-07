@@ -13,12 +13,15 @@ export const PRICING_LABEL_KEYS: DictKey[] = [
   "pricing.whyBase", "pricing.whyOverhead", "pricing.whyMargin", "pricing.whyMarket",
   "pricing.whyAging", "pricing.whyNoAging", "pricing.whyFloor",
   "pricing.capture", "pricing.captured", "pricing.invLoaded",
+  "pricing.approvalPrefix", "pricing.approvalAction", "pricing.sendApproval", "pricing.sent",
   "capture.processing", "capture.failed",
   "pitch.indAuto", "pitch.indService", "pitch.indSalon", "pitch.indOther",
 ];
 
 export const ACADEMY_LABEL_KEYS: DictKey[] = [
   "training.title", "training.subtitle", "training.progress", "training.markDone", "training.done",
+  "training.assignTitle", "training.assignMember", "training.assignBtn", "training.assignedYou",
+  "training.team", "training.teamEmpty", "training.unassign", "training.ofDone",
   "training.auto.title", "training.auto.desc",
   "training.auto.l1t", "training.auto.l1b", "training.auto.l2t", "training.auto.l2b", "training.auto.l3t", "training.auto.l3b",
   "training.service.title", "training.service.desc",
@@ -38,6 +41,11 @@ export const LIBRARY_LABEL_KEYS: DictKey[] = [
   "training.passed", "training.avgScore", "training.attempts", "training.watch",
   "training.submit", "training.yourScore", "training.noModules",
   "training.teamProgress", "training.thEmployee", "training.thAttempts", "training.thAvg", "training.thLast", "training.noAttempts",
+];
+
+export const EXECUTE_LABEL_KEYS: DictKey[] = [
+  "approvals.title", "approvals.subtitle", "approvals.approve", "approvals.reject",
+  "approvals.approved", "approvals.rejectedMsg",
 ];
 
 export function buildLabels(keys: DictKey[], t: (k: DictKey) => string): Record<string, string> {

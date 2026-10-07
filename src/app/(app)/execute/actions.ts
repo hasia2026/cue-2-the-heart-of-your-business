@@ -20,6 +20,25 @@ export async function completeTask(taskId: string) {
   return { ok: true };
 }
 
+export async function decideRec(recId: string, decision: "APPROVED" | "REJECTED") {
+  const session = await requireSessionAction();
+  if (session.role === "MEMBER") throw new Error("Only owners and admins can decide approvals.");
+  const [rec] = await sql`select id, title, insight_id from recommendations where id = ${recId} and organization_id = ${session.organizationId}`;
+  if (!rec) throw new Error("Not found");
+  await sql`update recommendations set status = ${decision}, decided_at = now(), decided_by = ${session.user.id} where id = ${recId}`;
+  if (rec.insight_id) {
+    await sql`update insights set status = ${decision === "REJECTED" ? "DISMISSED" : "ACTION_TAKEN"} where id = ${rec.insight_id}`;
+  }
+  await logAudit({
+    organizationId: session.organizationId, actorId: session.user.id,
+    action: `RECOMMENDATION_${decision}`, targetType: "Recommendation", targetId: recId, detail: rec.title,
+  });
+  revalidatePath("/execute");
+  revalidatePath("/enhance");
+  revalidatePath("/understand");
+  return { ok: true };
+}
+
 export async function generateWorkflow(recId: string) {
   const session = await requireSessionAction();
   const result = await createWorkflowFromRecommendation(session.organizationId, session.user.id, recId);

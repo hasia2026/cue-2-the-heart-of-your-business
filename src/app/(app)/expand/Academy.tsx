@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { DictKey } from "@/lib/i18n";
 import { captureDocument } from "../capture/actions";
+import { setLessonDone, assignTrack, unassignTrack } from "./actions";
 
 type TrackKey = "auto" | "service" | "salon";
 type PitchKey = "pitch.indAuto" | "pitch.indService" | "pitch.indSalon" | "pitch.indOther";
+type Member = { id: string; name: string };
+export type TeamAssignment = { id: string; name: string; track: string; done: number };
 
 function trackFor(industry: string): TrackKey {
   const i = industry.toUpperCase();
@@ -26,30 +30,38 @@ function pitchKeys(industry: string): { ind: PitchKey; close: CloseKey } {
   return { ind: "pitch.indOther", close: "pitch.genericClose" };
 }
 
-export default function Academy({ industry, mission, customers, offerings, labels }: {
+export default function Academy({ industry, mission, customers, offerings, labels, myProgress, assignedTracks, canManage, members, team }: {
   industry: string; mission: string; customers: string; offerings: string; labels: Record<string, string>;
+  myProgress: string[]; assignedTracks: string[]; canManage: boolean;
+  members: Member[]; team: TeamAssignment[];
 }) {
   const t = (k: string) => labels[k] ?? k;
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [track, setTrack] = useState<TrackKey>(trackFor(industry));
-  const [done, setDone] = useState<string[]>([]);
+  const [done, setDone] = useState<string[]>(myProgress);
   const [pitch, setPitch] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [captured, setCaptured] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      setDone(JSON.parse(localStorage.getItem("cue.training.done") ?? "[]") as string[]);
-    } catch { /* ignore */ }
-  }, []);
+    setDone(myProgress);
+  }, [myProgress]);
 
-  function toggle(key: string) {
-    const next = done.includes(key) ? done.filter((d) => d !== key) : [...done, key];
+  function toggle(trackKey: TrackKey, lesson: number, key: string) {
+    const isDone = done.includes(key);
+    const next = isDone ? done.filter((d) => d !== key) : [...done, key];
     setDone(next);
-    try { localStorage.setItem("cue.training.done", JSON.stringify(next)); } catch { /* ignore */ }
+    const fd = new FormData();
+    fd.set("track", trackKey);
+    fd.set("lesson", String(lesson));
+    fd.set("done", isDone ? "0" : "1");
+    setLessonDone(fd).then(() => startTransition(() => router.refresh())).catch(() => { /* keep optimistic state */ });
   }
 
   const lessons = [1, 2, 3].map((i) => ({
-    key: `${track}.l${i}`,
+    n: i,
+    key: `${track}.${i}`,
     title: t(("training." + track + ".l" + i + "t") as DictKey),
     body: t(("training." + track + ".l" + i + "b") as DictKey),
   }));
@@ -89,6 +101,7 @@ export default function Academy({ industry, mission, customers, offerings, label
       className={`rounded-xl px-3 py-1.5 text-sm transition ${track === k ? "bg-emerald-500/20 font-semibold text-emerald-200" : "text-navy-100/70 hover:bg-white/[0.05] hover:text-white"}`}
     >
       {label}
+      {assignedTracks.includes(k) && <span className="ms-1.5 rounded-full bg-emerald-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">{t("training.assignedYou")}</span>}
     </button>
   );
 
@@ -120,13 +133,63 @@ export default function Academy({ industry, mission, customers, offerings, label
                   <p className="muted mt-1 text-xs leading-relaxed">{l.body}</p>
                 </div>
               </div>
-              <button onClick={() => toggle(l.key)} className="btn-ghost mt-3 !py-1 !text-xs">
+              <button onClick={() => toggle(track, l.n, l.key)} className="btn-ghost mt-3 !py-1 !text-xs">
                 {isDone ? t("training.done") : t("training.markDone")}
               </button>
             </div>
           );
         })}
       </div>
+
+      {canManage && (
+        <div className="mt-6 rounded-2xl border border-white/[0.06] p-5">
+          <div className="font-semibold text-white">{t("training.assignTitle")}</div>
+          <form action={assignTrack} className="mt-3 flex flex-wrap items-end gap-2">
+            <div className="min-w-44">
+              <label className="label">{t("training.assignMember")}</label>
+              <select name="userId" className="input">
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-36">
+              <label className="label">{t("training.title")}</label>
+              <select name="track" className="input">
+                <option value="auto">{t("training.auto.title")}</option>
+                <option value="service">{t("training.service.title")}</option>
+                <option value="salon">{t("training.salon.title")}</option>
+              </select>
+            </div>
+            <button className="btn-primary !py-2 !text-xs">{t("training.assignBtn")}</button>
+          </form>
+
+          <div className="mt-4 border-t border-white/[0.06] pt-3">
+            <div className="text-sm font-semibold text-white">{t("training.team")}</div>
+            {team.length > 0 ? (
+              <table className="mt-2 w-full text-left text-sm">
+                <tbody>
+                  {team.map((r) => (
+                    <tr key={r.id} className="border-t border-white/[0.05]">
+                      <td className="py-2 text-navy-100">{r.name}</td>
+                      <td className="py-2 text-navy-300">{t(("training." + r.track + ".title") as DictKey)}</td>
+                      <td className="py-2 text-emerald-300">{t("training.ofDone").replace("{done}", String(r.done))}</td>
+                      <td className="py-2 text-end">
+                        <form action={unassignTrack}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <button className="btn-ghost !py-0.5 !text-[11px]">{t("training.unassign")}</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="muted mt-2 text-sm">{t("training.teamEmpty")}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 rounded-2xl border border-white/[0.06] p-5">
         <div className="flex flex-wrap items-center gap-3">

@@ -5,6 +5,50 @@ import { requireSession } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TRACKS = ["auto", "service", "salon"];
+
+export async function setLessonDone(fd: FormData): Promise<void> {
+  const session = await requireSession();
+  const track = String(fd.get("track") ?? "");
+  const lesson = Number(fd.get("lesson") ?? 0);
+  const done = String(fd.get("done") ?? "1") === "1";
+  if (!TRACKS.includes(track) || ![1, 2, 3].includes(lesson)) return;
+  if (done) {
+    await sql`
+      insert into academy_progress (organization_id, user_id, track, lesson)
+      values (${session.organizationId}, ${session.user.id}, ${track}, ${lesson})
+      on conflict (organization_id, user_id, track, lesson) do nothing`;
+  } else {
+    await sql`
+      delete from academy_progress
+      where organization_id = ${session.organizationId} and user_id = ${session.user.id}
+        and track = ${track} and lesson = ${lesson}`;
+  }
+  revalidatePath("/expand");
+}
+
+export async function assignTrack(fd: FormData): Promise<void> {
+  const session = await requireSession();
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return;
+  const orgId = session.organizationId;
+  const track = String(fd.get("track") ?? "");
+  const userId = String(fd.get("userId") ?? "");
+  if (!TRACKS.includes(track) || !UUID_RE.test(userId)) return;
+  await sql`
+    insert into academy_assignments (organization_id, user_id, track, assigned_by)
+    values (${orgId}, ${userId}, ${track}, ${session.user.id})
+    on conflict (organization_id, user_id, track) do nothing`;
+  revalidatePath("/expand");
+}
+
+export async function unassignTrack(fd: FormData): Promise<void> {
+  const session = await requireSession();
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return;
+  const id = String(fd.get("id") ?? "");
+  if (!UUID_RE.test(id)) return;
+  await sql`delete from academy_assignments where id = ${id} and organization_id = ${session.organizationId}`;
+  revalidatePath("/expand");
+}
 
 export async function importTraining(fd: FormData): Promise<void> {
   const session = await requireSession();

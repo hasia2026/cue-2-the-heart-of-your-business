@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { captureDocument } from "../capture/actions";
+import { requestPriceApproval } from "./actions";
 
 type Veh = { id: string; label: string; cost: number; days: number; listPrice: number };
 type Mode = "job" | "vehicle" | "product";
@@ -35,6 +36,8 @@ export default function PricingStudio({ industry, vehicles, labels }: {
   const [busy, setBusy] = useState(false);
   const [captured, setCaptured] = useState<string | null>(null);
   const [fail, setFail] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const [margin, setMargin] = useState(30);
   const [vehId, setVehId] = useState("");
@@ -121,6 +124,46 @@ export default function PricingStudio({ industry, vehicles, labels }: {
       setCaptured(t("capture.failed"));
     } finally {
       setBusy(false);
+    }
+  }
+
+  function decisionPayload() {
+    const label = mode === "vehicle" ? t("pricing.tabVehicle") : mode === "job" ? t("pricing.tabJob") : t("pricing.tabProduct");
+    const v = vehicles.find((x) => x.id === vehId);
+    const subject = mode === "vehicle" && v ? `${label} — ${v.label}` : label;
+    const inputs =
+      mode === "vehicle"
+        ? `${t("pricing.vehicleCost")} ${usd(cost, 0)} + ${t("pricing.recon")} ${usd(recon, 0)}; ${t("pricing.daysOnLot")} ${days}; ${t("pricing.marketAdj")} ${market > 0 ? "+" : ""}${market}%`
+        : mode === "job"
+          ? `${t("pricing.laborHours")} ${hours} × ${t("pricing.laborRate")} ${usd(rate, 0)} + ${t("pricing.parts")} ${usd(parts, 0)} + ${t("pricing.fees")} ${usd(fees, 0)}; ${t("pricing.overhead")} ${overhead}%`
+          : `${t("pricing.unitCost")} ${usd(unitCost, 2)}; ${t("pricing.timeMin")} ${timeMin}; ${t("pricing.staffRate")} ${usd(staffRate, 0)}; ${t("pricing.overhead")} ${overhead}%`;
+    return {
+      title: `${t("pricing.approvalPrefix")} ${subject} → ${usd(r.suggest, mode === "vehicle" ? 0 : 2)}`,
+      action: `${t("pricing.approvalAction").replace("{price}", usd(r.suggest, mode === "vehicle" ? 0 : 2)).replace("{floor}", usd(r.floor, mode === "vehicle" ? 0 : 2))}. ${inputs}`,
+      rationale: r.why.join(" • "),
+      impact: Math.max(0, r.suggest - r.floor),
+    };
+  }
+
+  async function sendForApproval() {
+    if (sending) return;
+    setSending(true);
+    setFail(false);
+    setSent(false);
+    try {
+      const p = decisionPayload();
+      const fd = new FormData();
+      fd.set("title", p.title);
+      fd.set("action", p.action);
+      fd.set("rationale", p.rationale);
+      fd.set("impact", String(p.impact));
+      await requestPriceApproval(fd);
+      setSent(true);
+    } catch {
+      setFail(true);
+      setCaptured(t("capture.failed"));
+    } finally {
+      setSending(false);
     }
   }
 
@@ -222,9 +265,15 @@ export default function PricingStudio({ industry, vehicles, labels }: {
               ))}
             </ul>
           </div>
-          <button onClick={capture} disabled={busy} className="btn-primary mt-4 w-full">
-            {busy ? t("capture.processing") : t("pricing.capture")}
-          </button>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button onClick={capture} disabled={busy} className="btn-ghost !text-xs">
+              {busy ? t("capture.processing") : t("pricing.capture")}
+            </button>
+            <button onClick={sendForApproval} disabled={sending} className="btn-primary !text-xs">
+              {sending ? t("capture.processing") : t("pricing.sendApproval")}
+            </button>
+          </div>
+          {sent && <p className="mt-2 text-xs text-emerald-300">{t("pricing.sent")}</p>}
           {captured && (
             <p className={`mt-2 text-xs ${fail ? "text-red-300" : "text-emerald-300"}`}>{captured}</p>
           )}

@@ -1,11 +1,14 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
-import ExecuteClient, { type Task as TaskRow, type WF as WFRow, type Rec as RecRow } from "./ExecuteClient";
+import { getT } from "@/lib/locale";
+import { EXECUTE_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
+import ExecuteClient, { type Task as TaskRow, type WF as WFRow, type Rec as RecRow, type PendingRec } from "./ExecuteClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExecutePage() {
   const session = await requireSession();
+  const { t } = await getT();
   const orgId = session.organizationId;
 
   const tasks = await sql`
@@ -25,6 +28,10 @@ export default async function ExecutePage() {
     select r.id, r.title, r.action from recommendations r
     where r.organization_id = ${orgId} and r.status = 'APPROVED' and r.workflow_id is null
     order by r.decided_at desc limit 10`;
+  const pendingRecs = await sql`
+    select r.id, r.title, r.action, r.impact_value as "impactValue" from recommendations r
+    where r.organization_id = ${orgId} and r.status = 'PENDING'
+    order by r.created_at desc limit 10`;
 
   return (
     <div className="space-y-6">
@@ -36,6 +43,9 @@ export default async function ExecutePage() {
         tasks={tasks as unknown as TaskRow[]}
         workflows={workflows as unknown as WFRow[]}
         approvedRecs={approvedRecs as unknown as RecRow[]}
+        pendingRecs={pendingRecs as unknown as PendingRec[]}
+        canDecide={session.role !== "MEMBER"}
+        labels={buildLabels(EXECUTE_LABEL_KEYS, t)}
       />
     </div>
   );

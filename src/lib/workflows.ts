@@ -52,7 +52,7 @@ function guessKind(title: string): string {
 }
 
 async function buildTasks(organizationId: string, workflowId: string, recId: string, title: string) {
-  const [rec] = await sql`select insight_id from recommendations where id = ${recId}`;
+  const [rec] = await sql`select insight_id, action from recommendations where id = ${recId}`;
   const insightId = rec?.insight_id;
   const made: { title: string; detail: string }[] = [];
 
@@ -107,7 +107,7 @@ async function buildTasks(organizationId: string, workflowId: string, recId: str
 
   // Fallback: single action task from the recommendation itself
   if (made.length === 0) {
-    made.push({ title, detail: "Run the approved recommendation. See the linked insight for evidence." });
+    made.push({ title, detail: rec?.action || "Run the approved recommendation. See the linked insight for evidence." });
   }
 
   const [lead] = await sql`

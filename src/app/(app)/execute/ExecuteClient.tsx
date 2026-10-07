@@ -2,13 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { completeTask, generateWorkflow } from "./actions";
+import { completeTask, decideRec, generateWorkflow } from "./actions";
 
 export type Task = { id: string; title: string; detail: string | null; status: string; priority: string; assignee: string | null; workflowTitle: string | null };
 export type WF = { id: string; title: string; kind: string; status: string; taskCount: number; recId: string | null };
 export type Rec = { id: string; title: string; action: string };
+export type PendingRec = { id: string; title: string; action: string; impactValue: string | number | null };
 
-export default function ExecuteClient({ tasks, workflows, approvedRecs }: { tasks: Task[]; workflows: WF[]; approvedRecs: Rec[] }) {
+export default function ExecuteClient({ tasks, workflows, approvedRecs, pendingRecs, canDecide, labels }: {
+  tasks: Task[]; workflows: WF[]; approvedRecs: Rec[];
+  pendingRecs: PendingRec[]; canDecide: boolean; labels: Record<string, string>;
+}) {
+  const t = (k: string) => labels[k] ?? k;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -39,9 +44,53 @@ export default function ExecuteClient({ tasks, workflows, approvedRecs }: { task
     }
   }
 
+  async function decide(recId: string, decision: "APPROVED" | "REJECTED") {
+    setBusyId(recId);
+    setMsg(null);
+    try {
+      await decideRec(recId, decision);
+      setMsg(decision === "APPROVED" ? t("approvals.approved") : t("approvals.rejectedMsg"));
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {msg && <div className="rounded-xl border border-cue-green/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{msg}</div>}
+
+      {pendingRecs.length > 0 && (
+        <section className="card p-5">
+          <h2 className="section-title mb-1">{t("approvals.title")}</h2>
+          <p className="muted mb-3 text-xs">{t("approvals.subtitle")}</p>
+          <div className="space-y-2">
+            {pendingRecs.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.06] px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-navy-100">{r.title}</div>
+                  <div className="text-xs text-navy-300/70">{r.action}</div>
+                </div>
+                {r.impactValue != null && Number(r.impactValue) > 0 && (
+                  <span className="text-sm font-semibold text-cue-green">+${Number(r.impactValue).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                )}
+                {canDecide && (
+                  <div className="flex gap-2">
+                    <button disabled={busyId === r.id || pending} onClick={() => decide(r.id, "APPROVED")} className="btn-primary !py-1.5 text-xs">
+                      {busyId === r.id ? "…" : t("approvals.approve")}
+                    </button>
+                    <button disabled={busyId === r.id || pending} onClick={() => decide(r.id, "REJECTED")} className="btn-ghost !py-1.5 text-xs">
+                      {t("approvals.reject")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {approvedRecs.length > 0 && (
         <section className="card p-5">
