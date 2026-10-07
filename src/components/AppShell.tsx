@@ -13,33 +13,53 @@ export default async function AppShell({ children }: { children: React.ReactNode
       title: "Command",
       items: [
         { href: "/dashboard", label: t("nav.dashboard"), icon: "◎" },
-        { href: "/compass", label: t("nav.compass"), icon: "✧" },
-        { href: "/signals", label: t("nav.signals"), icon: "◉" },
       ],
     },
     {
-      title: "Knowledge loop",
+      // The five loops — each loop is a parent, its modules nest beneath it.
+      title: "",
       items: [
-        { href: "/capture", label: t("nav.capture"), icon: "⤓" },
-        { href: "/understand", label: t("nav.understand"), icon: "◈" },
-        { href: "/knowledge", label: t("nav.knowledge"), icon: "❑" },
-        { href: "/enhance", label: t("nav.enhance"), icon: "✦" },
-      ],
-    },
-    {
-      title: "Operate",
-      items: [
-        { href: "/pipeline", label: t("nav.pipeline"), icon: "⇉" },
-        { href: "/execute", label: t("nav.execute"), icon: "▶" },
-        { href: "/report", label: t("nav.report"), icon: "▤" },
-        { href: "/people", label: t("nav.people"), icon: "☰" },
-        { href: "/expand", label: t("nav.expand"), icon: "↑" },
+        {
+          href: "/capture",
+          label: t("nav.capture"),
+          icon: "⤓",
+          children: [{ href: "/signals", label: t("nav.signals") }],
+        },
+        {
+          href: "/understand",
+          label: t("nav.understand"),
+          icon: "◈",
+          children: [
+            { href: "/compass", label: t("nav.compass") },
+            { href: "/knowledge", label: t("nav.knowledge") },
+          ],
+        },
+        {
+          href: "/enhance",
+          label: t("nav.enhance"),
+          icon: "✦",
+        },
+        {
+          href: "/execute",
+          label: t("nav.execute"),
+          icon: "▶",
+          children: [
+            { href: "/pipeline", label: t("nav.pipeline") },
+            { href: "/report", label: t("nav.report") },
+            { href: "/people", label: t("nav.people") },
+          ],
+        },
+        {
+          href: "/expand",
+          label: t("nav.expand"),
+          icon: "↑",
+          children: [{ href: "/lab", label: t("nav.lab") }],
+        },
       ],
     },
     {
       title: "System",
       items: [
-        { href: "/lab", label: t("nav.lab"), icon: "⚗" },
         { href: "/ecosystem", label: t("nav.ecosystem"), icon: "⊂" },
         { href: "/settings", label: t("nav.settings"), icon: "⚙" },
       ],

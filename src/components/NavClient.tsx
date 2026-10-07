@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-export type NavItem = { href: string; label: string; icon: string };
+export type NavChild = { href: string; label: string };
+export type NavItem = { href: string; label: string; icon: string; children?: NavChild[] };
 
 export default function NavClient({ groups }: { groups: { title: string; items: NavItem[] }[] }) {
   const pathname = usePathname();
@@ -13,7 +14,8 @@ export default function NavClient({ groups }: { groups: { title: string; items: 
   return (
     <>
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-white/[0.07] bg-ink-950/80 px-4 py-3 backdrop-blur lg:hidden">
+      {/* Mobile top bar — self-start keeps it out of the root flex row's vertical stretch so sticky works */}
+      <div className="sticky top-0 z-40 flex w-full items-center justify-between self-start border-b border-white/[0.07] bg-ink-950/80 px-4 py-3 backdrop-blur lg:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 font-bold text-white">
           <LogoMark className="h-6 w-6" /> CUE
         </Link>
@@ -37,22 +39,55 @@ export default function NavClient({ groups }: { groups: { title: string; items: 
 
         {groups.map((g) => (
           <div key={g.title} className="mb-5">
-            <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-navy-300/70">{g.title}</div>
+            {g.title ? (
+              <div className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-navy-300/70">{g.title}</div>
+            ) : null}
             <nav className="space-y-0.5">
               {g.items.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const selfActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const children = item.children ?? [];
+                const childActive = children.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"));
                 return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition ${
-                      active ? "bg-violet-500/15 font-semibold text-violet-200 shadow-glow" : "text-navy-100/80 hover:bg-white/[0.05] hover:text-white"
-                    }`}
-                  >
-                    <span className="w-5 text-center text-base leading-none">{item.icon}</span>
-                    {item.label}
-                  </Link>
+                  <div key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition ${
+                        selfActive
+                          ? "bg-violet-500/15 font-semibold text-violet-200 shadow-glow"
+                          : childActive
+                            ? "bg-white/[0.04] font-medium text-white"
+                            : "text-navy-100/80 hover:bg-white/[0.05] hover:text-white"
+                      }`}
+                    >
+                      <span className="w-5 text-center text-base leading-none">{item.icon}</span>
+                      <span className="flex-1">{item.label}</span>
+                      {children.length > 0 && (
+                        <span className="text-[10px] font-normal text-navy-300/60">{children.length}</span>
+                      )}
+                    </Link>
+                    {children.length > 0 && (
+                      <div className="mb-1 ms-[19px] mt-0.5 space-y-0.5 border-s border-white/[0.08] ps-3">
+                        {children.map((c) => {
+                          const active = pathname === c.href || pathname.startsWith(c.href + "/");
+                          return (
+                            <Link
+                              key={c.href}
+                              href={c.href}
+                              onClick={() => setOpen(false)}
+                              className={`block rounded-lg px-2 py-1.5 text-[13px] transition ${
+                                active
+                                  ? "bg-violet-500/10 font-semibold text-violet-200"
+                                  : "text-navy-100/60 hover:bg-white/[0.04] hover:text-white"
+                              }`}
+                            >
+                              {c.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>
