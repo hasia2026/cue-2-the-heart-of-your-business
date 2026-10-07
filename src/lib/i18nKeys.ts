@@ -43,6 +43,12 @@ export const LIBRARY_LABEL_KEYS: DictKey[] = [
   "training.teamProgress", "training.thEmployee", "training.thAttempts", "training.thAvg", "training.thLast", "training.noAttempts",
 ];
 
+export const NAV_TOAST_KEYS: DictKey[] = [
+  "nav.toasts.newInsight",
+  "nav.toasts.newApproval",
+  "nav.toasts.newTask",
+];
+
 export const EXECUTE_LABEL_KEYS: DictKey[] = [
   "approvals.title", "approvals.subtitle", "approvals.approve", "approvals.reject",
   "approvals.approved", "approvals.rejectedMsg",

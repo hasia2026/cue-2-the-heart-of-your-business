@@ -1,7 +1,6 @@
 import { sql } from "@/lib/db";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
-import { LogoMark } from "@/components/NavClient";
 import EvidenceDrawer from "@/components/EvidenceDrawer";
 
 export const dynamic = "force-dynamic";
@@ -64,37 +63,8 @@ export default async function DashboardPage() {
         <span className="text-lg font-semibold text-white md:text-xl">{t("dash.taglineTop")}</span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        {/* ── Left rail: brand + value pillars (mock's left column) ── */}
-        <aside className="space-y-4">
-          <div className="card flex items-center gap-3 p-4">
-            <LogoMark className="h-9 w-9" />
-            <div>
-              <div className="text-lg font-bold tracking-wide text-white">CUE</div>
-              <div className="text-[11px] text-violet-300">{t("app.tagline")}</div>
-            </div>
-          </div>
-          <div className="card space-y-4 p-5">
-            {[
-              { icon: "✦", color: "text-violet-300", ring: "border-violet-400/50", title: t("pillar.understand"), desc: t("home.understandDesc") },
-              { icon: "◎", color: "text-cyan-300", ring: "border-cyan-400/50", title: t("pillar.execute"), desc: t("home.executeDesc") },
-              { icon: "⚡", color: "text-emerald-300", ring: "border-emerald-400/50", title: t("pillar.enhance"), desc: t("home.enhanceDesc") },
-              { icon: "▤", color: "text-orange-300", ring: "border-orange-400/50", title: t("pillar.expand"), desc: t("home.expandDesc") },
-            ].map((p) => (
-              <div key={p.title} className="flex items-start gap-3">
-                <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${p.ring} bg-white/[0.03] text-lg ${p.color}`}>{p.icon}</span>
-                <div>
-                  <div className={`font-semibold ${p.color}`}>{p.title}</div>
-                  <p className="muted text-xs leading-snug">{p.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </aside>
-
-        {/* ── Main panel (mock's right column) ── */}
-        <div className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3">
+      {/* Essentials only — priority insight, health, numbers, actions. No side rail, no filler tiles. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Priority insight */}
             {priority ? (
               <div className="card card-hover relative overflow-hidden p-5 lg:col-span-1">
@@ -116,14 +86,6 @@ export default async function DashboardPage() {
                 <p className="muted mt-6 text-sm">{t("dash.noInsights")}</p>
               </div>
             )}
-
-            {/* Emblem center */}
-            <div className="card relative hidden items-center justify-center overflow-hidden p-5 lg:flex">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.22),transparent_65%)]" />
-              <div className="cue-halo relative">
-                <LogoMark className="h-28 w-28" />
-              </div>
-            </div>
 
             {/* Business health ring */}
             <div className="card flex flex-col items-center justify-center p-5 text-center">
@@ -162,7 +124,7 @@ export default async function DashboardPage() {
 
           {/* Bottom band: activity + recommended next actions */}
           <div className="grid gap-4 lg:grid-cols-2">
-            <section className="card p-5">
+            <section className="card min-w-0 p-5">
               <h2 className="eyebrow mb-3">{t("dash.recentActivity")}</h2>
               <ul className="space-y-2.5">
                 {activity.map((a, i) => (
@@ -180,7 +142,7 @@ export default async function DashboardPage() {
               </ul>
             </section>
 
-            <section className="card p-5">
+            <section className="card min-w-0 p-5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="eyebrow !text-violet-300">{t("dash.recommendedActions")}</h2>
                 <a href="/execute" className="text-xs text-cyan-300 hover:underline">{t("dash.viewAll")}</a>
@@ -222,8 +184,6 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
-      </div>
     </div>
   );
 }

@@ -5,17 +5,32 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 export type NavChild = { href: string; label: string };
-export type NavItem = { href: string; label: string; icon: string; children?: NavChild[] };
+export type NavItem = { href: string; label: string; icon: string; pulse?: number; children?: NavChild[] };
 
-export default function NavClient({ groups }: { groups: { title: string; items: NavItem[] }[] }) {
+export type NavGroup = { title: string; items: NavItem[] };
+
+export default function NavClient({
+  groups,
+  toastLabels = {},
+}: {
+  groups: NavGroup[];
+  toastLabels?: Record<string, string>;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // What the pulse means, per loop — shown as the badge tooltip.
+  const toastFor = (item: NavItem) => {
+    if (item.href === "/understand" && (item.pulse ?? 0) > 0) return toastLabels["nav.toasts.newInsight"];
+    if (item.href === "/enhance" && (item.pulse ?? 0) > 0) return toastLabels["nav.toasts.newApproval"];
+    if (item.href === "/execute" && (item.pulse ?? 0) > 0) return toastLabels["nav.toasts.newTask"];
+    return undefined;
+  };
+
   return (
     <>
-      {/* Mobile top bar */}
-      {/* Mobile top bar — self-start keeps it out of the root flex row's vertical stretch so sticky works */}
-      <div className="sticky top-0 z-40 flex w-full items-center justify-between self-start border-b border-white/[0.07] bg-ink-950/80 px-4 py-3 backdrop-blur lg:hidden">
+      {/* Mobile top bar — root is flex-col on mobile, so this owns a full-width row and sticky engages */}
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-white/[0.07] bg-ink-950/80 px-4 py-3 backdrop-blur lg:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 font-bold text-white">
           <LogoMark className="h-6 w-6" /> CUE
         </Link>
@@ -62,8 +77,13 @@ export default function NavClient({ groups }: { groups: { title: string; items: 
                     >
                       <span className="w-5 text-center text-base leading-none">{item.icon}</span>
                       <span className="flex-1">{item.label}</span>
-                      {children.length > 0 && (
-                        <span className="text-[10px] font-normal text-navy-300/60">{children.length}</span>
+                      {(item.pulse ?? 0) > 0 && (
+                        <span
+                          className="ms-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-cue-red/90 px-1.5 text-[10px] font-bold leading-none text-white"
+                          title={toastFor(item)}
+                        >
+                          {(item.pulse ?? 0) > 9 ? "9+" : item.pulse}
+                        </span>
                       )}
                     </Link>
                     {children.length > 0 && (

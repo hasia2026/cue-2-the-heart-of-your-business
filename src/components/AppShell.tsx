@@ -1,5 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
+import { sql } from "@/lib/db";
+import { NAV_TOAST_KEYS, buildLabels } from "@/lib/i18nKeys";
 import NavClient, { LogoMark } from "./NavClient";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { signOut } from "@/app/signin/actions";
@@ -7,6 +9,27 @@ import { signOut } from "@/app/signin/actions";
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   const { locale, rtl, t } = await getT();
+
+  // ── Loop pulse: open work awaiting attention, per loop parent ──
+  // Counts stay 0 for signed-out visitors and empty/prospect orgs; pulse
+  // badges render only for real open items, never fabricated.
+  const s = session;
+  let pulse = { capture: 0, understand: 0, enhance: 0, execute: 0, expand: 0 };
+  if (s) {
+    const [oi, pa, at] = await Promise.all([
+      sql`select count(*)::int as n from insights where organization_id = ${s.organizationId} and status = 'OPEN'`,
+      sql`select count(*)::int as n from recommendations where organization_id = ${s.organizationId} and status = 'PENDING'`,
+      sql`select count(*)::int as n from tasks where organization_id = ${s.organizationId} and status in ('OPEN', 'IN_PROGRESS')`,
+    ]);
+    pulse = {
+      capture: 0,
+      understand: Number(oi[0]?.n ?? 0),
+      enhance: Number(pa[0]?.n ?? 0),
+      execute: Number(at[0]?.n ?? 0),
+      expand: 0,
+    };
+  }
+  const toastLabels = buildLabels(NAV_TOAST_KEYS, t);
 
   const groups = [
     {
@@ -29,6 +52,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           href: "/understand",
           label: t("nav.understand"),
           icon: "◈",
+          pulse: pulse.understand,
           children: [
             { href: "/compass", label: t("nav.compass") },
             { href: "/knowledge", label: t("nav.knowledge") },
@@ -38,11 +62,13 @@ export default async function AppShell({ children }: { children: React.ReactNode
           href: "/enhance",
           label: t("nav.enhance"),
           icon: "✦",
+          pulse: pulse.enhance,
         },
         {
           href: "/execute",
           label: t("nav.execute"),
           icon: "▶",
+          pulse: pulse.execute,
           children: [
             { href: "/pipeline", label: t("nav.pipeline") },
             { href: "/report", label: t("nav.report") },
@@ -67,8 +93,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
   ];
 
   return (
-    <div className="flex min-h-screen" dir={rtl ? "rtl" : "ltr"} lang={locale}>
-      <NavClient groups={groups} />
+    // Mobile: top bar stacks above content (column); desktop: sidebar + content row
+    <div className="flex min-h-screen flex-col lg:flex-row" dir={rtl ? "rtl" : "ltr"} lang={locale}>
+      <NavClient groups={groups} toastLabels={toastLabels} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 hidden items-center gap-3 border-b border-white/[0.07] bg-ink-950/70 px-6 py-3 backdrop-blur lg:flex">
           <div className="text-sm text-navy-300">{t("app.tagline")}</div>
