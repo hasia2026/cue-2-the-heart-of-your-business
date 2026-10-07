@@ -12,9 +12,15 @@ export type NavGroup = { title: string; items: NavItem[] };
 export default function NavClient({
   groups,
   toastLabels = {},
+  signedIn = false,
+  signOutAction,
+  signOutLabel = "Sign out",
 }: {
   groups: NavGroup[];
   toastLabels?: Record<string, string>;
+  signedIn?: boolean;
+  signOutAction?: () => Promise<void>;
+  signOutLabel?: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -34,9 +40,16 @@ export default function NavClient({
         <Link href="/dashboard" className="flex items-center gap-2 font-bold text-white">
           <LogoMark className="h-6 w-6" /> CUE
         </Link>
-        <button onClick={() => setOpen(!open)} className="btn-ghost !px-3 !py-1.5" aria-label="Menu">
-          {open ? "✕" : "☰"}
-        </button>
+        <div className="flex items-center gap-2">
+          {signedIn && signOutAction && (
+            <form action={signOutAction}>
+              <button className="btn-ghost !px-3 !py-1.5 text-xs">{signOutLabel}</button>
+            </form>
+          )}
+          <button onClick={() => setOpen(!open)} className="btn-ghost !px-3 !py-1.5" aria-label="Menu">
+            {open ? "✕" : "☰"}
+          </button>
+        </div>
       </div>
 
       <aside

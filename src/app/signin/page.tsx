@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import PasswordInput from "@/components/PasswordInput";
 import { signInAction } from "./actions";
 
 export default async function SignInPage() {
@@ -16,7 +17,7 @@ export default async function SignInPage() {
           </div>
           <div>
             <label className="label" htmlFor="password">Password</label>
-            <input id="password" name="password" type="password" required className="input" autoComplete="current-password" />
+            <PasswordInput id="password" name="password" required autoComplete="current-password" />
           </div>
           <button className="btn-primary w-full">Sign in</button>
         </form>

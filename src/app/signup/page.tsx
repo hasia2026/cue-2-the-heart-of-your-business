@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import PasswordInput from "@/components/PasswordInput";
 import { signUpAction } from "@/app/signin/actions";
 
 export default async function SignUpPage({
@@ -36,7 +37,7 @@ export default async function SignUpPage({
           </div>
           <div>
             <label className="label" htmlFor="password">Password (8+ characters)</label>
-            <input id="password" name="password" type="password" required minLength={8} className="input" autoComplete="new-password" />
+            <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
           </div>
           <button className="btn-primary w-full">Create company</button>
         </form>

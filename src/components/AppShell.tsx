@@ -95,7 +95,13 @@ export default async function AppShell({ children }: { children: React.ReactNode
   return (
     // Mobile: top bar stacks above content (column); desktop: sidebar + content row
     <div className="flex min-h-screen flex-col lg:flex-row" dir={rtl ? "rtl" : "ltr"} lang={locale}>
-      <NavClient groups={groups} toastLabels={toastLabels} />
+      <NavClient
+        groups={groups}
+        toastLabels={toastLabels}
+        signedIn={!!session}
+        signOutAction={signOut}
+        signOutLabel={t("app.signOut")}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 hidden items-center gap-3 border-b border-white/[0.07] bg-ink-950/70 px-6 py-3 backdrop-blur lg:flex">
           <div className="text-sm text-navy-300">{t("app.tagline")}</div>
