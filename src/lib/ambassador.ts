@@ -75,14 +75,31 @@ export async function getAmbassadorConfig(orgId: string): Promise<AmbassadorConf
   const [row] = await sql`
     select ambassador_provider, ambassador_model, ambassador_key_enc
     from ai_settings where organization_id = ${orgId}`;
-  if (!row?.ambassador_provider || !row?.ambassador_key_enc) {
-    return { provider: null, model: null, apiKey: null };
+  if (row?.ambassador_provider && row?.ambassador_key_enc) {
+    return {
+      provider: row.ambassador_provider as ProviderId,
+      model: (row.ambassador_model as string | null) ?? null,
+      apiKey: decryptSecret(row.ambassador_key_enc as string),
+    };
   }
-  return {
-    provider: row.ambassador_provider as ProviderId,
-    model: (row.ambassador_model as string | null) ?? null,
-    apiKey: decryptSecret(row.ambassador_key_enc as string),
-  };
+  // Server-level fallback (env): lets the Ambassador speak with a free LLM
+  // without per-org setup. Org-level config always wins; with no key anywhere
+  // the grounded core answers alone — nothing pretends to be smarter than it is.
+  if (process.env.GROQ_API_KEY) {
+    return {
+      provider: "groq",
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      apiKey: process.env.GROQ_API_KEY,
+    };
+  }
+  if (process.env.GEMINI_API_KEY) {
+    return {
+      provider: "google",
+      model: process.env.GEMINI_MODEL || "gemini-2.0-flash",
+      apiKey: process.env.GEMINI_API_KEY,
+    };
+  }
+  return { provider: null, model: null, apiKey: null };
 }
 
 /** The grounded business facts (CUE's own deterministic engine), in-language. */

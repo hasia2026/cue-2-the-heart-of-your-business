@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { whatsappConnected } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,10 @@ export default async function EcosystemPage() {
   const integrations = await sql`
     select id, key, name, category, status, data_available, capabilities
     from integrations where organization_id = ${orgId} order by category, name`;
+
+  // WhatsApp status is computed live from env — never fabricated from the seed row.
+  const liveStatus = (key: string, status: string) =>
+    key === "whatsapp_cloud" && whatsappConnected() ? "CONNECTED" : status;
 
   return (
     <div className="space-y-6">
@@ -32,7 +37,7 @@ export default async function EcosystemPage() {
           <div key={i.id} className="card p-5">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-white">{i.name}</span>
-              <span className={`badge ms-auto ${STATUS_BADGE[i.status] ?? "badge-low"}`}>{i.status}</span>
+              <span className={`badge ms-auto ${STATUS_BADGE[liveStatus(i.key, i.status)] ?? "badge-low"}`}>{liveStatus(i.key, i.status)}</span>
             </div>
             <div className="mt-1 text-xs uppercase tracking-widest text-navy-300/60">{i.category}</div>
             <dl className="mt-3 space-y-1 text-xs">

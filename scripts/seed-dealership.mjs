@@ -298,7 +298,8 @@ async function main() {
       (${orgId}, 'quickbooks', 'QuickBooks Online', 'ACCOUNTING', 'DEMO', 'Invoices, payments, COA', 'Push invoices; reconcile payments'),
       (${orgId}, 'google_calendar', 'Google Calendar', 'SCHEDULING', 'DEMO', 'Appointments', 'Two-way appointment sync'),
       (${orgId}, 'google_gbp', 'Google Business Profile', 'EMAIL', 'AVAILABLE', 'Reviews, Q&A, messages', 'Review alerts; reply drafting'),
-      (${orgId}, 'twilio_sms', 'Twilio SMS', 'EMAIL', 'AVAILABLE', 'Outbound SMS', 'Service status + lead follow-up texts')`;
+      (${orgId}, 'twilio_sms', 'Twilio SMS', 'EMAIL', 'AVAILABLE', 'Outbound SMS', 'Service status + lead follow-up texts'),
+      (${orgId}, 'whatsapp_cloud', 'WhatsApp (Cloud API)', 'MESSAGING', 'AVAILABLE', 'Inbound + outbound WhatsApp', 'AI Ambassador replies from your records; status turns CONNECTED when server credentials are set')`;
 
     await sql`
       insert into ai_settings (organization_id) values (${orgId})`;

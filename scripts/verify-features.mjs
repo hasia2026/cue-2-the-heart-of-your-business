@@ -159,6 +159,24 @@ try {
   const forgotBody = await forgotPage.text();
   check("forgot page: form present", forgotBody.includes("Send reset link"));
 
+  // ── AI Ambassador: grounded answer + honest LLM modes ──
+  const ambRes = await fetch(BASE + "/api/ambassador", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", cookie: `cue_session=${session}` },
+    body: JSON.stringify({ question: "What is CUE?" }),
+  });
+  const amb = await ambRes.json().catch(() => null);
+  check("ambassador: answers from records",
+    ambRes.status === 200 && typeof amb?.answer === "string" && amb.answer.length > 20
+      && (amb.mode === "grounded" || amb.mode === "ambassador"),
+    `${ambRes.status} mode=${amb?.mode}`);
+
+  // ── WhatsApp webhook: honest refusal when unverified/unconfigured ──
+  const waNoParams = await fetch(BASE + "/api/webhooks/whatsapp");
+  check("whatsapp webhook: unverified GET refused", waNoParams.status === 403, String(waNoParams.status));
+  const waBadToken = await fetch(BASE + "/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=42");
+  check("whatsapp webhook: wrong verify token refused", waBadToken.status === 403, String(waBadToken.status));
+
   // ── Demo data still clean of test artifacts ──
   const [att] = await sql`select count(*)::int as n from training_attempts`;
   const [part] = await sql`select count(*)::int as n from partners`;
