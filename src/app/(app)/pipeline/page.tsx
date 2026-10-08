@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { getVocab } from "@/lib/vocab";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ const ago = (d: Date | string | null) => d ? `${Math.floor((Date.now() - new Dat
 export default async function PipelinePage() {
   const session = await requireSession();
   const orgId = session.organizationId;
+  const vocab = await getVocab(orgId);
 
   const leads = await sql`
     select id, name, source, interest, est_value, status, created_at, last_contact_at
@@ -40,7 +42,7 @@ export default async function PipelinePage() {
     <div className="space-y-6">
       <div>
         <h1 className="page-title">Pipeline</h1>
-        <p className="page-sub">Leads, deals, inventory, and service work in one view — the Auto Dealership pack surface.</p>
+        <p className="page-sub">{vocab.pipelineSub}</p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -89,7 +91,7 @@ export default async function PipelinePage() {
         </section>
 
         <section className="card p-5">
-          <h2 className="section-title mb-3">Inventory (oldest first)</h2>
+          <h2 className="section-title mb-3">{vocab.inventoryTitle}</h2>
           <div className="space-y-2">
             {inventory.map((v) => {
               const dol = Math.floor((Date.now() - new Date(v.listed_at).getTime()) / 864e5);
@@ -102,12 +104,12 @@ export default async function PipelinePage() {
                 </div>
               );
             })}
-            {inventory.length === 0 && <p className="muted">No available inventory.</p>}
+            {inventory.length === 0 && <p className="muted">{vocab.inventoryEmpty}</p>}
           </div>
         </section>
 
         <section className="card p-5">
-          <h2 className="section-title mb-3">Service orders</h2>
+          <h2 className="section-title mb-3">{vocab.serviceTitle}</h2>
           <div className="space-y-2">
             {service.map((s) => (
               <div key={s.id} className="rounded-xl border border-white/[0.06] px-3.5 py-2.5">
@@ -120,7 +122,7 @@ export default async function PipelinePage() {
                 <div className="mt-1 text-xs text-navy-300">{s.customer} · {money(s.amount)}</div>
               </div>
             ))}
-            {service.length === 0 && <p className="muted">No service orders.</p>}
+            {service.length === 0 && <p className="muted">{vocab.serviceEmpty}</p>}
           </div>
         </section>
       </div>
