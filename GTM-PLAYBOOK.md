@@ -141,3 +141,38 @@ Week 2: 5 scan calls, 2 pilots started. Instrument everything (even a spreadshee
 Week 3: 2 more pilots; publish one screenshot-as-case-study per pilot with permission.
 Week 4: Convert 1–2 to annual; raise the founding-customer price to $299.
 Success at day 30 = 5 pilots, 2 conversions, 1 documented case study. That's the seed of everything else.
+
+---
+
+## 7. COMPETITIVE POSITIONING (october 2026 scan)
+
+There is no single product doing what CUE does. The danger is suites converging, not one
+incumbent. Use this table in scan calls when the prospect says "we already use X":
+
+| Category | Examples | Where they stop |
+|---|---|---|
+| Field-service AI (HVAC) | QuoteIQ, Avoca AI, BuildOps, Housecall Pro, ServiceTrade | Dispatch, call handling, quoting, scheduling. No business-strategy insights, approvals governance, or knowledge loop. |
+| All-in-one CRM/marketing OS | GoHighLevel (+ dealership resellers), monday.com, HubSpot | Pipeline and campaigns — they *store* data, they don't interpret it. No insight engine, no strategy loop. |
+| "AI Business OS" startups | NeuraLake, Omninity, NexusOS, BOSAI and similar | Same category *branding*; mostly early or thin — narrow feature sets behind the marketing site. |
+| Vertical DMS | DealerSocket, VinSolutions, CDK | Dealership CRM/inventory, legacy, per-seat pricing, zero generative-AI insight layer. |
+
+**What CUE combines that none of them do (say it in this order):**
+1. **The full loop** — capture documents → understand insights → enhance strategy (Compass,
+   Pricing Studio) → execute *with human approval gates* → expand (GTM pipeline). Competitors
+   cover one or two of the five.
+2. **Approvals governance** — AI proposes, the owner decides, full audit trail. Enterprises
+   talk about this pattern; SMB tools don't ship it.
+3. **One system, industry-native vocabulary** — the same loops speak "dealership" or "HVAC"
+   (per-org industry packs). Competitors are either vertical-only or generic.
+4. **Honest degradation** — grounded-only answers when no AI key is configured, real numbers
+   only. Most "AI OS" marketing in this space is the overclaiming CUE was built to avoid.
+5. **Cost position** — free-LLM wiring (Groq/Gemini) keeps AI operating cost near zero, while
+   DMS/FSM incumbents charge per-seat SaaS prices.
+
+**Objection handling:**
+- "We already have GoHighLevel/CDK" → "Keep it. CUE reads what your system already stores and
+  finds the money it's leaking — it sits above your CRM, not instead of it."
+- "Avoca/QuoteIQ do AI for HVAC" → "They answer phones and dispatch trucks. CUE tells you why
+  your margin dropped and what to do about it — and asks your permission before anything moves."
+- "Why not just bolt ChatGPT onto our reports?" → "No evidence trail, no approvals, no audit.
+  CUE's every number is computed from your records and every action is logged."
