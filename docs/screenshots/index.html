@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CUE — Product Tour Screenshots</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #0b1220;
+    color: #e6edf5;
+  }
+  header {
+    padding: 40px 32px 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  header h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: #93a4ba; }
+  nav {
+    max-width: 1200px;
+    margin: 12px auto 0;
+    padding: 0 32px 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  nav a {
+    color: #8ec5ff;
+    text-decoration: none;
+    font-size: 13px;
+    border: 1px solid #24344d;
+    border-radius: 999px;
+    padding: 4px 12px;
+  }
+  nav a:hover { background: #14243c; }
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px 64px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 28px;
+  }
+  figure {
+    margin: 0;
+    background: #101b2e;
+    border: 1px solid #223351;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #0b1220;
+  }
+  figcaption {
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #b9c7da;
+    border-top: 1px solid #223351;
+  }
+  figcaption b { color: #e6edf5; display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CUE — Product Tour Screenshots</h1>
+  <p>22 screenshots across both demo orgs: Northgate Auto Group (dealership) and Summit Air Heating &amp; Cooling (HVAC).</p>
+</header>
+<nav id="toc"></nav>
+<main id="gallery"></main>
+<script>
+  const shots = [
+    ["landing-hero", "Landing hero", "Public homepage with the five CUE loops and Revi mascot."],
+    ["score-result", "Business score result", "Capture loop: scored business profile."],
+    ["dashboard", "Dashboard (dealership)", "Northgate Auto Group command center with KPI cards."],
+    ["hvac-dashboard", "Dashboard (HVAC)", "Summit Air Heating & Cooling command center."],
+    ["nav-pulse", "Nav / Pulse", "App shell navigation and Pulse feed."],
+    ["capture-document-manager", "Capture — Document manager", "Document library with view/edit/move/share/delete actions."],
+    ["signals", "Signals", "Business signals detection feed."],
+    ["understand-insights", "Understand — Insights", "AI insights over captured data."],
+    ["compass", "Compass", "Strategic compass recommendations."],
+    ["knowledge", "Knowledge", "Knowledge base entries."],
+    ["pricing-studio", "Pricing Studio", "Pricing simulation and margin tools."],
+    ["brand-studio", "Brand Studio", "Brand voice and messaging assets."],
+    ["execute-approvals", "Execute — Approvals", "Action approvals with audit trail."],
+    ["pipeline", "Pipeline", "GTM pipeline tracker with per-industry vocabulary."],
+    ["pilot-report", "Pilot report", "Pilot program reporting view."],
+    ["people", "People", "Team roster and roles."],
+    ["academy", "Academy", "Learning modules."],
+    ["lab", "Innovation Lab", "Experiment ideas board."],
+    ["ecosystem", "Ecosystem", "Partner integrations."],
+    ["settings", "Settings", "Org settings and AI configuration."],
+    ["book-call", "Book a call", "Scheduling page for pilot calls."],
+    ["partners", "Partners", "Partner program page."]
+  ];
+  const toc = document.getElementById("toc");
+  const gallery = document.getElementById("gallery");
+  for (const [file, title, desc] of shots) {
+    const a = document.createElement("a");
+    a.href = "#" + file;
+    a.textContent = title;
+    toc.appendChild(a);
+    const fig = document.createElement("figure");
+    fig.id = file;
+    const img = document.createElement("img");
+    img.src = file + ".png";
+    img.alt = title;
+    img.loading = "lazy";
+    const cap = document.createElement("figcaption");
+    const b = document.createElement("b");
+    b.textContent = title;
+    cap.appendChild(b);
+    cap.appendChild(document.createTextNode(desc));
+    fig.append(img, cap);
+    gallery.appendChild(fig);
+  }
+</script>
+</body>
+</html>
