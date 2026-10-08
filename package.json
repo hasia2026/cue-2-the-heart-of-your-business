@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:setup": "node scripts/db-setup.mjs",
     "db:seed": "node scripts/seed-dealership.mjs",
-    "db:reset": "node scripts/db-setup.mjs --fresh && node scripts/seed-dealership.mjs"
+    "db:reset": "node scripts/db-setup.mjs --fresh && node scripts/seed-dealership.mjs",
+    "tour:video": "node scripts/build-product-tour.mjs"
   },
   "dependencies": {
     "next": "^15.5.4",
