@@ -239,7 +239,9 @@ create table if not exists documents (
   status text not null default 'PROCESSED', -- UPLOADED | PROCESSING | PROCESSED | FAILED
   extracted_text text,
   uploaded_at timestamptz not null default now(),
-  source text not null default 'UPLOAD'
+  source text not null default 'UPLOAD',
+  share_token uuid,
+  share_expires timestamptz
 );
 create index if not exists documents_org_idx on documents(organization_id);
 

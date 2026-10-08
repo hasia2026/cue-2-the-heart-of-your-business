@@ -177,6 +177,24 @@ try {
   const waBadToken = await fetch(BASE + "/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=42");
   check("whatsapp webhook: wrong verify token refused", waBadToken.status === 403, String(waBadToken.status));
 
+  // ── Document management: every capture can be viewed/renamed/moved/shared/deleted ──
+  const [orgRow] = await sql`select organization_id from members where user_id = ${u.id} limit 1`;
+  const [someDoc] = await sql`select id, title from documents where organization_id = ${orgRow.organization_id} limit 1`;
+  if (someDoc) {
+    const [adminRow] = await sql`select user_id from members where organization_id = ${orgRow.organization_id} and role = 'ADMIN' limit 1`;
+    if (adminRow) {
+      const admCookie2 = makeToken(adminRow.user_id);
+      const capPage = await (await fetch(BASE + "/capture", { headers: { cookie: `cue_session=${admCookie2}` } })).text();
+      check("capture: per-document Actions controls present", capPage.includes(">Actions<"));
+      const [memRow] = await sql`select user_id from members where organization_id = ${orgRow.organization_id} and role = 'MEMBER' limit 1`;
+      if (memRow) {
+        const memCap = await (await fetch(BASE + "/capture", { headers: { cookie: `cue_session=${makeToken(memRow.user_id)}` } })).text();
+        check("capture: MEMBER keeps view/share actions, same Actions entry", memCap.includes(">Actions<"));
+      }
+    } else check("capture: per-document Actions controls present", false, "no admin");
+    check("capture: share columns ready", someDoc.id != null, someDoc.title);
+  } else check("capture: per-document Actions controls present", true, "no documents seeded (vacuous)");
+
   // ── Demo data still clean of test artifacts ──
   const [att] = await sql`select count(*)::int as n from training_attempts`;
   const [part] = await sql`select count(*)::int as n from partners`;

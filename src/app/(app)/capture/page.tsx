@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import CaptureClient from "./CaptureClient";
+import DocumentRow from "./DocumentRow";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +11,13 @@ export default async function CapturePage() {
   const { t } = await getT();
   const orgId = session.organizationId;
   const docs = await sql`
-    select d.id, d.title, d.kind, d.status, d.uploaded_at, d.size_bytes,
-      (select count(*) from knowledge_items k where k.document_id = d.id)::int as knowledge_count
+    select d.id, d.title, d.kind, d.status, d.uploaded_at, d.size_bytes, d.extracted_text,
+      d.department_id, d.share_token is not null as has_share,
+      (select count(*) from knowledge_items k where k.document_id = d.id)::int as knowledge_count,
+      (select name from departments dp where dp.id = d.department_id) as department_name
     from documents d where d.organization_id = ${orgId}
     order by d.uploaded_at desc limit 30`;
+  const departments = await sql`select id, name from departments where organization_id = ${orgId} order by name`;
   const [stats] = await sql`
     select
       (select count(*) from documents where organization_id = ${orgId})::int as docs,
@@ -39,12 +43,18 @@ export default async function CapturePage() {
         <h2 className="section-title mb-3">{t("capture.capturedHead")} ({docs.length})</h2>
         <div className="space-y-2">
           {docs.map((d) => (
-            <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] px-4 py-2.5 text-sm">
-              <span className="badge-blue">{d.kind}</span>
-              <span className="font-medium text-navy-100">{d.title}</span>
-              <span className="text-xs text-navy-300/60">{new Date(d.uploaded_at).toLocaleDateString()} · {Math.max(1, Math.round(Number(d.size_bytes) / 1024))} KB</span>
-              {Number(d.knowledge_count) > 0 && <span className="badge-green ms-auto">{d.knowledge_count} {t("capture.knowledge")}</span>}
-            </div>
+            <DocumentRow
+              key={d.id}
+              doc={{
+                id: d.id, title: d.title, kind: d.kind, status: d.status,
+                uploaded_at: String(d.uploaded_at), size_bytes: Number(d.size_bytes),
+                knowledge_count: Number(d.knowledge_count), extracted_text: d.extracted_text,
+              }}
+              canManage={session.role !== "MEMBER"}
+              departments={departments.map((dp) => ({ id: dp.id, name: dp.name }))}
+              currentDept={d.department_name ?? null}
+              hasShare={Boolean(d.has_share)}
+            />
           ))}
           {docs.length === 0 && <p className="muted">{t("capture.empty")}</p>}
         </div>
