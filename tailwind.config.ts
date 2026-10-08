@@ -5,22 +5,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Deep-space backgrounds (violet-tinted near-black, like the brand deck)
+        // Deep-space backgrounds — driven by CSS vars so the light/dark toggle
+        // can re-map the whole palette (see :root / html.light in globals.css)
         ink: {
-          950: "#050113",
-          900: "#0B0721",
-          800: "#130B30",
-          700: "#1C1244",
-          600: "#2A1D5E",
+          950: "rgb(var(--ink-950) / <alpha-value>)",
+          900: "rgb(var(--ink-900) / <alpha-value>)",
+          800: "rgb(var(--ink-800) / <alpha-value>)",
+          700: "rgb(var(--ink-700) / <alpha-value>)",
+          600: "rgb(var(--ink-600) / <alpha-value>)",
         },
         // Text neutrals (lavender-tinted)
         navy: {
-          900: "#171233",
-          700: "#2A2255",
-          500: "#5B4FA8",
-          300: "#A79FD4",
-          100: "#E7E4F8",
-          50: "#F4F2FD",
+          900: "rgb(var(--navy-900) / <alpha-value>)",
+          700: "rgb(var(--navy-700) / <alpha-value>)",
+          500: "rgb(var(--navy-500) / <alpha-value>)",
+          300: "rgb(var(--navy-300) / <alpha-value>)",
+          100: "rgb(var(--navy-100) / <alpha-value>)",
+          50: "rgb(var(--navy-50) / <alpha-value>)",
         },
         cue: {
           blue: "#38BDF8", // neon cyan — Capture

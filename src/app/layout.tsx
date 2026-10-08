@@ -12,7 +12,16 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { locale, rtl } = await getT();
   return (
-    <html lang={locale} dir={rtl ? "rtl" : "ltr"}>
+    <html lang={locale} dir={rtl ? "rtl" : "ltr"} suppressHydrationWarning>
+      <head>
+        {/* Apply the saved theme before first paint — no light/dark flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('cue-theme')==='light')document.documentElement.classList.add('light')}catch(e){}",
+          }}
+        />
+      </head>
       <body>
         {children}
         <AmbassadorWidget />

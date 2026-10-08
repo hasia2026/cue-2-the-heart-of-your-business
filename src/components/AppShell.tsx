@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { NAV_TOAST_KEYS, buildLabels } from "@/lib/i18nKeys";
 import NavClient, { LogoMark } from "./NavClient";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ThemeToggle from "./ThemeToggle";
 import { signOut } from "@/app/signin/actions";
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
@@ -106,6 +107,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
         <header className="sticky top-0 z-10 hidden items-center gap-3 border-b border-white/[0.07] bg-ink-950/70 px-6 py-3 backdrop-blur lg:flex">
           <div className="text-sm text-navy-300">{t("app.tagline")}</div>
           <div className="ms-auto flex items-center gap-2">
+            <ThemeToggle />
             <LanguageSwitcher />
             {session ? (
               <form action={signOut}>

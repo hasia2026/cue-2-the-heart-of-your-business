@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import ThemeToggle from "./ThemeToggle";
 
 export type NavChild = { href: string; label: string };
 export type NavItem = { href: string; label: string; icon: string; pulse?: number; children?: NavChild[] };
@@ -41,6 +42,7 @@ export default function NavClient({
           <LogoMark className="h-6 w-6" /> CUE
         </Link>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           {signedIn && signOutAction && (
             <form action={signOutAction}>
               <button className="btn-ghost !px-3 !py-1.5 text-xs">{signOutLabel}</button>
