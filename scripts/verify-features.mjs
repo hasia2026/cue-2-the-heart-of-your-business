@@ -109,6 +109,56 @@ try {
   const [recLeft] = await sql`select count(*)::int as n from recommendations where id = ${rec.id}`;
   check("verification recommendation removed", recLeft.n === 0);
 
+  // ── Role gating: MEMBER session sees no approval/assignment controls ──
+  const [member] = await sql`select id from users where email = 'tom@northgate.example'`;
+  if (member) {
+    const memberCookie = makeToken(member.id);
+    const memExec = await (await fetch(BASE + "/execute", { headers: { cookie: `cue_session=${memberCookie}` } })).text();
+    check("MEMBER /execute: no approve/reject controls", !memExec.includes(">Approve<") && !memExec.includes(">Reject<"));
+    check("MEMBER /execute: open tasks visible", memExec.includes("Invoice:"));
+    const memExpand = await (await fetch(BASE + "/expand", { headers: { cookie: `cue_session=${memberCookie}` } })).text();
+    // The labels dict (RSC payload) always carries the panel's strings, so the
+    // honest check is the visible <button>Assign</button>, which is gated.
+    check("MEMBER /expand: no assign panel", !memExpand.includes(">Assign<"));
+    const memSettings = await (await fetch(BASE + "/settings", { headers: { cookie: `cue_session=${memberCookie}` } })).text();
+    check("MEMBER /settings → renders", memSettings.includes("Settings"));
+    const [admin] = await sql`select id from users where email = 'marcus@northgate.example'`;
+    if (admin) {
+      const adminCookie = makeToken(admin.id);
+      const admExec = await (await fetch(BASE + "/execute", { headers: { cookie: `cue_session=${adminCookie}` } })).text();
+      check("ADMIN /execute: approve/reject controls visible", admExec.includes(">Approve<"));
+      const admExpand = await (await fetch(BASE + "/expand", { headers: { cookie: `cue_session=${adminCookie}` } })).text();
+      check("ADMIN /expand: assign panel visible", admExpand.includes("Assign a track"));
+    } else check("ADMIN /expand: assign panel visible", false, "admin user missing");
+  } else {
+    check("MEMBER /execute: no approve/reject controls", false, "member user missing");
+    check("MEMBER /execute: open tasks visible", false, "member user missing");
+    check("MEMBER /expand: no assign panel", false, "member user missing");
+    check("MEMBER /settings → renders", false, "member user missing");
+    check("ADMIN /execute: approve/reject controls visible", false, "admin user missing");
+    check("ADMIN /expand: assign panel visible", false, "admin user missing");
+  }
+
+  // ── Password reset flow: token hash → validity → single use (tx rolled back) ──
+  const { createHash, randomBytes } = await import("node:crypto");
+  const rawToken = randomBytes(16).toString("base64url");
+  const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+  await sql.begin(async (tx) => {
+    const [pr] = await tx`insert into password_resets (user_id, token_hash, expires_at) values (${u.id}, ${tokenHash}, now() + interval '60 minutes') returning id`;
+    const [valid] = await tx`select id from password_resets where token_hash = ${tokenHash} and used_at is null and expires_at > now()`;
+    check("reset: fresh token is valid", !!valid);
+    await tx`update password_resets set used_at = now() where id = ${pr.id}`;
+    const [afterUse] = await tx`select id from password_resets where token_hash = ${tokenHash} and used_at is null and expires_at > now()`;
+    check("reset: used token is invalid", !afterUse);
+    throw { rollback: true };
+  }).catch((e) => { if (!e?.rollback) throw e; });
+  const [prLeft] = await sql`select count(*)::int as n from password_resets where token_hash = ${tokenHash}`;
+  check("reset: token rolled back", prLeft.n === 0);
+  const forgotPage = await fetch(BASE + "/forgot-password");
+  check("/forgot-password → 200", forgotPage.status === 200, String(forgotPage.status));
+  const forgotBody = await forgotPage.text();
+  check("forgot page: form present", forgotBody.includes("Send reset link"));
+
   // ── Demo data still clean of test artifacts ──
   const [att] = await sql`select count(*)::int as n from training_attempts`;
   const [part] = await sql`select count(*)::int as n from partners`;

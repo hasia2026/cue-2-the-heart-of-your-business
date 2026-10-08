@@ -4,6 +4,7 @@
 // the intelligence engine can detect (unbilled service work, stale leads, aging
 // inventory, finance bottlenecks). Idempotent: wipes demo org first.
 // Usage: node --env-file=.env scripts/seed-dealership.mjs
+import { scryptSync, randomBytes } from "node:crypto";
 import postgres from "postgres";
 
 const url = process.env.DATABASE_URL;
@@ -23,11 +24,40 @@ async function main() {
       insert into organizations (name, is_demo) values (${DEMO_ORG}, true) returning id`;
     const orgId = org.id;
 
+    // Owner is upserted too: deleting the demo org cascades members but not
+    // users, so a plain insert would trip users_email_key on every rerun.
     const [ownerUser] = await sql`
       insert into users (email, name, password_hash)
       values ('demo@northgate.example', 'Dana Whitfield (Demo)', ${"seeded-demo-no-login"})
+      on conflict (email) do update set name = excluded.name
       returning id`;
-    await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${ownerUser.id}, 'OWNER')`;
+    const existingMember = await sql`select id from members where organization_id = ${orgId} and user_id = ${ownerUser.id}`;
+    if (!existingMember.length) {
+      await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${ownerUser.id}, 'OWNER')`;
+    }
+
+    // Role demo accounts — hashed with the real scheme so placeholders can
+    // never authenticate. Stable demo credentials (documented in PRODUCT-TOUR):
+    //   ADMIN  marcus@northgate.example / demo-admin-2026
+    //   MEMBER tom@northgate.example   / demo-member-2026
+    const demoHash = (p) => {
+      const salt = randomBytes(16).toString("hex");
+      return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
+    };
+    // Upsert by email so rerunning the seed against a live DB never trips
+    // the users_email_key constraint on prior demo accounts.
+    const [adminUser] = await sql`
+      insert into users (email, name, password_hash)
+      values ('marcus@northgate.example', 'Marcus Lee (Demo)', ${demoHash("demo-admin-2026")})
+      on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
+      returning id`;
+    await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${adminUser.id}, 'ADMIN')`;
+    const [memberUser] = await sql`
+      insert into users (email, name, password_hash)
+      values ('tom@northgate.example', 'Tom Alvarez (Demo)', ${demoHash("demo-member-2026")})
+      on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
+      returning id`;
+    await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${memberUser.id}, 'MEMBER')`;
 
     const [profile] = await sql`
       insert into business_profiles (organization_id, name, industry, size, locations, business_model, offerings, target_customers, mission, values_text, operational_priorities)
