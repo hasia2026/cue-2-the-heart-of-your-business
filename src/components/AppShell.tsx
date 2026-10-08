@@ -5,6 +5,7 @@ import { NAV_TOAST_KEYS, buildLabels } from "@/lib/i18nKeys";
 import NavClient, { LogoMark } from "./NavClient";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ThemeToggle from "./ThemeToggle";
+import ReviMark from "./ReviMark";
 import { signOut } from "@/app/signin/actions";
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
@@ -122,6 +123,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
         <footer className="border-t border-white/[0.06] px-6 py-4 text-xs text-navy-300/60">
           <div className="flex items-center gap-2">
             <LogoMark className="h-4 w-4" /> CUE — Built by HASI Technologies
+            <ReviMark className="ms-2 h-5 w-5" />
+            <span className="text-navy-300/60">Revi is always watching for leaks.</span>
           </div>
         </footer>
       </div>

@@ -183,8 +183,21 @@ Profile, the **AI ladder** (how much autonomy CUE has), team/roles, and the full
 
 ## Try the demo
 
-`demo@northgate.example` / `cue-demo-2026` → a 60-second path:
-Dashboard → **Enhance → Pricing Studio** (send a price for approval) → **Execute → Approvals** (approve it) → **Create workflow** → task assigned → **Expand → Academy** (mark a lesson done, assign a track).
+Two demo organizations ship side by side — pick the vertical that matches the prospect:
+
+**Northgate Auto Group (auto dealership)**
+- OWNER: `demo@northgate.example` / `cue-demo-2026`
+- ADMIN: `marcus@northgate.example` / `demo-admin-2026`
+- MEMBER: `tom@northgate.example` / `demo-member-2026`
+
+**Summit Air Heating & Cooling (HVAC)**
+- OWNER: `demo@summitair.example` / `hvac-demo-2026`
+- ADMIN: `rita@summitair.example` / `hvac-admin-2026`
+- MEMBER: `chris@summitair.example` / `hvac-member-2026`
+
+60-second path (either org): Dashboard → **Enhance → Pricing Studio** (send a price for approval) → **Execute → Approvals** (approve it) → **Create workflow** → task assigned → **Expand → Academy** (mark a lesson done, assign a track).
+
+Re-seeding: `node --env-file=.env scripts/seed-dealership.mjs` / `scripts/seed-hvac.mjs` — each wipes and rebuilds only its own org. Rerunning a seed wipes that org's demo state (audit chain, Academy progress).
 
 ---
 

@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import { LogoMark } from "@/components/NavClient";
+import ReviMark from "@/components/ReviMark";
 import type { DictKey } from "@/lib/i18n";
 
 const LOOP: { n: string; titleKey: DictKey; descKey: DictKey; accent: string; glow: string }[] = [
@@ -19,6 +20,10 @@ export default async function Home() {
       <div className="text-center">
         <div className="cue-halo mx-auto mb-6 inline-flex">
           <LogoMark className="h-20 w-20" />
+        </div>
+        {/* Revi — the mascot, perched on the headline */}
+        <div className="relative mx-auto -mt-10 flex justify-end max-w-md md:max-w-2xl">
+          <ReviMark className="h-14 w-14 drop-shadow-glow" />
         </div>
         <div className="eyebrow mb-4">{t("home.eyebrow")}</div>
         <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight text-white md:text-6xl">
