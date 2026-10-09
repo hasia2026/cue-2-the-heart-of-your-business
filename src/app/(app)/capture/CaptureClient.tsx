@@ -10,10 +10,57 @@ export default function CaptureClient() {
   const { t } = useLocale();
   const STEPS = [t("capture.s1"), t("capture.s2"), t("capture.s3"), t("capture.s4"), t("capture.s5")];
   const formRef = useRef<HTMLFormElement>(null);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(0);
   const [done, setDone] = useState<string | null>(null);
   const [fail, setFail] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  async function toggleRecording() {
+    setVoiceError(null);
+    if (recording) {
+      mediaRef.current?.stop(); // onstop handler does the rest
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((tr) => tr.stop());
+        setRecording(false);
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+        if (blob.size < 2000) { setVoiceError(t("capture.voiceTooShort")); return; }
+        setTranscribing(true);
+        try {
+          const ext = (rec.mimeType || "audio/webm").includes("mp4") ? "m4a" : "webm";
+          const fd = new FormData();
+          fd.append("file", new File([blob], `voice-note.${ext}`, { type: blob.type }));
+          const res = await fetch("/api/capture/transcribe", { method: "POST", body: fd });
+          const j = await res.json();
+          if (!res.ok) throw new Error(j.error || t("capture.voiceFailed"));
+          const el = noteRef.current;
+          if (el) el.value = (el.value ? el.value + "\n\n" : "") + j.text;
+        } catch (err) {
+          setVoiceError(err instanceof Error ? err.message : t("capture.voiceFailed"));
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      mediaRef.current = rec;
+      rec.start();
+      setRecording(true);
+    } catch {
+      setVoiceError(t("capture.voiceDenied"));
+    }
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -54,7 +101,15 @@ export default function CaptureClient() {
           </div>
           <div>
             <label className="label" htmlFor="note">{t("capture.note")}</label>
-            <textarea id="note" name="note" rows={3} className="input" placeholder={t("capture.notePlaceholder")} />
+            <textarea id="note" name="note" rows={3} ref={noteRef} className="input" placeholder={t("capture.notePlaceholder")} />
+            <div className="mt-2 flex items-center gap-2">
+              <button type="button" onClick={toggleRecording} disabled={transcribing}
+                className={`badge ${recording ? "badge-red" : "badge-blue"} cursor-pointer select-none`}>
+                {recording ? "● " : "🎙 "}{transcribing ? t("capture.voiceTranscribing") : recording ? t("capture.voiceStop") : t("capture.voiceRecord")}
+              </button>
+              <span className="text-xs text-navy-300/70">{t("capture.voiceHint")}</span>
+            </div>
+            {voiceError && <p className="mt-1 text-xs text-red-300">{voiceError}</p>}
           </div>
         </div>
         <div className="flex flex-col gap-2 md:w-44">

@@ -16,14 +16,16 @@ const require = createRequire(import.meta.url);
 const ffmpeg = require('ffmpeg-static');
 
 // [screenshot id, burned-in caption, narration]
+// Narration uses spaced-out letters ("C U E") so every TTS engine spells it as
+// individual letters; SVOX/Docs-only phonetic hint ("kyoō") guides reuse.
 const slides = [
-  ['landing-hero', 'CUE — The Heart of Your Business', "Welcome to C U E, the heart of your business. An A I operating system that connects the people, knowledge, workflows, and systems that keep a business moving."],
-  ['score-result', 'Capture — Business score', "It starts with capture. Answer a few questions about your business, and C U E scores how you operate today."],
+  ['landing-hero', 'CUE — The Heart of Your Business', "Welcome to Kyoo, the heart of your business. An A I operating system that connects the people, knowledge, workflows, and systems that keep a business moving."],
+  ['score-result', 'Capture — Business score', "It starts with capture. Answer a few questions about your business, and Kyoo scores how you operate today."],
   ['dashboard', 'Dashboard — Northgate Auto Group', "The dashboard puts your whole dealership on one screen. Key metrics, alerts, and next actions, all live."],
   ['hvac-dashboard', 'Dashboard — Summit Air HVAC', "And this is Summit Air Heating and Cooling, an H V A C company running the exact same loops, with vocabulary tuned to their trade."],
   ['nav-pulse', 'Pulse', "Pulse keeps you current, surfacing what changed and what needs a decision."],
   ['capture-document-manager', 'Capture — Document manager', "The document manager stores every contract, quote, and form, with share, move, edit, and delete controls, and a full audit trail."],
-  ['signals', 'Signals', "C U E watches for signals. Changes in your data that deserve attention before they become problems."],
+  ['signals', 'Signals', "Kyoo watches for signals. Changes in your data that deserve attention before they become problems."],
   ['understand-insights', 'Understand — Insights', "The understand loop turns raw activity into plain language insights you can act on."],
   ['compass', 'Compass', "Compass turns those insights into strategy, pointing your team at the highest leverage moves."],
   ['knowledge', 'Knowledge', "Knowledge keeps your playbooks, procedures, and answers in one searchable place."],
@@ -31,14 +33,14 @@ const slides = [
   ['brand-studio', 'Brand Studio', "Brand studio keeps every message on voice, from quotes to campaigns."],
   ['execute-approvals', 'Execute — Approvals', "The execute loop proposes actions, and waits for your approval. Nothing moves without you."],
   ['pipeline', 'Pipeline', "The pipeline tracker follows every deal from first touch to close, with terms that match your industry."],
-  ['pilot-report', 'Pilot report', "Pilot reports summarize exactly what C U E delivered, in numbers you can verify."],
+  ['pilot-report', 'Pilot report', "Pilot reports summarize exactly what Kyoo delivered, in numbers you can verify."],
   ['people', 'People', "People manages your team, with owner, admin, and member roles."],
   ['academy', 'Academy', "Academy trains your staff, one short module at a time."],
   ['lab', 'Innovation Lab', "The innovation lab collects ideas, and turns the best ones into experiments."],
   ['ecosystem', 'Ecosystem', "Ecosystem connects the tools you already use."],
   ['settings', 'Settings', "Settings put you in control of your organization, theme, and A I configuration."],
   ['book-call', 'Book a call', "Ready to see it on your own business? Book a call with our team."],
-  ['partners', 'CUE Partners', "C U E partners help you roll out across locations. C U E. The heart of your business."],
+  ['partners', 'CUE Partners', "Kyoo partners help you roll out across locations. Kyoo. The heart of your business."],
 ];
 
 function readEnvKey(name) {
