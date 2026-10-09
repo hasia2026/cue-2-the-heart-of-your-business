@@ -1,7 +1,9 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { PROVIDERS } from "@/lib/ambassador";
-import { updateProfile, updateAiSettings, saveAmbassadorSettings } from "./actions";
+import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateVocab } from "./actions";
+import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
+import VocabForm from "./VocabForm";
 import { getT } from "@/lib/locale";
 import type { DictKey } from "@/lib/i18n";
 
@@ -34,6 +36,9 @@ export default async function SettingsPage({
   ];
   const tierKey = (s: string): DictKey =>
     s === "Free tier available" ? "settings.freeTier" : s === "Pay-as-you-go" ? "settings.payGo" : "settings.freeModels";
+
+  const vocab = await getVocab(orgId);
+  const overrides = Object.fromEntries(VOCAB_LABELS.map(([key]) => [key, vocab[key] ?? ""]));
 
   return (
     <div className="space-y-6">
@@ -76,6 +81,12 @@ export default async function SettingsPage({
             <button className="btn-primary">{t("settings.saveProfile")}</button>
           </div>
         </form>
+      </section>
+
+      <section className="card p-6">
+        <h2 className="section-title mb-1">{t("settings.vocabTitle")}</h2>
+        <p className="muted mb-4 text-xs">{t("settings.vocabSub")}</p>
+        <VocabForm overrides={overrides} />
       </section>
 
       <section className="card p-6">

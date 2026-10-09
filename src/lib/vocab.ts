@@ -1,6 +1,9 @@
 // Industry vocabulary — page labels adapt to the org's vertical instead of
 // always speaking dealership. Resolved from business_profiles.industry; the
 // auto pack is the default so existing orgs see zero change.
+// White-labeling: business_profiles.label_overrides (jsonb map of Vocab key →
+// string) wins over the pack default for any key the org has set. Edited from
+// Settings → Vocabulary.
 import { sql } from "./db";
 
 export type Vocab = {
@@ -17,6 +20,19 @@ export type Vocab = {
   dimPipeline: string | null;
   dimInventory: string | null;
 };
+
+// Editable keys, exposed to the Settings form in this order.
+export const VOCAB_LABELS: [keyof Vocab & string, string][] = [
+  ["pack", "Industry pack name"],
+  ["dashPack", "Dashboard pack chip"],
+  ["pipelineSub", "Pipeline page subtitle"],
+  ["inventoryTitle", "Inventory section title"],
+  ["inventoryEmpty", "Inventory empty state"],
+  ["serviceTitle", "Service section title"],
+  ["serviceEmpty", "Service empty state"],
+  ["dimPipeline", "Compass: pipeline dimension"],
+  ["dimInventory", "Compass: inventory dimension"],
+];
 
 const AUTO: Vocab = {
   pack: "Auto Dealership",
@@ -43,6 +59,20 @@ const HVAC: Vocab = {
 };
 
 export async function getVocab(orgId: string): Promise<Vocab> {
-  const [row] = await sql`select industry from business_profiles where organization_id = ${orgId}`;
-  return row?.industry === "HOME_SERVICES" ? HVAC : AUTO;
+  const [row] = await sql`
+    select industry, label_overrides from business_profiles where organization_id = ${orgId}`;
+  const base = row?.industry === "HOME_SERVICES" ? HVAC : AUTO;
+  const overrides = (row?.label_overrides ?? {}) as Partial<Record<keyof Vocab, unknown>>;
+  const vocab = { ...base };
+  for (const [key] of VOCAB_LABELS) {
+    const v = overrides[key];
+    if (key === "dimPipeline" || key === "dimInventory") {
+      // null explicitly resets to the i18n default; blank string clears an override.
+      (vocab[key] as string | null) =
+        v === null ? null : typeof v === "string" && v.trim() ? v.trim() : base[key];
+    } else if (typeof v === "string" && v.trim()) {
+      (vocab[key] as string) = v.trim();
+    }
+  }
+  return vocab;
 }

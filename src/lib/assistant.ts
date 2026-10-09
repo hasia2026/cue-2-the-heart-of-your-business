@@ -4,6 +4,7 @@
 // Locale-aware: EN / ES / VI / AR templates. Numbers and names stay verbatim.
 import { sql } from "./db";
 import { isLocale, type Locale } from "./i18n";
+import { getVocab } from "./vocab";
 
 export type AssistantAnswer = {
   answer: string;
@@ -174,6 +175,7 @@ export async function answerQuestion(
   const q = question.toLowerCase();
   const t = T[locale];
   const sources: { label: string; kind: string }[] = [];
+  const vocab = await getVocab(organizationId);
   const money = (n: number) =>
     "$" + n.toLocaleString(locale === "ar" ? "en-US" : locale === "vi" ? "vi-VN" : locale === "es" ? "es-MX" : "en-US", {
       minimumFractionDigits: 2,
@@ -251,7 +253,7 @@ export async function answerQuestion(
     if (!rows.length) return { answer: t.noInv, sources, suggestions: SUGGESTED[locale] };
     return {
       answer:
-        `${t.invHead}\n\n` +
+        `${vocab.inventoryTitle.replace(" (oldest first)", "")}\n\n` +
         rows.map((r) => `• ${r.year} ${r.make} ${r.model} (${r.stock_number}) — ${money(Number(r.list_price ?? 0))}, ${t.listed} ${new Date(r.listed_at).toLocaleDateString()} (${Math.floor((Date.now() - new Date(r.listed_at).getTime()) / 864e5)}d)`).join("\n"),
       sources,
       suggestions: SUGGESTED[locale],

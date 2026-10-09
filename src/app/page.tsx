@@ -66,6 +66,22 @@ export default async function Home() {
         </p>
       </div>
 
+      {/* Competitive strip — keep their tools, CUE sits above (details on /compare) */}
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        {([
+          ["cmp.crmNote", "text-navy-300"],
+          ["cmp.fsmNote", "text-navy-300"],
+          ["cmp.cueNote", "text-white"],
+        ] as const).map(([k, cls]) => (
+          <div key={k} className={`card p-5 text-xs leading-relaxed ${cls}`}>
+            {t(k)}
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-center">
+        <a href="/compare" className="text-xs text-cue-blue hover:underline">{t("cmp.title")} →</a>
+      </div>
+
       {/* The pledge */}
       <div className="card mt-6 p-6 text-center">
         <p className="text-sm text-navy-100">

@@ -7,7 +7,7 @@ import { decryptSecret } from "./secretbox";
 import { answerQuestion } from "./assistant";
 import type { Locale } from "./i18n";
 
-export type ProviderId = "openai" | "anthropic" | "google" | "groq" | "openrouter";
+export type ProviderId = "openai" | "anthropic" | "google" | "groq" | "openrouter" | "xai";
 
 export const PROVIDERS: {
   id: ProviderId;
@@ -39,7 +39,7 @@ export const PROVIDERS: {
   {
     id: "anthropic",
     label: "Anthropic (Claude)",
-    models: ["claude-3-5-haiku-latest", "claude-3-5-sonnet-latest"],
+    models: ["claude-haiku-4-5", "claude-sonnet-4-5"],
     docs: "https://console.anthropic.com/settings/keys",
     keyHint: "sk-ant-…",
     freeTier: "Pay-as-you-go",
@@ -53,6 +53,16 @@ export const PROVIDERS: {
     keyHint: "AIza…",
     freeTier: "Free tier available",
     endpoint: (m) => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,
+  },
+  {
+    id: "xai",
+    label: "xAI (Grok)",
+    models: ["grok-3-mini", "grok-2-latest"],
+    docs: "https://console.x.ai",
+    keyHint: "xai-…",
+    freeTier: "Pay-as-you-go",
+    // xAI exposes an OpenAI-compatible API.
+    endpoint: () => "https://api.x.ai/v1/chat/completions",
   },
   {
     id: "openrouter",
@@ -90,6 +100,20 @@ export async function getAmbassadorConfig(orgId: string): Promise<AmbassadorConf
       provider: "groq",
       model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
       apiKey: process.env.GROQ_API_KEY,
+    };
+  }
+  if (process.env.ANTHROPIC_API_KEY) {
+    return {
+      provider: "anthropic",
+      model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5",
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    };
+  }
+  if (process.env.XAI_API_KEY) {
+    return {
+      provider: "xai",
+      model: process.env.XAI_MODEL || "grok-3-mini",
+      apiKey: process.env.XAI_API_KEY,
     };
   }
   if (process.env.GEMINI_API_KEY) {
@@ -163,7 +187,7 @@ async function llmFraming(
       const text = j?.candidates?.[0]?.content?.parts?.[0]?.text;
       return typeof text === "string" && text.trim() ? text.trim() : null;
     }
-    // OpenAI-compatible: openai, groq, openrouter
+    // OpenAI-compatible: openai, groq, openrouter, xai
     const res = await fetch(p.endpoint(model), {
       method: "POST",
       headers: {

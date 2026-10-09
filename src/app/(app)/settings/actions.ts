@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { encryptSecret } from "@/lib/secretbox";
 import { PROVIDERS } from "@/lib/ambassador";
+import { VOCAB_LABELS } from "@/lib/vocab";
 
 export async function updateProfile(formData: FormData) {
   const session = await requireSessionAction();
@@ -26,6 +27,32 @@ export async function updateProfile(formData: FormData) {
   });
   revalidatePath("/settings");
   revalidatePath("/compass");
+}
+
+export async function updateVocab(formData: FormData) {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+
+  // Only known keys, only non-empty strings; blank clears the override so the
+  // industry pack default shows again. dimPipeline/dimInventory may be null.
+  const overrides: Record<string, string | null> = {};
+  for (const [key] of VOCAB_LABELS) {
+    const v = String(formData.get(key) ?? "").trim();
+    if (v) overrides[key] = v;
+  }
+
+  // sql.json() — NOT a stringified + ::jsonb cast, which postgres.js stores as a
+  // JSON *string* scalar (getVocab would silently fall back to pack defaults).
+  await sql`update business_profiles set label_overrides = ${sql.json(overrides)} where organization_id = ${orgId}`;
+
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "VOCAB_UPDATED", detail: `Vocabulary overrides set (${Object.keys(overrides).length} labels)`,
+  });
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/compass");
+  revalidatePath("/pipeline");
 }
 
 export async function updateAiSettings(formData: FormData) {

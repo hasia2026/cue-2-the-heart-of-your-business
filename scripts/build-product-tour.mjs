@@ -62,12 +62,12 @@ async function geminiTts(text, outWav, log) {
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } } } },
   };
   let lastErr = '';
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${GEMINI_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      if (res.status === 429 || res.status >= 500) { lastErr = `HTTP ${res.status}`; await new Promise(r => setTimeout(r, 4000 * attempt)); continue; }
+      if (res.status === 429 || res.status >= 500) { lastErr = `HTTP ${res.status} (attempt ${attempt})`; await new Promise(r => setTimeout(r, 12000 * attempt)); continue; }
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
       const json = await res.json();
       const part = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
@@ -139,7 +139,9 @@ if (GEMINI_KEY) {
   for (let i = 0; i < slides.length; i++) {
     process.stdout.write(`  tts ${i + 1}/${slides.length}\r`);
     if (await geminiTts(slides[i][2], manifest[i].wav, console.error)) ok++;
-    if (i < slides.length - 1) await new Promise(r => setTimeout(r, 1500)); // stay friendly to rate limits
+    // Free tier: 10 requests/min for the TTS model. ~8.5s spacing keeps us at
+    // ~7 calls/min so a 22-slide narration never trips the quota.
+    if (i < slides.length - 1) await new Promise(r => setTimeout(r, 8500));
   }
   console.log('');
   if (ok === slides.length) engine = 'gemini';
