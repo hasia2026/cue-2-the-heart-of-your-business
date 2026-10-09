@@ -33,8 +33,9 @@ try {
   const orgId = m.organization_id;
   const session = makeToken(u.id);
 
-  async function page(path, locale) {
-    const cookie = locale ? `cue_session=${session}; cue_locale=${locale}` : `cue_session=${session}`;
+  async function page(path, locale, cookieOverride) {
+    const base = cookieOverride ?? `cue_session=${session}`;
+    const cookie = locale ? `${base}; cue_locale=${locale}` : base;
     const res = await fetch(BASE + path, { headers: { cookie }, redirect: "manual" });
     return { status: res.status, body: await res.text() };
   }
@@ -194,6 +195,25 @@ try {
     } else check("capture: per-document Actions controls present", false, "no admin");
     check("capture: share columns ready", someDoc.id != null, someDoc.title);
   } else check("capture: per-document Actions controls present", true, "no documents seeded (vacuous)");
+
+  // ── Per-org vocabulary: HVAC org speaks HVAC, dealership org is untouched ──
+  const [summit] = await sql`select u.id from users u join members m on m.user_id = u.id
+    join organizations o on o.id = m.organization_id
+    where u.email = 'demo@summitair.example' and o.name like 'Summit Air%'`;
+  if (summit) {
+    const sumDash = await page("/dashboard", null, `cue_session=${makeToken(summit.id)}`);
+    check("HVAC /dashboard → 200", sumDash.status === 200, String(sumDash.status));
+    check("HVAC dashboard: pack chip", sumDash.body.includes("Home Services (HVAC) pack"));
+    const sumCompass = await page("/compass", null, `cue_session=${makeToken(summit.id)}`);
+    check("HVAC compass: 'Quote pipeline' dimension", sumCompass.body.includes("Quote pipeline"));
+  } else {
+    check("HVAC dashboard: pack chip", false, "summit demo user missing");
+    check("HVAC compass: 'Quote pipeline' dimension", false, "summit demo user missing");
+  }
+  const autoDash = await page("/dashboard");
+  check("Auto dashboard: unchanged pack chip", autoDash.body.includes("Auto Dealership pack"));
+  const autoCompass = await page("/compass");
+  check("Auto compass: default 'Sales pipeline' label", autoCompass.body.includes("Sales pipeline"));
 
   // ── Demo data still clean of test artifacts ──
   const [att] = await sql`select count(*)::int as n from training_attempts`;
