@@ -87,3 +87,50 @@
 | Fri | 1 scan call + log every metric (scans→pilots→conversions) |
 
 **Stop-doing rule:** if a channel produces zero scan bookings in 2 weeks, drop it for the other one. The funnel only needs ~5 scans and 2 pilots a month to hit 10 pilots in a quarter.
+
+---
+
+## E. Competitive objection scripts (from GTM-PLAYBOOK §7)
+
+Use when the prospect names a product they already pay for. The frame is always the same:
+**keep their tool, position CUE as the layer above it.** Never trash the incumbent — the
+prospect chose it (or inherited it), and attacking it attacks their judgment.
+
+### E1 — "We already have GoHighLevel / HubSpot / a CRM"
+> "Keep it — CUE isn't another place to type. Your CRM is a notebook: it stores what someone
+> bothered to enter. CUE audits the notebook. It reads what's already there and catches the
+> leads nobody touched, the ROs that never got billed, the follow-up that fell through. Most
+> stores we scan are paying for CRM seats on data that's 40% empty. The scan will show you
+> yours in 20 minutes."
+
+**Email/DM version:**
+> Subject: Your CRM is a notebook. Who audits it?
+>
+> Quick one — [Store] runs [CRM], so the leads are all in there. The question isn't storage,
+> it's follow-through: last store we scanned had 11 quote requests with zero logged follow-up
+> inside a CRM that cost them $400/mo. I'll run the same read on your numbers, free, 20
+> minutes. If your follow-through is clean, I'll say so and leave you alone.
+
+### E2 — "Our DMS vendor says they're adding AI"
+> "Ask them for the demo with *your* data and a date. Until then — every DMS AI announcement
+> is a roadmap slide; CUE is running detectors on real records today, with evidence attached
+> to every finding and an audit trail behind every action. And when your vendor ships, CUE
+> reads their output too. We sit above the DMS, not inside it."
+
+### E3 — "Avoca / QuoteIQ / our FSM app already does AI" (HVAC)
+> "They're good at what they do — answering phones, dispatching trucks, quoting jobs. That's
+> the *front door*. CUE is what happens after the truck leaves: did the invoice go out, did
+> the quote get followed up, is the maintenance agreement attached to the ticket? We scanned
+> a shop with a top-tier FSM stack and found $6,400 of completed-but-uninvoiced work sitting
+> in it. The work was done. The system knew. Nobody was watching."
+
+### E4 — "Why not just have ChatGPT read our reports?"
+> "Three reasons: evidence, permissions, audit. ChatGPT can't show you the actual RO behind
+> a number, can't be trusted with customer data, and keeps no record of what it told you
+> last month. CUE computes every finding from a record you can open, proposes actions that
+> wait for your approval, and logs everything. When you hand your bank a report, you need
+> the second kind."
+
+### The universal close after any objection answer
+> "None of this replaces what you bought — it just checks it. 20 minutes on your numbers.
+> If the scan finds nothing, you've lost a coffee break."

@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
+import { getVocab } from "@/lib/vocab";
 import type { DictKey } from "@/lib/i18n";
 
 const DIM_LABELS: Record<string, DictKey> = {
@@ -21,6 +22,7 @@ export default async function CompassPage() {
   const { t } = await getT();
   const orgId = session.organizationId;
   const health = await computeHealth(orgId);
+  const vocab = await getVocab(orgId);
   const [profile] = await sql`select * from business_profiles where organization_id = ${orgId}`;
   const goals = profile
     ? await sql`select title, detail, horizon, status from goals where profile_id = ${profile.id} and status = 'ACTIVE'`
@@ -60,7 +62,7 @@ export default async function CompassPage() {
         {health.dimensions.map((d) => (
           <div key={d.key} className="card p-5">
             <div className="flex items-center gap-3">
-              <div className="font-semibold text-white">{DIM_LABELS[d.key] ? t(DIM_LABELS[d.key]) : d.label}</div>
+              <div className="font-semibold text-white">{d.key === "pipeline" && vocab.dimPipeline ? vocab.dimPipeline : d.key === "inventory" && vocab.dimInventory ? vocab.dimInventory : DIM_LABELS[d.key] ? t(DIM_LABELS[d.key]) : d.label}</div>
               <div className="ms-auto flex items-center gap-2">
                 <span className={`badge ${d.score >= 75 ? "badge-green" : d.score >= 55 ? "badge-orange" : "badge-red"}`}>{d.score}</span>
                 <span className="text-xs text-navy-300">{t("compass.conf")} {Math.round(d.confidence * 100)}%</span>

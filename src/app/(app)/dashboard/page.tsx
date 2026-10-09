@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
+import { getVocab } from "@/lib/vocab";
 import EvidenceDrawer from "@/components/EvidenceDrawer";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export default async function DashboardPage() {
   const [session] = await Promise.all([import("@/lib/auth").then((m) => m.requireSession())]);
   const orgId = session.organizationId;
   const { t } = await getT();
+  const vocab = await getVocab(orgId);
   const health = await computeHealth(orgId);
 
   const insights = await sql`
@@ -61,6 +63,7 @@ export default async function DashboardPage() {
       {/* Top tagline — poster header line */}
       <div className="text-center">
         <span className="text-lg font-semibold text-white md:text-xl">{t("dash.taglineTop")}</span>
+        <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-navy-300">{vocab.dashPack}</div>
       </div>
 
       {/* Essentials only — priority insight, health, numbers, actions. No side rail, no filler tiles. */}

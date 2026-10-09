@@ -10,6 +10,12 @@ export type Vocab = {
   inventoryEmpty: string;
   serviceTitle: string;
   serviceEmpty: string;
+  // Dashboard: pack chip shown under the tagline.
+  dashPack: string;
+  // Compass dimension label overrides (English). null → keep the i18n default
+  // (the auto pack's wording lives in i18n.ts for all locales).
+  dimPipeline: string | null;
+  dimInventory: string | null;
 };
 
 const AUTO: Vocab = {
@@ -19,6 +25,9 @@ const AUTO: Vocab = {
   inventoryEmpty: "No available inventory.",
   serviceTitle: "Service orders",
   serviceEmpty: "No service orders.",
+  dashPack: "Auto Dealership pack",
+  dimPipeline: null,
+  dimInventory: null,
 };
 
 const HVAC: Vocab = {
@@ -28,6 +37,9 @@ const HVAC: Vocab = {
   inventoryEmpty: "No open equipment quotes.",
   serviceTitle: "Service calls",
   serviceEmpty: "No service calls.",
+  dashPack: "Home Services (HVAC) pack",
+  dimPipeline: "Quote pipeline",
+  dimInventory: "Equipment quotes",
 };
 
 export async function getVocab(orgId: string): Promise<Vocab> {
