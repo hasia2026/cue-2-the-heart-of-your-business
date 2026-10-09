@@ -21,7 +21,7 @@ export const PROVIDERS: {
   {
     id: "groq",
     label: "Groq",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+    models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
     docs: "https://console.groq.com/keys",
     keyHint: "gsk_…",
     freeTier: "Free tier available",
