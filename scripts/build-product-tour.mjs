@@ -54,7 +54,8 @@ function readEnvKey(name) {
 }
 
 const GEMINI_KEY = readEnvKey('GEMINI_API_KEY');
-const TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+const TTS_MODEL = 'gemini-3.1-flash-tts-preview'; // 2026-10: flash-tts = 10 req/day free; also try 'gemini-3.8-flash-lite-tts'
+const TTS_FALLBACK_MODELS = ['gemini-3.8-flash-lite-tts']; // per-model daily pools; script fails over when one runs dry
 const TTS_VOICE = 'Kore';
 
 // --- Gemini TTS: returns a WAV file path for the text, or null on failure ---
@@ -63,28 +64,35 @@ async function geminiTts(text, outWav, log) {
     contents: [{ parts: [{ text: `Read this narration warmly and at a steady pace:\n\n${text}` }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } } } },
   };
+  const models = [TTS_MODEL, ...TTS_FALLBACK_MODELS];
   let lastErr = '';
-  for (let attempt = 1; attempt <= 5; attempt++) {
+  for (let attempt = 1; attempt <= 10; attempt++) {
+    const model = models[Math.min(Math.floor((attempt - 1) / 5), models.length - 1)];
     try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${GEMINI_KEY}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
-      if (res.status === 429 || res.status >= 500) { lastErr = `HTTP ${res.status} (attempt ${attempt})`; await new Promise(r => setTimeout(r, 12000 * attempt)); continue; }
+      if (res.status === 429 || res.status >= 500) { lastErr = `HTTP ${res.status} (attempt ${attempt})`; await new Promise(r => setTimeout(r, 20000 * attempt)); continue; }
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
       const json = await res.json();
       const part = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
       if (!part) throw new Error('no audio in response');
-      const mime = part.inlineData.mimeType || 'audio/L16;rate=24000';
-      const rate = parseInt(/rate=(\d+)/.exec(mime)?.[1] || '24000', 10);
-      const pcm = Buffer.from(part.inlineData.data, 'base64');
-      // Wrap raw PCM in a minimal WAV header (16-bit mono)
-      const header = Buffer.alloc(44);
-      header.write('RIFF', 0); header.writeUInt32LE(36 + pcm.length, 4); header.write('WAVE', 8);
-      header.write('fmt ', 12); header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20);
-      header.writeUInt16LE(1, 22); header.writeUInt32LE(rate, 24); header.writeUInt32LE(rate * 2, 28);
-      header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34);
-      header.write('data', 36); header.writeUInt32LE(pcm.length, 40);
-      writeFileSync(outWav, Buffer.concat([header, pcm]));
+      const mimeType = part.inlineData.mimeType || '';
+      // lite-tts returns a complete audio/wav; flash-tts returned raw PCM to wrap.
+      if (/audio\/wav/i.test(mimeType)) {
+        writeFileSync(outWav, Buffer.from(part.inlineData.data, 'base64'));
+      } else {
+        const rate = parseInt(/rate=(\d+)/.exec(mimeType)?.[1] || '24000', 10);
+        const pcm = Buffer.from(part.inlineData.data, 'base64');
+        // Wrap raw PCM in a minimal WAV header (16-bit mono)
+        const header = Buffer.alloc(44);
+        header.write('RIFF', 0); header.writeUInt32LE(36 + pcm.length, 4); header.write('WAVE', 8);
+        header.write('fmt ', 12); header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20);
+        header.writeUInt16LE(1, 22); header.writeUInt32LE(rate, 24); header.writeUInt32LE(rate * 2, 28);
+        header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34);
+        header.write('data', 36); header.writeUInt32LE(pcm.length, 40);
+        writeFileSync(outWav, Buffer.concat([header, pcm]));
+      }
       return true;
     } catch (e) { lastErr = e.message; }
   }
@@ -93,20 +101,29 @@ async function geminiTts(text, outWav, log) {
 }
 
 // --- SAPI fallback (no key needed) ---
+// Narration text uses the phonetic "Kyoo" spelling, which SAPI mangles into
+// "Kaiwoo"/"Kiowa". Promote each occurrence to an explicit SSML phoneme
+// ("k y uw") so the fallback voice says CUE the same way Gemini does.
+function toSapiSsml(text) {
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/Kyoo/g, '<phoneme alphabet="sapi" ph="k y uw">CUE</phoneme>');
+  return `<?xml version="1.0"?>\n<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${esc}</speak>`;
+}
 function sapiTts(manifest) {
+  const ssmls = manifest.map(m => toSapiSsml(m.text));
   const psScript = `
 Add-Type -AssemblyName System.Speech
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
 $s.Rate = 1
-$slides = Get-Content -Raw '${path.join(workDir, 'slides.json').replace(/'/g, "''")}' | ConvertFrom-Json
-foreach ($s2 in $slides) {
-  $s.SetOutputToWaveFile($s2.wav)
-  $s.Speak($s2.text)
+$ssmls = Get-Content -Raw '${path.join(workDir, 'ssmls.json').replace(/'/g, "''")}' | ConvertFrom-Json
+for ($i = 0; $i -lt $ssmls.Count; $i++) {
+  $s.SetOutputToWaveFile($ssmls[$i].wav)
+  $s.SpeakSsml($ssmls[$i].ssml)
   $s.SetOutputToNull()
 }
 $s.Dispose()
 `;
-  writeFileSync(path.join(workDir, 'slides.json'), JSON.stringify(manifest));
+  writeFileSync(path.join(workDir, 'ssmls.json'), JSON.stringify(manifest.map((m, i) => ({ wav: m.wav.replace(/\\/g, '/'), ssml: ssmls[i] }))));
   writeFileSync(path.join(workDir, 'tts.ps1'), psScript);
   const ps = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(workDir, 'tts.ps1')], { encoding: 'utf8' });
   return ps.status === 0;
@@ -124,12 +141,13 @@ function wavDuration(file) {
   throw new Error(`no data chunk in ${file}`);
 }
 
-if (!existsSync(ffmpeg)) { console.error('ffmpeg binary missing — run: npm install --no-save ffmpeg-static'); process.exit(1); }
+if (!existsSync(ffmpeg)) { console.error('ffmpeg binary missing — run: npm install ffmpeg-static'); process.exit(1); }
 for (const [id] of slides) {
   const png = path.join(shotsDir, `${id}.png`);
   if (!existsSync(png)) { console.error(`missing screenshot ${png}`); process.exit(1); }
 }
-rmSync(workDir, { recursive: true, force: true });
+// Resume-friendly: wipe only stale segment artifacts, keep already-synthesized narration
+// WAVs (.tour-build/narr-NN.wav) from a prior partial run so we don't re-synthesize them.
 mkdirSync(workDir, { recursive: true });
 
 // 1) Narration
@@ -139,6 +157,7 @@ if (GEMINI_KEY) {
   console.log(`Synthesizing narration with Gemini TTS (${TTS_MODEL}, voice ${TTS_VOICE})...`);
   let ok = 0;
   for (let i = 0; i < slides.length; i++) {
+    if (existsSync(manifest[i].wav) && wavDuration(manifest[i].wav) > 0.5) { ok++; continue; } // resume: reuse prior run's synth clips
     process.stdout.write(`  tts ${i + 1}/${slides.length}\r`);
     if (await geminiTts(slides[i][2], manifest[i].wav, console.error)) ok++;
     // Free tier: 10 requests/min for the TTS model. ~8.5s spacing keeps us at
