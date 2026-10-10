@@ -153,7 +153,10 @@ mkdirSync(workDir, { recursive: true });
 // 1) Narration
 const manifest = slides.map(([, , text], i) => ({ wav: path.join(workDir, `narr-${String(i).padStart(2, '0')}.wav`), text }));
 let engine = 'none';
-if (GEMINI_KEY) {
+// TOUR_FORCE_SAPI=1 skips the drained Gemini pools and goes straight to the (now
+// SSML-corrected) local Windows voice — keeps the pipeline usable during quota resets.
+const FORCE_SAPI = process.env.TOUR_FORCE_SAPI === '1';
+if (GEMINI_KEY && !FORCE_SAPI) {
   console.log(`Synthesizing narration with Gemini TTS (${TTS_MODEL}, voice ${TTS_VOICE})...`);
   let ok = 0;
   for (let i = 0; i < slides.length; i++) {
