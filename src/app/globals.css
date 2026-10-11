@@ -18,6 +18,14 @@
   --navy-50: 244 242 253;
 }
 
+/* ── Landing hero brand splash ──────────────────────────────────
+   Both logo variants are always rendered; the app's theme class
+   decides which is visible. The light JPG's white background blends
+   into the page via multiply so no rectangle edge shows. */
+.cue-hero-light { display: none; }
+html.light .cue-hero-dark { display: none; }
+html.light .cue-hero-light { display: block; mix-blend-mode: multiply; }
+
 /* ── Light theme — flipped by the ThemeToggle (html.light) ─────────────
    The ink and navy palettes are variable-driven, so every ink/navy utility
    in the app re-maps automatically; the rules below catch the remaining

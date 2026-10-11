@@ -17,17 +17,25 @@ export default async function Home() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-16 md:py-24">
       <div className="relative text-center">
-        {/* Full-quality brand splash — the exact CUE logo mark, dark + light variants */}
-        <picture className="mx-auto block w-full max-w-xl">
-          <source srcSet="/cue-logo-light.jpg" media="(prefers-color-scheme: light)" />
+        {/* Full-quality brand splash — the exact CUE logo art, dark + light variants.
+            Which one shows follows the app theme (html.light), not the OS, and the
+            light JPG's white background is blended into the page with multiply. */}
+        <div className="mx-auto w-full max-w-xl">
           <img
             src="/cue-logo-dark.png"
             alt="CUE — The Heart of Your Business"
             width={1024}
             height={1024}
-            className="mx-auto h-auto w-full drop-shadow-glow"
+            className="cue-hero cue-hero-dark mx-auto h-auto w-full drop-shadow-glow"
           />
-        </picture>
+          <img
+            src="/cue-logo-light.jpg"
+            alt=""
+            width={1024}
+            height={1024}
+            className="cue-hero cue-hero-light mx-auto h-auto w-full"
+          />
+        </div>
         {/* Revi — the mascot, perched at the top-right of the splash */}
         <div className="pointer-events-none absolute right-0 top-0 hidden md:block">
           <ReviMark className="h-14 w-14 drop-shadow-glow" />
