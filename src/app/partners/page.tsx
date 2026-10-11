@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { sql } from "@/lib/db";
+import PublicHeader from "@/components/PublicHeader";
 import { LogoMark } from "@/components/NavClient";
 import { createPartnerAction } from "./actions";
 
@@ -32,6 +33,8 @@ export default async function PartnersPage({
     : null;
 
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-3xl px-4 py-14">
       <div className="text-center">
         <div className="cue-halo mx-auto mb-5 inline-flex">
@@ -111,5 +114,6 @@ export default async function PartnersPage({
         Questions? <a className="text-violet-300 underline" href="mailto:pilots@hasi.tech?subject=CUE%20partner%20program">pilots@hasi.tech</a>
       </p>
     </div>
+    </>
   );
 }

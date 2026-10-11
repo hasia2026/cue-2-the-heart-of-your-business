@@ -1,3 +1,4 @@
+import PublicHeader from "@/components/PublicHeader";
 import { LogoMark } from "@/components/NavClient";
 
 export const metadata = {
@@ -9,6 +10,8 @@ export default function BookPage() {
   const url = process.env.CALENDLY_URL;
 
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-3xl px-4 py-14">
       <div className="text-center">
         <div className="cue-halo mx-auto mb-5 inline-flex">
@@ -53,5 +56,6 @@ export default function BookPage() {
         Prefer to self-serve? Run the <a className="text-violet-300 underline" href="/score">Revenue Leak Score</a> — free, 60 seconds.
       </p>
     </div>
+    </>
   );
 }

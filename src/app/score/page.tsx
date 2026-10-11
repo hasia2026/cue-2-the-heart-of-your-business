@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PublicHeader from "@/components/PublicHeader";
 import { LogoMark } from "@/components/NavClient";
 import { QUESTIONS, REVENUE_BRACKETS } from "@/lib/leak-score";
 import ScoreClient from "./ScoreClient";
@@ -11,14 +12,7 @@ export const metadata = {
 export default function ScorePage() {
   return (
     <div className="min-h-screen">
-      <header className="border-b border-white/[0.07]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <Link href="/" className="flex items-center gap-2 font-bold text-white">
-            <LogoMark className="h-6 w-6" /> CUE
-          </Link>
-          <a href="/signin" className="text-sm text-navy-300 hover:text-white">Sign in</a>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main className="mx-auto max-w-5xl px-4 py-10 md:py-14">
         <div className="mb-8 text-center">

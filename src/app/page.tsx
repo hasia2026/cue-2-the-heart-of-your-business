@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import ReviMark from "@/components/ReviMark";
+import PublicHeader from "@/components/PublicHeader";
 import type { DictKey } from "@/lib/i18n";
 
 const LOOP: { n: string; titleKey: DictKey; descKey: DictKey; accent: string; glow: string }[] = [
@@ -15,6 +16,8 @@ export default async function Home() {
   const session = await getSession();
   const { t } = await getT();
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-5xl px-4 py-16 md:py-24">
       <div className="relative text-center">
         {/* Full-quality brand splash — the exact CUE logo art, dark + light variants.
@@ -112,5 +115,6 @@ export default async function Home() {
         <a href="/score" className="btn-primary">{t("home.scoreCta")}</a>
       </div>
     </div>
+    </>
   );
 }

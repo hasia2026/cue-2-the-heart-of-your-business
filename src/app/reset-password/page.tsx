@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
+import PublicHeader from "@/components/PublicHeader";
 import ResetPasswordForm from "./ResetForm";
 
 export const metadata = {
@@ -16,6 +17,8 @@ export default async function ResetPasswordPage({
   const { token } = await searchParams;
 
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-md px-4 py-16">
       <div className="card p-7">
         <h1 className="page-title">Set a new password</h1>
@@ -29,5 +32,6 @@ export default async function ResetPasswordPage({
         )}
       </div>
     </div>
+    </>
   );
 }

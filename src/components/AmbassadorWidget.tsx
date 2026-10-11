@@ -6,6 +6,7 @@ import { useLocale } from "@/components/useLocale";
 type Msg = { role: "user" | "ambassador"; text: string; mode?: string };
 
 const SPEECH_LANG: Record<string, string> = { en: "en-US", ar: "ar-SA", es: "es-ES", vi: "vi-VN" };
+const AUTO_SPEAK_KEY = "cue-amb-auto-speak";
 
 export default function AmbassadorWidget() {
   const { locale, rtl, t } = useLocale();
@@ -21,26 +22,57 @@ export default function AmbassadorWidget() {
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  // Auto-speak preference — persists across visits in localStorage
+  const [autoSpeak, setAutoSpeak] = useState(false);
+  useEffect(() => {
+    try {
+      setAutoSpeak(localStorage.getItem(AUTO_SPEAK_KEY) === "1");
+    } catch {
+      /* private mode */
+    }
+  }, []);
+
+  // Instantly stop any speech (barge-in / cleanup)
+  const stopSpeaking = useRef(() => {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    setSpeakingIdx(null);
+  });
+
   // Speak an ambassador answer with the browser's built-in speechSynthesis (offline, zero cost)
   function speak(text: string, i: number) {
     if (!("speechSynthesis" in window)) return;
     if (speakingIdx === i) {
-      window.speechSynthesis.cancel();
-      setSpeakingIdx(null);
+      stopSpeaking.current();
       return;
     }
-    window.speechSynthesis.cancel();
+    stopSpeaking.current();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = SPEECH_LANG[locale] ?? "en-US";
-    u.onend = () => setSpeakingIdx(null);
-    u.onerror = () => setSpeakingIdx(null);
+    u.onend = stopSpeaking.current;
+    u.onerror = stopSpeaking.current;
     setSpeakingIdx(i);
     window.speechSynthesis.speak(u);
   }
 
+  // Auto-speak freshly answered ambassador messages
+  useEffect(() => {
+    if (!autoSpeak || !("speechSynthesis" in window)) return;
+    const last = msgs[msgs.length - 1];
+    if (last && last.role === "ambassador" && msgs.length > 1) {
+      const i = msgs.length - 1;
+      const u = new SpeechSynthesisUtterance(last.text);
+      u.lang = SPEECH_LANG[locale] ?? "en-US";
+      u.onend = () => setSpeakingIdx((cur) => (cur === i ? null : cur));
+      u.onerror = () => setSpeakingIdx((cur) => (cur === i ? null : cur));
+      setSpeakingIdx(i);
+      window.speechSynthesis.speak(u);
+    }
+  }, [msgs, autoSpeak, locale]);
+
   // Mic: record via MediaRecorder → transcribe with the live-tested Groq Whisper route → send
-  async function startRec() {
+  async function beginRecording() {
     if (recState !== "idle" || busy) return;
+    stopSpeaking.current(); // barging in while speech plays
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const chunks: Blob[] = [];
@@ -77,33 +109,10 @@ export default function AmbassadorWidget() {
     else if (recState === "transcribing") return; // wait for network call
   }
 
-  // Tidy up: cancel recording + speech when the widget closes or unmounts
-  useEffect(() => {
-    if (open) return;
-    if (recRef.current?.state === "recording") recRef.current.stop();
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    setSpeakingIdx(null);
-  }, [open, speakingIdx]);
-  useEffect(
-    () => () => {
-      if (recRef.current?.state === "recording") recRef.current.stop();
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    },
-    [],
-  );
-
-  // Seed the greeting in the current language (re-seeds if language changes)
-  useEffect(() => {
-    setMsgs([{ role: "ambassador", text: t("amb.greeting") }]);
-  }, [locale]);
-
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, open]);
-
   async function send(text?: string) {
     const question = (text ?? q).trim();
     if (!question || busy) return;
+    stopSpeaking.current(); // barge-in: new message kills speech instantly
     setQ("");
     setMsgs((m) => [...m, { role: "user", text: question }]);
     setBusy(true);
@@ -125,6 +134,64 @@ export default function AmbassadorWidget() {
     }
   }
 
+  // Tidy up: cancel recording + speech when the widget closes or unmounts
+  useEffect(() => {
+    if (open) return;
+    if (recRef.current?.state === "recording") recRef.current.stop();
+    stopSpeaking.current();
+  }, [open]);
+  useEffect(
+    () => () => {
+      if (recRef.current?.state === "recording") recRef.current.stop();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    },
+    [],
+  );
+
+  // Seed the greeting in the current language (re-seeds if language changes)
+  useEffect(() => {
+    stopSpeaking.current();
+    setMsgs([{ role: "ambassador", text: t("amb.greeting") }]);
+  }, [locale]);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [msgs, open]);
+
+  // Hold-to-talk on mobile: pointerdown starts, pointerup stops + sends
+  const holdRef = useRef<{ timer: number | null }>({ timer: null });
+  function holdStart() {
+    if (recState !== "idle") return;
+    if (holdRef.current.timer) {
+      window.clearTimeout(holdRef.current.timer);
+      holdRef.current.timer = null;
+    }
+    // small press threshold so an accidental tap doesn't open the mic
+    holdRef.current.timer = window.setTimeout(() => {
+      holdRef.current.timer = null;
+      void beginRecording();
+    }, 250);
+  }
+  function holdEnd() {
+    if (holdRef.current.timer) {
+      window.clearTimeout(holdRef.current.timer);
+      holdRef.current.timer = null;
+      return; // was just a tap — ignore
+    }
+    stopRec();
+  }
+
+  function toggleAutoSpeak() {
+    const next = !autoSpeak;
+    setAutoSpeak(next);
+    if (!next) stopSpeaking.current();
+    try {
+      localStorage.setItem(AUTO_SPEAK_KEY, next ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+  }
+
   return (
     <div dir={rtl ? "rtl" : "ltr"} lang={locale} className={rtl ? "text-right" : undefined}>
       {/* Floating launcher — bottom right (bottom-left when RTL) */}
@@ -142,7 +209,7 @@ export default function AmbassadorWidget() {
 
       {open && (
         <div
-          className={`fixed bottom-5 z-50 flex h-[560px] w-[min(94vw,400px)] flex-col overflow-hidden rounded-2xl border border-violet-400/30 bg-ink-900/97 shadow-glow backdrop-blur ${
+          className={`fixed bottom-5 z-50 flex h-[min(600px,88vh)] w-[min(94vw,400px)] flex-col overflow-hidden rounded-2xl border border-violet-400/30 bg-ink-900/97 shadow-glow backdrop-blur ${
             rtl ? "left-5" : "right-5"
           }`}
         >
@@ -154,6 +221,18 @@ export default function AmbassadorWidget() {
                 {busy ? t("amb.busy") : t("amb.online")}
               </div>
             </div>
+            {/* Auto-speak preference — remembered across visits */}
+            <button
+              onClick={toggleAutoSpeak}
+              className={`!px-2 !py-1 rounded-full text-xs transition border ${
+                autoSpeak ? "border-cyan-400/50 bg-cyan-500/20 text-cyan-200" : "border-white/20 bg-white/[0.04] text-navy-300"
+              }`}
+              aria-pressed={autoSpeak}
+              aria-label={`${t("amb.speak")}: ${autoSpeak ? "on" : "off"}`}
+              title={`${t("amb.speak")} — ${autoSpeak ? "ON (tap to stop)" : "off (tap to start)"}`}
+            >
+              🔊 {autoSpeak ? "✓" : ""}
+            </button>
             <button onClick={() => setOpen(false)} className="text-navy-300 hover:text-white text-lg" aria-label={t("amb.close")}>✕</button>
           </div>
 
@@ -186,7 +265,43 @@ export default function AmbassadorWidget() {
             {busy && <div className="animate-pulse text-xs text-violet-300">🦋 {t("amb.thinking")}</div>}
           </div>
 
-          <div className="border-t border-white/10 p-3">
+          {/* Mobile hold-to-talk — big mic under the message list on small screens */}
+          <div className="border-t border-white/10 p-3 md:min-h-[ unset]">
+            {/* big hold-to-talk button — small screens only */}
+            <div className="mb-2 flex justify-center lg:hidden">
+              {recState === "idle" ? (
+                <button
+                  type="button"
+                  onPointerDown={holdStart}
+                  onPointerUp={holdEnd}
+                  onPointerCancel={holdEnd}
+                  onPointerLeave={holdEnd}
+                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/20 bg-violet-600/30 text-2xl text-white active:scale-95 active:bg-violet-500/50 transition ${
+                    holdRef.current.timer ? "animate-pulse" : ""
+                  }`}
+                  aria-label={t("amb.voice")}
+                  title={t("amb.voice")}
+                >
+                  🎙
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onPointerUp={holdEnd}
+                  onPointerCancel={holdEnd}
+                  className={`flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white transition ${
+                    recState === "recording"
+                      ? "animate-pulse border-2 border-red-400/60 bg-red-600/70"
+                      : "border-2 border-cyan-400/40 bg-cyan-500/30"
+                  }`}
+                  aria-label={recState === "recording" ? t("amb.voiceStop") : t("amb.voiceTranscribing")}
+                  title={recState === "recording" ? t("amb.voiceStop") : t("amb.voiceTranscribing")}
+                >
+                  {recState === "recording" ? "■" : "⏳"}
+                </button>
+              )}
+            </div>
+
             <div className="mb-2 flex flex-wrap gap-1.5">
               {(["amb.s1", "amb.s2", "amb.s3", "amb.s4", "amb.s5"] as const).map((k) => (
                 <button key={k} onClick={() => send(t(k))} className="badge-low hover:bg-white/[0.1] !normal-case !text-xs">
@@ -201,27 +316,17 @@ export default function AmbassadorWidget() {
               }}
               className="flex gap-2"
             >
-              {recState !== "idle" ? (
-                <button
-                  type="button"
-                  onClick={stopRec}
-                  className={`!px-3 ${recState === "recording" ? "bg-red-600/80 text-white rounded-xl animate-pulse" : ""} border border-white/20 rounded-xl`}
-                  aria-label={recState === "recording" ? t("amb.voiceStop") : t("amb.voiceTranscribing")}
-                  title={recState === "recording" ? t("amb.voiceStop") : t("amb.voiceTranscribing")}
-                >
-                  {recState === "recording" ? "■ " : "⏳ "}🎙
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startRec}
-                  className="!px-3 border border-white/20 rounded-xl hover:bg-white/[0.08]"
-                  aria-label={t("amb.voice")}
-                  title={t("amb.voice")}
-                >
-                  🎙
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={recState !== "idle" ? stopRec : beginRecording}
+                className={`!px-3 border border-white/20 rounded-xl hover:bg-white/[0.08] ${
+                  recState === "recording" ? "animate-pulse bg-red-600/80 text-white" : ""
+                }`}
+                aria-label={recState !== "idle" ? t("amb.voiceStop") : t("amb.voice")}
+                title={recState !== "idle" ? t("amb.voiceStop") : t("amb.voice")}
+              >
+                {recState === "recording" ? "■" : recState === "transcribing" ? "⏳" : "🎙"}
+              </button>
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -229,7 +334,7 @@ export default function AmbassadorWidget() {
                 className="input flex-1"
                 aria-label={t("amb.placeholder")}
               />
-              <button className="btn-primary !px-4" disabled={busy}>→</button>
+              <button onClick={() => send()} className="btn-primary !px-4" disabled={busy}>→</button>
             </form>
           </div>
         </div>

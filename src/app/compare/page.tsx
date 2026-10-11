@@ -1,3 +1,4 @@
+import PublicHeader from "@/components/PublicHeader";
 import { getT } from "@/lib/locale";
 import { LogoMark } from "@/components/NavClient";
 import type { DictKey } from "@/lib/i18n";
@@ -17,6 +18,8 @@ const ROWS: { cap: DictKey; crm: string; cue: string }[] = [
 export default async function ComparePage() {
   const { t } = await getT();
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-4xl px-4 py-16">
       <div className="text-center">
         <div className="cue-halo mx-auto mb-6 inline-flex"><LogoMark className="h-14 w-14" /></div>
@@ -61,5 +64,6 @@ export default async function ComparePage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

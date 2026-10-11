@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
+import PublicHeader from "@/components/PublicHeader";
 import { signUpAction } from "@/app/signin/actions";
 
 export default async function SignUpPage({
@@ -12,6 +13,8 @@ export default async function SignUpPage({
   const { ref } = await searchParams;
   const refCode = (ref ?? "").trim().toUpperCase().slice(0, 24) || null;
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-md px-4 py-16">
       <div className="card p-7">
         <h1 className="page-title">Create your company</h1>
@@ -46,5 +49,6 @@ export default async function SignUpPage({
         </p>
       </div>
     </div>
+    </>
   );
 }

@@ -1,44 +1,61 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "./useLocale";
+import type { Locale } from "@/lib/i18n";
 
-const LANGS = [
+const OPTIONS: { code: Locale; label: string }[] = [
   { code: "en", label: "EN" },
+  { code: "ar", label: "ع" },
   { code: "es", label: "ES" },
   { code: "vi", label: "VI" },
-  { code: "ar", label: "AR" },
 ];
 
+/** Compact language pills — persist via the locale cookie and refresh server text. */
 export default function LanguageSwitcher() {
+  const { locale } = useLocale();
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [current, setCurrent] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  async function setLocale(code: string) {
-    setCurrent(code);
-    await fetch("/api/locale", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locale: code }),
-    });
-    startTransition(() => router.refresh());
+  // Sync once the cookie has been read client-side (server already stamped <html lang>).
+  const [active, setActive] = useState<Locale>("en");
+  useEffect(() => setActive(locale), [locale]);
+
+  async function pick(code: Locale) {
+    if (code === active || saving) return;
+    setActive(code);
+    setSaving(true);
+    try {
+      await fetch("/api/locale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: code }),
+      });
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <div className="flex overflow-hidden rounded-xl border border-white/10" role="group" aria-label="Language">
-      {LANGS.map((l) => (
+    <div
+      className="inline-flex items-center gap-0.5 rounded-full border border-white/10 bg-white/[0.04] p-0.5"
+      role="group"
+      aria-label="Language"
+    >
+      {OPTIONS.map((o) => (
         <button
-          key={l.code}
-          onClick={() => setLocale(l.code)}
-          disabled={pending}
-          className={`px-2 py-1 text-xs font-semibold transition ${
-            (current ?? (typeof document !== "undefined" ? document.cookie.match(/cue_locale=(\w+)/)?.[1] ?? "en" : "en")) === l.code
-              ? "bg-cue-blue text-white"
-              : "text-navy-300 hover:bg-white/[0.06]"
+          key={o.code}
+          onClick={() => pick(o.code)}
+          disabled={saving}
+          aria-pressed={active === o.code}
+          title={o.code === "ar" ? "العربية" : o.code === "es" ? "Español" : o.code === "vi" ? "Tiếng Việt" : "English"}
+          className={`rounded-full px-2 py-1 text-[11px] font-semibold leading-none transition ${
+            active === o.code ? "bg-violet-500/30 text-white" : "text-navy-300 hover:text-white"
           }`}
         >
-          {l.label}
+          {o.label}
         </button>
       ))}
     </div>

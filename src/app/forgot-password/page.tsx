@@ -1,3 +1,4 @@
+import PublicHeader from "@/components/PublicHeader";
 import ForgotPasswordForm from "./ForgotForm";
 
 export const metadata = {
@@ -6,6 +7,8 @@ export const metadata = {
 
 export default function ForgotPasswordPage() {
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-md px-4 py-16">
       <div className="card p-7">
         <h1 className="page-title">Reset your password</h1>
@@ -18,5 +21,6 @@ export default function ForgotPasswordPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import PasswordInput from "@/components/PasswordInput";
+import PublicHeader from "@/components/PublicHeader";
 import { signInAction } from "./actions";
 
 export default async function SignInPage({
@@ -11,6 +12,8 @@ export default async function SignInPage({
   if (await getSession()) redirect("/dashboard");
   const { reset } = await searchParams;
   return (
+    <>
+    <PublicHeader />
     <div className="mx-auto max-w-md px-4 py-16">
       <div className="card p-7">
         <h1 className="page-title">Welcome back</h1>
@@ -39,5 +42,6 @@ export default async function SignInPage({
         </p>
       </div>
     </div>
+    </>
   );
 }
