@@ -66,6 +66,35 @@ export default async function DashboardPage() {
         <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-navy-300">{vocab.dashPack}</div>
       </div>
 
+      {/* COMMAND CENTER — the recommended next action leads the page */}
+      <section className="card relative min-w-0 overflow-hidden border-l-2 border-l-violet-400/80 p-5">
+        <div className="pointer-events-none absolute -left-16 -top-16 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <span className="eyebrow !text-violet-300">{t("dash.recommendedActions")}</span>
+            <div className="muted mt-0.5">{t("dash.title")}</div>
+          </div>
+          <a href="/execute" className="text-xs text-cyan-300 hover:underline">{t("dash.viewAll")} →</a>
+        </div>
+        <ul className="space-y-2.5">
+          {topTasks.map((task, i) => (
+            <li key={task.id} className="flex items-center gap-2.5 text-sm">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-semibold text-violet-200">{i + 1}</span>
+              <a href="/execute" className="min-w-0 flex-1 truncate text-navy-100 hover:text-white hover:underline">{task.title}</a>
+              <span className="badge-low shrink-0">{task.priority}</span>
+            </li>
+          ))}
+          {topTasks.length === 0 && (
+            <li className="muted text-sm">
+              {pending?.n > 0
+                ? `${pending.n} × ${t("dash.pendingDecisions")} → `
+                : t("dash.noTasks")}
+              {!pending?.n && <a href="/understand" className="text-cyan-300 hover:underline">Understand</a>}
+            </li>
+          )}
+        </ul>
+      </section>
+
       {/* Essentials only — priority insight, health, numbers, actions. No side rail, no filler tiles. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Priority insight */}
@@ -125,50 +154,24 @@ export default async function DashboardPage() {
             ))}
           </div>
 
-          {/* Bottom band: activity + recommended next actions */}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <section className="card min-w-0 p-5">
-              <h2 className="eyebrow mb-3">{t("dash.recentActivity")}</h2>
-              <ul className="space-y-2.5">
-                {activity.map((a, i) => (
-                  <li key={i} className="flex items-center gap-2.5 text-sm">
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${a.actor_type === "AI" ? "bg-violet-500/15 text-violet-300" : "bg-emerald-500/15 text-emerald-300"}`}>
-                      {a.actor_type === "AI" ? "✦" : "✓"}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-navy-100">
-                      {a.action.replaceAll("_", " ").toLowerCase()}{a.detail ? ` — ${a.detail}` : ""}
-                    </span>
-                    <span className="muted shrink-0 text-xs">{new Date(a.created_at).toLocaleDateString()}</span>
-                  </li>
-                ))}
-                {activity.length === 0 && <li className="muted">—</li>}
-              </ul>
-            </section>
-
-            <section className="card min-w-0 p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="eyebrow !text-violet-300">{t("dash.recommendedActions")}</h2>
-                <a href="/execute" className="text-xs text-cyan-300 hover:underline">{t("dash.viewAll")}</a>
-              </div>
-              <ul className="space-y-2.5">
-                {topTasks.map((task, i) => (
-                  <li key={task.id} className="flex items-center gap-2.5 text-sm">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-semibold text-violet-200">{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate text-navy-100">{task.title}</span>
-                    <span className="badge-low shrink-0">{task.priority}</span>
-                  </li>
-                ))}
-                {topTasks.length === 0 && (
-                  <li className="muted text-sm">
-                    {pending?.n > 0
-                      ? `${pending.n} × ${t("dash.pendingDecisions")} → `
-                      : t("dash.noTasks")}
-                    {!pending?.n && <a href="/understand" className="text-cyan-300 hover:underline">Understand</a>}
-                  </li>
-                )}
-              </ul>
-            </section>
-          </div>
+          {/* Bottom band: activity */}
+          <section className="card min-w-0 p-5">
+            <h2 className="eyebrow mb-3">{t("dash.recentActivity")}</h2>
+            <ul className="space-y-2.5">
+              {activity.map((a, i) => (
+                <li key={i} className="flex items-center gap-2.5 text-sm">
+                  <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${a.actor_type === "AI" ? "bg-violet-500/15 text-violet-300" : "bg-emerald-500/15 text-emerald-300"}`}>
+                    {a.actor_type === "AI" ? "✦" : "✓"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-navy-100">
+                    {a.action.replaceAll("_", " ").toLowerCase()}{a.detail ? ` — ${a.detail}` : ""}
+                  </span>
+                  <span className="muted shrink-0 text-xs">{new Date(a.created_at).toLocaleDateString()}</span>
+                </li>
+              ))}
+              {activity.length === 0 && <li className="muted">—</li>}
+            </ul>
+          </section>
 
           {/* Secondary insights below the fold of the mock */}
           {rest.length > 0 && (
