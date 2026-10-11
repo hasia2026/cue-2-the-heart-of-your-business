@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useLocale } from "./useLocale";
 import type { Locale } from "@/lib/i18n";
 
@@ -15,7 +14,6 @@ const OPTIONS: { code: Locale; label: string }[] = [
 /** Compact language pills — persist via the locale cookie and refresh server text. */
 export default function LanguageSwitcher() {
   const { locale } = useLocale();
-  const router = useRouter();
   const [saving, setSaving] = useState(false);
 
   // Sync once the cookie has been read client-side (server already stamped <html lang>).
@@ -32,7 +30,9 @@ export default function LanguageSwitcher() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locale: code }),
       });
-      router.refresh();
+      // Full reload so client components (AmbassadorWidget inclu.) re-read the
+      // cookie — router.refresh() alone leaves already-mounted widgets stale.
+      window.location.reload();
     } finally {
       setSaving(false);
     }
