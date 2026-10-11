@@ -43,7 +43,7 @@ export default function CaptureClient() {
           const ext = (rec.mimeType || "audio/webm").includes("mp4") ? "m4a" : "webm";
           const fd = new FormData();
           fd.append("file", new File([blob], `voice-note.${ext}`, { type: blob.type }));
-          const res = await fetch("/api/capture/transcribe", { method: "POST", body: fd });
+          const res = await fetch("/capture/transcribe", { method: "POST", body: fd });
           const j = await res.json();
           if (!res.ok) throw new Error(j.error || t("capture.voiceFailed"));
           const el = noteRef.current;

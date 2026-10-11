@@ -1,6 +1,5 @@
 import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
-import { LogoMark } from "@/components/NavClient";
 import ReviMark from "@/components/ReviMark";
 import type { DictKey } from "@/lib/i18n";
 
@@ -17,19 +16,28 @@ export default async function Home() {
   const { t } = await getT();
   return (
     <div className="mx-auto max-w-5xl px-4 py-16 md:py-24">
-      <div className="text-center">
-        <div className="cue-halo mx-auto mb-6 inline-flex">
-          <LogoMark className="h-20 w-20" />
-        </div>
-        {/* Revi — the mascot, perched on the headline */}
-        <div className="relative mx-auto -mt-10 flex justify-end max-w-md md:max-w-2xl">
+      <div className="relative text-center">
+        {/* Full-quality brand splash — the exact CUE logo mark, dark + light variants */}
+        <picture className="mx-auto block w-full max-w-xl">
+          <source srcSet="/cue-logo-light.jpg" media="(prefers-color-scheme: light)" />
+          <img
+            src="/cue-logo-dark.png"
+            alt="CUE — The Heart of Your Business"
+            width={1024}
+            height={1024}
+            className="mx-auto h-auto w-full drop-shadow-glow"
+          />
+        </picture>
+        {/* Revi — the mascot, perched at the top-right of the splash */}
+        <div className="pointer-events-none absolute right-0 top-0 hidden md:block">
           <ReviMark className="h-14 w-14 drop-shadow-glow" />
         </div>
-        <div className="eyebrow mb-4">{t("home.eyebrow")}</div>
-        <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight text-white md:text-6xl">
-          {t("home.titleA")}{" "}
-          <span className="hero-gradient">{t("home.titleB")}</span>
-        </h1>
+        <p className="eyebrow -mt-2 mb-4">{t("home.eyebrow")}</p>
+        <div className="mx-auto max-w-3xl">
+          <h1 className="text-3xl font-bold uppercase tracking-[0.35em] text-white md:text-5xl">
+            CUE THE HEART OF YOUR BUSINESS
+          </h1>
+        </div>
         <p className="mx-auto mt-5 max-w-2xl text-navy-300 md:text-lg">
           {t("home.sub")}
         </p>
