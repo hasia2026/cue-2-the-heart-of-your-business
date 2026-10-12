@@ -1,7 +1,7 @@
 // Env-gated transactional email via the Resend REST API — node fetch only,
 // no SDK dependency. When RESEND_API_KEY is unset, send() reports
 // connected: false and callers degrade honestly instead of pretending.
-export type SendResult = { connected: boolean; sent: boolean; error?: string };
+export type SendResult = { connected: boolean; sent: boolean; error?: string; id?: string };
 
 export function mailerConnected(): boolean {
   return !!process.env.RESEND_API_KEY;
@@ -31,7 +31,8 @@ export async function sendMail(opts: { to: string; subject: string; text: string
       const detail = await res.text().catch(() => "");
       return { connected: true, sent: false, error: `Resend ${res.status}: ${detail.slice(0, 200) }` };
     }
-    return { connected: true, sent: true };
+    const body = (await res.json().catch(() => ({}))) as { id?: string };
+    return { connected: true, sent: true, id: body.id };
   } catch (e) {
     return { connected: true, sent: false, error: e instanceof Error ? e.message : String(e) };
   }

@@ -216,7 +216,36 @@ async function main() {
     check("ambassador authenticated ask-back", false, "no session cookie from signin — cannot assert grounded mode");
   }
 
-  // 5. Auth guards still up.
+  // 5. Digest preview — the real builder runs for Summit Air; all four
+  //    sections render with concrete dollar figures from live seeded data.
+  //    (Skipped body asserts — the structurally-exact fallback would have
+  //    been caught asking for an org with no seeded data.)
+  if (cookie) {
+    const prevRes = await fetch(BASE + "/api/digest/send?preview=1", { headers: { cookie } });
+    let prev = {};
+    try { prev = await prevRes.json(); } catch { /* non-JSON → fail below */ }
+    check("/api/digest/send?preview=1 → 200", prevRes.status === 200, String(prevRes.status));
+    const text = typeof prev?.preview === "string" ? prev.preview : "";
+    check("digest preview returned text", text.length > 50, `len=${text.length}`);
+    check("digest names the org", text.includes("Summit Air"), text.slice(0, 60));
+    for (const [name, marker] of [
+      ["open revenue leaks", "Open revenue leaks"],
+      ["decisions awaiting approval", "Decisions awaiting your approval"],
+      ["approvals this week", "Approvals this week"],
+      ["money found / recovered", "Money found / recovered"],
+    ]) {
+      check(`digest section: ${name}`, text.includes(marker), marker);
+    }
+    // Figures must parse as non-negative finite numbers (zero is plausible —
+    // an empty "collected" bucket) — NaN/negative/absurdly large = broken builder.
+    const dollars = text.match(/\$\d[\d,]*/g) ?? [];
+    check("digest cites ≥3 distinct dollar figures", dollars.length >= 3, `${dollars.length} found: ${dollars.slice(0, 5).join(", ")}`);
+    check("dollar figures are plausible (non-negative, <$10M)", dollars.every((d) => { const n = Number(d.replace(/[$,]/g, "")); return Number.isFinite(n) && n >= 0 && n < 1e7; }), dollars.join(", "));
+  } else {
+    check("digest preview authenticated", false, "no session cookie — cannot assert sections");
+  }
+
+  // 6. Auth guards still up.
   const digestUnauth = await fetch(BASE + "/api/digest/send");
   check("/api/digest/send unauthenticated → 401", digestUnauth.status === 401, String(digestUnauth.status));
 
