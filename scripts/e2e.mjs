@@ -245,9 +245,62 @@ async function main() {
     check("digest preview authenticated", false, "no session cookie — cannot assert sections");
   }
 
-  // 6. Auth guards still up.
+  // 6. Agreements: renewal + proposal detectors + localized quote delivery.
+  //    Fixture upkeep and DB reads go through scripts/e2e-db-probe.mjs —
+  //    inline multi-line node -e is unreliable under Git Bash/Windows.
+  if (cookie) {
+    const { execFileSync } = await import("node:child_process");
+    const probe = (mode) =>
+      execFileSync(process.execPath, ["--env-file=.env", "scripts/e2e-db-probe.mjs", mode], { encoding: "utf8" }).trim().split("\n").pop();
+
+    // Ensure the fixtures exist regardless of which seed ran last (idempotent).
+    try { JSON.parse(probe("fixtures")); }
+    catch { check("agreement fixtures seeded", false, "e2e-db-probe failed — is DATABASE_URL set?"); }
+
+    // Fire the app's own refresh action (progressive-enhancement form POST
+    // against the understand page), then re-read the insights table.
+    const page = await fetch(BASE + "/understand", { headers: { cookie } });
+    const html = await page.text();
+    const ids = [...new Set([...html.matchAll(/ACTION_ID_([0-9a-f]{40,60})/g)].map((m) => m[1]))];
+    let refreshed = false;
+    for (const id of ids) {
+      const rb = "----r" + Date.now();
+      const rp = ["--" + rb, 'Content-Disposition: form-data; name="$ACTION_ID_' + id + '"', "", "", "--" + rb + "--", ""].join("\r\n");
+      const res = await fetch(BASE + "/understand", { method: "POST", headers: { "Content-Type": "multipart/form-data; boundary=" + rb, cookie }, body: rp, redirect: "manual" });
+      if (res.status === 303 || res.status === 200) { refreshed = true; break; }
+    }
+    check("understand refresh action fired", refreshed, ids.length + " action ids on page");
+
+    const flags = JSON.parse(probe("insights"));
+    check("renewal detector insight open (agreement ≤30d)", flags.renewal === true, (flags.titles ?? []).join("; ").slice(0, 140));
+    check("proposal detector insight open (no-agreement heavy users)", flags.proposal === true, (flags.titles ?? []).join("; ").slice(0, 140));
+
+    // Localized quote: resolve Yolanda's id via the probe, then preview via route.
+    const y = JSON.parse(probe("customer"));
+    if (y) {
+      const qRes = await fetch(BASE + "/api/quotes/send", {
+        method: "POST", headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ customerId: y.id, title: "E2E quote", items: [{ description: "Fixture quote line", amount: 1000 }], preview: true }),
+      });
+      const q = await qRes.json().catch(() => ({}));
+      check("quote preview resolves customer locale (es)", qRes.status === 200 && q?.locale === "es" && q?.localeSource === "customer", `status=${qRes.status} locale=${q?.locale} source=${q?.localeSource}`);
+      check("quote plaintext is Spanish", typeof q?.previewText === "string" && q.previewText.includes("Su cotización"), (q?.previewText ?? "").slice(0, 60));
+      const qEn = await fetch(BASE + "/api/quotes/send", {
+        method: "POST", headers: { "Content-Type": "application/json", cookie },
+        body: JSON.stringify({ customerId: y.id, title: "E2E quote", items: [{ description: "Fixture", amount: 1 }], locale: "vi", preview: true }),
+      });
+      const qe = await qEn.json().catch(() => ({}));
+      check("quote locale override wins over customer pref", qEn.status === 200 && qe?.locale === "vi" && qe?.localeSource === "override", `locale=${qe?.locale} source=${qe?.localeSource}`);
+    } else {
+      check("quote locale fixtures present", false, "Yolanda Reyes not found — seed-hvac missing?");
+    }
+  }
+
+  // 7. Auth guards still up.
   const digestUnauth = await fetch(BASE + "/api/digest/send");
   check("/api/digest/send unauthenticated → 401", digestUnauth.status === 401, String(digestUnauth.status));
+  const quoteUnauth = await fetch(BASE + "/api/quotes/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  check("/api/quotes/send unauthenticated → 401", quoteUnauth.status === 401, String(quoteUnauth.status));
 
   console.log(fails === 0 ? "\nE2E PASSED" : `\n${fails} E2E FAILURE(S)`);
   process.exitCode = fails === 0 ? 0 : 1;

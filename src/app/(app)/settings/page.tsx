@@ -4,6 +4,7 @@ import { PROVIDERS } from "@/lib/ambassador";
 import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateVocab } from "./actions";
 import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
+import IndustryPackForm from "./IndustryPackForm";
 import { getT } from "@/lib/locale";
 import type { DictKey } from "@/lib/i18n";
 
@@ -115,6 +116,14 @@ export default async function SettingsPage({
             <button className="btn-primary">Save digest settings</button>
           </div>
         </form>
+      </section>
+
+      {/* Industry pack switcher: flips every label pack-wide; per-label
+          overrides still layer on top via the card below. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Terminology</h2>
+        <p className="muted mb-4 text-xs">Industry pack switches the labels across dashboard, pipeline, and inventory in one move. Custom keeps whatever you set label-by-label below.</p>
+        <IndustryPackForm orgId={orgId} />
       </section>
 
       <section className="card p-6">

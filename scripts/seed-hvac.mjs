@@ -119,6 +119,21 @@ async function main() {
     }
     const cust = Object.fromEntries(custRows.map(r => [r.name, r.id]));
 
+    // Preferred quote-language ( Household picks up in localized quotes.
+    // The Pham Family prefers Vietnamese; Yolanda Reyes prefers Spanish.
+    await sql`update customers set preferred_locale = 'vi' where id = ${cust["The Pham Family"]}`;
+    await sql`update customers set preferred_locale = 'es' where id = ${cust["Ms. Yolanda Reyes"]}`;
+
+    // Maintenance agreements: Alvarez has ACTIVE expiring in ~24 days,
+    // Sierra Vista ACTIVE expiring in ~75 days (not yet), Earl Jenkins
+    // EXPIRED 10 days ago (missed renewal). The rest have none — a service
+    // history later seeds the proposal-signal detector.
+    await sql`
+      insert into maintenance_agreements (organization_id, customer_id, plan_name, annual_value, starts_at, ends_at, status)
+      values (${orgId}, ${cust["The Alvarez Family"]}, 'Residential upkeep plan', 249, ${daysAgo(341)}, ${daysAgo(-24)}, 'ACTIVE'),
+             (${orgId}, ${cust["Sierra Vista Property Group"]}, 'Portfolio plan (14 units)', 1890, ${daysAgo(290)}, ${daysAgo(-75)}, 'ACTIVE'),
+             (${orgId}, ${cust["Mr. Earl Jenkins"]}, 'Residential upkeep plan', 219, ${daysAgo(375)}, ${daysAgo(10)}, 'EXPIRED')`;
+
     // Equipment quotes (vehicles table reused: an "item" is an equipment unit
     // quoted for replacement — aging quotes are the repricing leak).
     const equipment = [

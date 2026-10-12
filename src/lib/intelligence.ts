@@ -185,6 +185,106 @@ async function detectOverdueInvoices(organizationId: string): Promise<DetectorRe
   };
 }
 
+async function detectAgreementRenewals(organizationId: string): Promise<DetectorResult | null> {
+  // Agreements ending within 30 days (or already expired but still marked
+  // ACTIVE, i.e. renewal chatter never closed it out). One insight per run;
+  // dedupe rolls daily so re-running after outreach gives a clean re-nudge.
+  const rolling = await sql`
+    select ag.id, ag.customer_id, ag.plan_name, ag.annual_value, ag.ends_at, c.name as customer_name
+    from maintenance_agreements ag
+    join customers c on c.id = ag.customer_id
+    where ag.organization_id = ${organizationId}
+      and ag.status = 'ACTIVE'
+      and ag.ends_at is not null
+      and ag.ends_at <= now() + interval '30 days'
+    order by ag.ends_at asc`;
+  if (!rolling.length) return null;
+
+  const soonest = rolling[0];
+  const endsSoon = rolling.filter((a) => new Date(a.ends_at).getTime() > Date.now());
+  const expired = rolling.length - endsSoon.length;
+  const total = rolling.reduce((s, a) => s + Number(a.annual_value), 0);
+  const expLabel = (d: string) =>
+    Math.floor((new Date(d).getTime() - Date.now()) / 864e5) <= 0 ? "already expired" : `in ${Math.floor((new Date(d).getTime() - Date.now()) / 864e5)} days`;
+  return {
+    type: "REVENUE",
+    dedupe: `agreement_renewals:${soonest.id}`,
+    title: `${rolling.length} maintenance agreement${rolling.length === 1 ? "" : "s"} up for renewal — $${Math.round(total).toLocaleString()} at stake`,
+    summary: rolling.map((a) => `• ${a.customer_name}: ${a.plan_name} ($${Math.round(a.annual_value)}/yr) ends ${expLabel(a.ends_at)}`).join("\n"),
+    severity: total > 2000 ? "HIGH" : "MEDIUM",
+    impactValue: total,
+    evidence: [
+      { label: `${rolling.length} agreements ending ≤30 days (${expired} already past end date)`, kind: "QUERY", ref: "maintenance_agreements", count: rolling.length },
+    ],
+    reasoning:
+      "Agreements renew silently by invoice date — nobody owns the outreach. Renewal contact 30 days early converts far better than a post-expiry dunning, and an unmanaged expiry hands the customer to a competitor maintenance sale.",
+    confidence: 0.93,
+    rec: {
+      title: `Draft renewal offers for ${rolling.length} agreement${rolling.length === 1 ? "" : "s"}`,
+      action: rolling.map((a) => `• ${a.customer_name}: call with pre-drafted offer — ${a.plan_name} renewal $${Math.round(a.annual_value)}/yr (ends ${new Date(a.ends_at).toLocaleDateString()})`).join("\n"),
+      rationale: "Early renewal outreach lifts retention versus chasing after lapse.",
+      impact: `Protects $${Math.round(total)}/yr in recurring revenue.`,
+      impactValue: total,
+      confidence: 0.93,
+    },
+  };
+}
+
+async function detectAgreementProposal(organizationId: string): Promise<DetectorResult | null> {
+  // No-agreement customers whose service history says they should have one:
+  // ≥2 completed service orders in 12 months, or 12-month spend ≥1.5× the
+  // org's cheapest ACTIVE plan. Plan-cost anchor comes from their own data.
+  const [anchor] = await sql`
+    select min(annual_value)::float as cheapest from maintenance_agreements
+    where organization_id = ${organizationId} and status = 'ACTIVE' and annual_value > 0`;
+  const planAnchor = Number(anchor?.cheapest ?? 0);
+  if (!planAnchor) return null; // no agreements yet — nothing to propose against
+
+  const candid = await sql`
+    select c.id, c.name, count(so.id)::int as visits,
+           coalesce(sum(so.amount), 0)::float as spend
+    from customers c
+    join service_orders so on so.customer_id = c.id and so.status = 'COMPLETED'
+      and so.opened_at > now() - interval '12 months'
+    where c.organization_id = ${organizationId}
+      and c.status = 'ACTIVE'
+      and not exists (
+        select 1 from maintenance_agreements ag
+        where ag.customer_id = c.id and ag.status in ('ACTIVE', 'EXPIRED')
+      )
+    group by c.id, c.name
+    having count(so.id) >= 2 or coalesce(sum(so.amount), 0) >= ${planAnchor * 1.5}
+    order by spend desc
+    limit 5`;
+  if (!candid.length) return null;
+
+  const top = candid[0];
+  const potential = candid.length * planAnchor;
+  return {
+    type: "CUSTOMER",
+    dedupe: "agreement_proposals",
+    title: `${candid.length} customer${candid.length === 1 ? "" : "s"} behaving like maintenance-plan fits — $${Math.round(potential).toLocaleString()}/yr unclaimed`,
+    summary: candid.map((c) => `• ${c.name}: ${c.visits} service call${c.visits === 1 ? "" : "s"} / $${Math.round(c.spend)} in 12 mo — no agreement`).join("\n"),
+    severity: candid.length >= 3 ? "HIGH" : "MEDIUM",
+    impactValue: potential,
+    evidence: [
+      { label: "customers with ≥2 completed calls in 12mo or spend ≥1.5× cheapest plan, zero agreements", kind: "QUERY", ref: "service_orders", count: candid.length },
+      { label: `cheapest ACTIVE plan: $${Math.round(planAnchor)}/yr`, kind: "DERIVED" },
+    ],
+    reasoning:
+      "Repeat service buyers pay call-by-call for breakdowns they could lower-cost-prevent. An agreement converts emergency buyers into annual revenue, smooths seasonality, and makes retention structural rather than luck-of-the-season.",
+    confidence: 0.85,
+    rec: {
+      title: `Propose a plan to ${candid.length} customer${candid.length === 1 ? "" : "s"}`,
+      action: candid.map((c) => `• ${c.name}: pitch ${c.visits} calls / $${Math.round(c.spend)} last 12mo → plan at ~$${Math.round(planAnchor)}/yr (saves them ~$${Math.max(0, Math.round(c.spend - planAnchor))})`).join("\n"),
+      rationale: "Their own spend math beats the plan price — the pitch writes itself from the numbers.",
+      impact: `Up to $${Math.round(potential)}/yr of new recurring revenue.`,
+      impactValue: potential,
+      confidence: 0.85,
+    },
+  };
+}
+
 export async function runDetectors(organizationId: string): Promise<number> {
   const detectors = [
     detectUnbilledService,
@@ -192,6 +292,8 @@ export async function runDetectors(organizationId: string): Promise<number> {
     detectAgingInventory,
     detectFinanceBottleneck,
     detectOverdueInvoices,
+    detectAgreementRenewals,
+    detectAgreementProposal,
   ];
   let created = 0;
   for (const det of detectors) {

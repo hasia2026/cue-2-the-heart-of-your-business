@@ -73,6 +73,12 @@ const HVAC: Vocab = {
   dimInventory: "Equipment quotes",
 };
 
+export const INDUSTRY_PACKS: { value: string; label: string }[] = [
+  { value: "AUTO_DEALERSHIP", label: "Auto Dealership" },
+  { value: "HOME_SERVICES", label: "Home Services (HVAC)" },
+  { value: "OTHER", label: "Custom / other (Generic pack + per-label overrides)" },
+];
+
 export async function getVocab(orgId: string): Promise<Vocab> {
   const [row] = await sql`
     select industry, label_overrides from business_profiles where organization_id = ${orgId}`;

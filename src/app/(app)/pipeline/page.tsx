@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { getVocab } from "@/lib/vocab";
+import QuoteSender from "./QuoteSender";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,10 @@ export default async function PipelinePage() {
     from appointments a join customers c on c.id = a.customer_id
     where a.organization_id = ${orgId} and a.scheduled_for >= now() - interval '1 day'
     order by a.scheduled_for asc limit 8`;
+  const quoteCustomers = await sql`
+    select id, name, email, preferred_locale from customers
+    where organization_id = ${orgId} and status = 'ACTIVE'
+    order by name asc limit 100`;
 
   return (
     <div className="space-y-6">
@@ -44,6 +49,14 @@ export default async function PipelinePage() {
         <h1 className="page-title">Pipeline</h1>
         <p className="page-sub">{vocab.pipelineSub}</p>
       </div>
+
+      {/* Localized quote delivery: pick a customer, one-line quote, go —
+          the language resolves from their stored preference unless overridden. */}
+      <section className="card p-5">
+        <h2 className="section-title mb-1">Send a localized quote</h2>
+        <p className="muted mb-3 text-xs">Goes out in the household's language — their stored preference wins unless you override it here. Email via Resend when connected; audit-logged either way.</p>
+        <QuoteSender customers={quoteCustomers as never} />
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="card p-5">

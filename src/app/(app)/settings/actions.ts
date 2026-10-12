@@ -6,7 +6,7 @@ import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { encryptSecret } from "@/lib/secretbox";
 import { PROVIDERS } from "@/lib/ambassador";
-import { VOCAB_LABELS } from "@/lib/vocab";
+import { VOCAB_LABELS, INDUSTRY_PACKS } from "@/lib/vocab";
 
 export async function updateProfile(formData: FormData) {
   const session = await requireSessionAction();
@@ -26,6 +26,24 @@ export async function updateProfile(formData: FormData) {
     action: "PROFILE_UPDATED", detail: "Business profile edited",
   });
   revalidatePath("/settings");
+  revalidatePath("/compass");
+}
+
+export async function updateIndustryPack(formData: FormData) {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+  const raw = String(formData.get("industryPack") ?? "").trim();
+  const pack = INDUSTRY_PACKS.find((p) => p.value === raw);
+  if (!pack) return; // unknown value — action no-ops rather than writing junk
+
+  await sql`update business_profiles set industry = ${raw} where organization_id = ${orgId}`;
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "INDUSTRY_PACK_SWITCHED", detail: `Industry pack = ${pack.label}`,
+  });
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/pipeline");
   revalidatePath("/compass");
 }
 
