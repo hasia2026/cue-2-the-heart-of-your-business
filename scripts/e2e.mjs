@@ -182,6 +182,36 @@ async function main() {
       /\$\d/.test(amb?.answer ?? "") || /\d{3}/.test(amb?.answer ?? ""),
       "no concrete figure in answer",
     );
+
+    // Voice path: a small valid WAV through /capture/transcribe (same upload
+    // the widget makes after recording). Only asserts the route accepts a
+    // session + valid audio container and answers 200 — the transcription
+    // content itself is nondeterministic (Groq Whisper), so we accept any
+    // string; anything 4xx/5xx (auth regression, handler break) fails.
+    const sr = 16000, n = sr; // 1 second of 16-bit mono PCM
+    const samples = new Int16Array(n);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const env = Math.max(0, Math.sin(Math.PI * (t % 0.25) / 0.25));
+      samples[i] = Math.round(7000 * env * Math.sin(2 * Math.PI * 260 * t));
+    }
+    const buf = new ArrayBuffer(44 + n * 2);
+    const view = new DataView(buf);
+    const wr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+    wr(0, "RIFF"); view.setUint32(4, 36 + n * 2, true); wr(8, "WAVE"); wr(12, "fmt ");
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, sr, true); view.setUint32(28, sr * 2, true);
+    view.setUint16(32, 2, true); view.setUint16(34, 16, true); wr(36, "data");
+    view.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) view.setInt16(44 + i * 2, samples[i], true);
+    const form = new FormData();
+    form.append("file", new Blob([buf], { type: "audio/wav" }), "question.webm");
+    const trRes = await fetch(BASE + "/capture/transcribe", { method: "POST", headers: { cookie }, body: form });
+    check(
+      "/capture/transcribe with session + fixture WAV → 200 (Groq transcription ran)",
+      trRes.status === 200,
+      `${trRes.status} ${(await trRes.text().catch(() => "")).slice(0, 100)}`,
+    );
   } else {
     check("ambassador authenticated ask-back", false, "no session cookie from signin — cannot assert grounded mode");
   }

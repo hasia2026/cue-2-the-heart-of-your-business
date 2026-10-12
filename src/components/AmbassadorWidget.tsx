@@ -82,6 +82,7 @@ export default function AmbassadorWidget() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setMicPending(false);
+      startMeter(stream);
       const chunks: Blob[] = [];
       const rec = new MediaRecorder(stream);
       recRef.current = rec;
@@ -89,6 +90,7 @@ export default function AmbassadorWidget() {
       rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
       rec.onstop = async () => {
         stream.getTracks().forEach((tr) => tr.stop());
+        stopMeter();
         setRecState("transcribing");
         try {
           const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
@@ -108,10 +110,46 @@ export default function AmbassadorWidget() {
       setRecState("recording");
     } catch (e) {
       setMicPending(false);
+      stopMeter();
       // NotAllowed → user denied or site policy blocks; NotFound/other → no mic or driver error.
       const denied = e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError");
       setMsgs((m) => [...m, { role: "ambassador", text: denied ? t("amb.micDeniedHard") : t("amb.micDenied") }]);
     }
+  }
+
+  // Live input feedback: a 7-bar amplitude meter fed from the real mic stream.
+  // Cheap AnalyserNode polling (no oscillation, no re-renders beyond the meter).
+  const [micLevel, setMicLevel] = useState(0); // 0..1
+  const meterRaf = useRef(0);
+  const meterCtx = useRef<AudioContext | null>(null);
+
+  function startMeter(stream: MediaStream) {
+    try {
+      const ctx = new AudioContext();
+      meterCtx.current = ctx;
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        setMicLevel(Math.min(1, (sum / data.length) / 96));
+        meterRaf.current = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch {
+      // Meter failure must never break the recording itself.
+    }
+  }
+
+  function stopMeter() {
+    cancelAnimationFrame(meterRaf.current);
+    meterCtx.current?.close().catch(() => {});
+    meterCtx.current = null;
+    setMicLevel(0);
   }
 
   function stopRec() {
@@ -337,6 +375,17 @@ export default function AmbassadorWidget() {
               >
                 {recState === "recording" ? "■" : recState === "transcribing" ? "⏳" : micPending ? "⏳" : "🎙"}
               </button>
+              {recState === "recording" && (
+                <div aria-hidden className="flex h-6 items-end gap-[2px] !px-0 rounded-lg bg-white/[0.06] px-2">
+                  {Array.from({ length: 7 }).map((_, i) => {
+                    // Bell-shaped envelope so the bars read as a meter, and each
+                    // bar's height follows the live input with a little variance.
+                    const wobble = ((micLevel * 96) * Math.abs(Math.sin(Date.now() / 220 + i))) % 24;
+                    const h = Math.max(3, Math.min(24, micLevel * 24 * Math.sin(Math.PI * ((i + 1) / 8)) + wobble * 0.35));
+                    return <span key={i} className="w-[3px] rounded-full bg-cyan-300" style={{ height: `${h}px` }} />;
+                  })}
+                </div>
+              )}
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
