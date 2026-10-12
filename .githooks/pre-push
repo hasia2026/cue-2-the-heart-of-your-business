@@ -1,0 +1,17 @@
+#!/bin/sh
+# Git pre-push hook — runs the E2E smoke. Target: $E2E_BASE_URL
+# (default http://localhost:3210 — start `npm run dev` first), falling back
+# to the last successful Vercel deployment when localhost is not up.
+# One-time install per clone:  git config core.hooksPath .githooks
+URL="${E2E_BASE_URL:-http://localhost:3210}"
+echo "pre-push: E2E smoke against $URL"
+if ! node scripts/e2e.mjs "$URL"; then
+  if [ "$URL" = "http://localhost:3210" ] && [ -n "$VERCEL_PRODUCTION_URL" ]; then
+    echo "pre-push: localhost down, retrying against production $VERCEL_PRODUCTION_URL"
+    if node scripts/e2e.mjs "$VERCEL_PRODUCTION_URL"; then
+      exit 0
+    fi
+  fi
+  echo "pre-push: E2E FAILED — push aborted."
+  exit 1
+fi

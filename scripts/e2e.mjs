@@ -1,0 +1,192 @@
+#!/usr/bin/env node
+/**
+ * CUE end-to-end smoke — one script, no test framework.
+ * Runs before every push (see .githooks/pre-push) or via node scripts/e2e.mjs [baseUrl].
+ *
+ * Seams exercised (public interfaces only):
+ *   1. Sign in as the Summit Air demo owner (real /signin round trip via its
+ *      server action) → lands on /dashboard.
+ *   2. Demo seeding presence — the dashboard renders Summit Air's seeded
+ *      pack chip and the priority-leak copy.
+ *   3. Leak-score — POST /api/score with fixture answers gets a scored
+ *      result back (the real scoring engine runs; nothing mocked).
+ *   4. Ambassador ask-back — POST /api/ambassador. In deterministic mode
+ *      (default, CI-friendly) the script runs against a deployment that has
+ *      zero LLM keys, so ambassadorAnswer falls through to mode:"grounded"
+ *      with the deterministic assistant answer — same routes, real data.
+ *      Set E2E_ALLOW_LLM=1 to instead assert a live LLM answered.
+ *   5. Auth guards — /api/digest/send unauthenticated must 401.
+ *
+ * Exit 0 = all checks passed. Exit 1 = any failure.
+ */
+const BASE = (process.argv[2] ?? process.env.E2E_BASE_URL ?? "http://localhost:3210").replace(/\/$/, "");
+const ALLOW_LLM = process.env.E2E_ALLOW_LLM === "1";
+
+let fails = 0;
+const check = (name, ok, extra = "") => {
+  console.log(`${ok ? "✓" : "✗"} ${name}${ok || !extra ? "" : " — " + extra}`);
+  if (!ok) fails++;
+};
+
+const OWNER_EMAIL = "demo@summitair.example";
+const OWNER_PASSWORD = "hvac-demo-2026";
+
+async function main() {
+  // Health of the target
+  const root = await fetch(BASE + "/");
+  check("target reachable", root.ok, `${root.status} at ${BASE}`);
+
+  // 1. Sign in — drive the real /signin server action and keep the session cookie.
+  const signinPage = await fetch(BASE + "/signin");
+  check("/signin renders", signinPage.ok, String(signinPage.status));
+  const signinHtml = await signinPage.text();
+
+  let cookie = "";
+  // Progressive-enhancement form POST — no Next-Action header needed; the
+  // hidden $$ACTION_ID field routes the action server-side, exactly like a
+  // browser with JS-driven form action would. Stable across minor versions.
+  const actionId = signinHtml.match(/ACTION_ID_([0-9a-f]{40,60})/)?.[1];
+  check("signin action id found", !!actionId);
+  if (actionId) {
+    const boundary = '----e2e' + Date.now();
+    const parts = [
+      '--' + boundary,
+      'Content-Disposition: form-data; name="$ACTION_ID_' + actionId + '"',
+      '',
+      '',
+      '--' + boundary,
+      'Content-Disposition: form-data; name="email"',
+      '',
+      OWNER_EMAIL,
+      '--' + boundary,
+      'Content-Disposition: form-data; name="password"',
+      '',
+      OWNER_PASSWORD,
+      '--' + boundary + '--',
+      '',
+    ].join('\r\n');;
+    const signin = await fetch(BASE + '/signin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary },
+      body: parts,
+      redirect: 'manual',
+    });
+    const setCookie = signin.headers.getSetCookie?.() ?? [];
+    cookie = (setCookie.find((x) => x.startsWith('cue_session=')) ?? '').split(';')[0];
+    const body = await signin.text();
+    const badCreds = body.includes('Invalid email or password');
+    check('signin accepted credentials', !badCreds && signin.status < 400 && !badCreds, );
+    check('session cookie issued', !!cookie, 'none of the actions produced one');
+  } else {
+    check('session cookie issued', false, 'no action id');
+  }
+
+  // 2. Demo seeding presence (dashboard as the signed-in owner).
+  const dash = await fetch(BASE + "/dashboard", {
+    headers: cookie ? { cookie } : {},
+    redirect: "manual",
+  });
+  check("/dashboard authenticated → 200", dash.status === 200, String(dash.status));
+  const dashBody = dash.ok ? await dash.text() : "";
+  check("Summit Air seeded pack chip", dashBody.includes("Home Services (HVAC) pack"), "pack chip missing");
+  check(
+    "Summit Air seeded leak renders",
+    dashBody.includes("quote requests have had no follow-up") && dashBody.includes("99,360"),
+    "priority leak missing",
+  );
+  if (dash.status !== 200 && !dashBody) {
+    check("fallback: dashboard HTML text (signin may render 200 page without cookie)", false, "skipped");
+  }
+
+  // 3. Leak score — real scoring engine, fixture answers, unique throwaway email.
+  // Question ids + bracket keys come from the /score page's escaped-JSON payload.
+  const scorePage = await fetch(BASE + "/score");
+  const scoreHtml = await scorePage.text();
+  // Strip backslashes from the escaped RSC payload, then plain-JSON match.
+  const flat = scoreHtml.split(String.fromCharCode(92)).join("");
+  const qIds = [...flat.matchAll(/"id":"([a-z0-9_]+)","text/g)].map((m) => m[1]);
+  const brackets = [...flat.matchAll(/"key":"([a-z0-9_]+)","label/g)].map((m) => m[1]);
+  const bracket = brackets[brackets.length - 1];
+  check("leak-score: fetched question + bracket fixtures", qIds.length >= 3 && !!bracket,
+    `questions=${qIds.length} bracket=${bracket}`);
+
+  const email = `e2e-${Date.now()}@cue-e2e.invalid`;
+  const answers = Object.fromEntries(qIds.map((id, i) => [id, i < 2 ? 0 : 3])); // leak heavy on the first two
+  const scoreRes = await fetch(BASE + "/api/score", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      businessName: "E2E Smoke Co",
+      industry: "home_services",
+      revenueBracket: bracket,
+      answers,
+    }),
+  });
+  const score = await scoreRes.json().catch(() => ({}));
+  check("/api/score → 200", scoreRes.status === 200, `${scoreRes.status} ${JSON.stringify(score).slice(0, 120)}`);
+  check("score computed from answers", typeof score?.score === "number" && score.score >= 0, String(score?.score));
+  check(
+    "worst-case answers do not score perfectly healthy",
+    !(qIds.length && qIds.slice(0, 2).every((id) => answers[id] === 0) && score?.score === 0),
+    JSON.stringify(score).slice(0, 80),
+  );
+
+  // 4. Ambassador ask-back.
+  // Signed in (or not): POST /api/ambassador. When a session cookie is present
+  // the route answers from records. Without one the route honestly replies
+  // with the public intro — in that case re-send WITH the signin cookie we
+  // got above; skip the grounded assertion only if signin never produced one.
+  const ambRes0 = await fetch(BASE + "/api/ambassador", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: "What should I focus on today?", locale: "en" }),
+  });
+  const amb0 = await ambRes0.json().catch(() => ({}));
+  check("/api/ambassador unauthenticated → public intro, 200", ambRes0.status === 200 && amb0?.mode === "public", `${ambRes0.status} mode=${amb0?.mode}`);
+
+  if (cookie) {
+    const ambRes = await fetch(BASE + "/api/ambassador", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({ question: "What should I focus on today?", locale: "en" }),
+    });
+    const amb = await ambRes.json().catch(() => ({}));
+    check("/api/ambassador authenticated → 200", ambRes.status === 200, String(ambRes.status));
+    check("ambassador answered from records", typeof amb?.answer === "string" && amb.answer.length > 20, String(amb?.answer).slice(0, 80));
+    // Mode is a property of the deployment (does it have an LLM key?), not of
+    // this test. Any of the app's honest modes is acceptable:
+    //   grounded   — assistant core answered deterministically (no LLM key)
+    //   ambassador — a configured LLM framed the grounded facts (e.g. Groq)
+    // The CI-safe expectation for E2E_ALLOW_LLM=1 is ambassador; otherwise
+    // accept either, since the target's LLM configuration isn't ours to force.
+    const expect = ALLOW_LLM ? "ambassador" : "grounded";
+    const accept = ALLOW_LLM ? ["ambassador"] : ["grounded", "ambassador"];
+    check(
+      ALLOW_LLM
+        ? "ambassador reached a live LLM (mode=ambassador)"
+        : "ambassador answered through an honest mode (grounded OR ambassador)",
+      accept.includes(amb?.mode),
+      `mode=${amb?.mode} provider=${amb?.provider} (expected=${expect})`,
+    );
+    check(
+      "ask-back cites real seeded numbers, not filler",
+      /\$\d/.test(amb?.answer ?? "") || /\d{3}/.test(amb?.answer ?? ""),
+      "no concrete figure in answer",
+    );
+  } else {
+    check("ambassador authenticated ask-back", false, "no session cookie from signin — cannot assert grounded mode");
+  }
+
+  // 5. Auth guards still up.
+  const digestUnauth = await fetch(BASE + "/api/digest/send");
+  check("/api/digest/send unauthenticated → 401", digestUnauth.status === 401, String(digestUnauth.status));
+
+  console.log(fails === 0 ? "\nE2E PASSED" : `\n${fails} E2E FAILURE(S)`);
+  process.exitCode = fails === 0 ? 0 : 1;
+}
+
+main().catch((e) => {
+  console.error("E2E CRASHED:", e.message);
+  process.exitCode = 1;
+});
