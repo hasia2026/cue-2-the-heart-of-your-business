@@ -31,6 +31,17 @@ export default async function SignUpPage({
             <input id="orgName" name="orgName" required className="input" placeholder="Northgate Auto Group" />
           </div>
           <div>
+            <label className="label" htmlFor="industry">Industry</label>
+            <select id="industry" name="industry" required defaultValue="" className="input">
+              <option value="" disabled>Choose your industry…</option>
+              <option value="AUTO_DEALERSHIP">Auto dealership</option>
+              <option value="HOME_SERVICES">Home services (HVAC, plumbing, electrical)</option>
+              <option value="RETAIL">Retail</option>
+              <option value="SALON">Salon / spa</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+          <div>
             <label className="label" htmlFor="name">Your name</label>
             <input id="name" name="name" required className="input" autoComplete="name" />
           </div>

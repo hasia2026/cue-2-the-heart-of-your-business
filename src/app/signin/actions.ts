@@ -15,6 +15,14 @@ export async function signUpAction(formData: FormData) {
   if (!name || !email || !password || !orgName) throw new Error("All fields are required");
   if (password.length < 8) throw new Error("Password must be at least 8 characters");
 
+  // Industry picker: drives the vocab pack everywhere (dashboard chip, pipeline,
+  // compass, service pages). Only the two seeded packs exist today; anything
+  // else is stored raw and shows the honest generic pack until one is built.
+  const INDUSTRIES = new Set(["AUTO_DEALERSHIP", "HOME_SERVICES", "OTHER", "RETAIL", "SALON"]);
+  const industry = String(formData.get("industry") ?? "").trim().toUpperCase();
+  const picked = INDUSTRIES.has(industry) ? industry : null;
+  if (!picked) throw new Error("Please choose an industry");
+
   const [existing] = await sql`select id from users where email = ${email}`;
   if (existing) throw new Error("An account with that email already exists");
 
@@ -25,7 +33,8 @@ export async function signUpAction(formData: FormData) {
     insert into organizations (name) values (${orgName}) returning id`;
   await sql`insert into members (organization_id, user_id, role) values (${org.id}, ${user.id}, 'OWNER')`;
   await sql`
-    insert into business_profiles (organization_id, name) values (${org.id}, ${orgName})`;
+    insert into business_profiles (organization_id, name, industry)
+    values (${org.id}, ${orgName}, ${picked})`;
   await sql`insert into ai_settings (organization_id) values (${org.id})`;
 
   // Partner referral attribution — first link wins (unique per org)

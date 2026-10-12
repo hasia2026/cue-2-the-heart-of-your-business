@@ -46,6 +46,21 @@ const AUTO: Vocab = {
   dimInventory: null,
 };
 
+// Generic fallback for orgs whose industry is neither of the built packs
+// (blank, OTHER, RETAIL, SALON, …). Honest labels instead of pretending to be
+// an auto dealership — the open-needs-no-vertical copy works for any business.
+const GENERIC: Vocab = {
+  pack: "Generic",
+  pipelineSub: "Leads, deals, inventory, and service work in one view — your industry pack surface.",
+  inventoryTitle: "Inventory (oldest first)",
+  inventoryEmpty: "No available inventory.",
+  serviceTitle: "Service orders",
+  serviceEmpty: "No service orders.",
+  dashPack: "Generic pack",
+  dimPipeline: null,
+  dimInventory: null,
+};
+
 const HVAC: Vocab = {
   pack: "Home Services (HVAC)",
   pipelineSub: "Quote requests, replacement jobs, equipment quotes, and service calls in one view — the Home Services pack surface.",
@@ -61,7 +76,7 @@ const HVAC: Vocab = {
 export async function getVocab(orgId: string): Promise<Vocab> {
   const [row] = await sql`
     select industry, label_overrides from business_profiles where organization_id = ${orgId}`;
-  const base = row?.industry === "HOME_SERVICES" ? HVAC : AUTO;
+  const base = row?.industry === "HOME_SERVICES" ? HVAC : row?.industry === "AUTO_DEALERSHIP" ? AUTO : GENERIC;
   const overrides = (row?.label_overrides ?? {}) as Partial<Record<keyof Vocab, unknown>>;
   const vocab = { ...base };
   for (const [key] of VOCAB_LABELS) {
