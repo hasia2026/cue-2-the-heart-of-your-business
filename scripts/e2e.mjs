@@ -124,13 +124,21 @@ async function main() {
     }),
   });
   const score = await scoreRes.json().catch(() => ({}));
-  check("/api/score → 200", scoreRes.status === 200, `${scoreRes.status} ${JSON.stringify(score).slice(0, 120)}`);
-  check("score computed from answers", typeof score?.score === "number" && score.score >= 0, String(score?.score));
-  check(
-    "worst-case answers do not score perfectly healthy",
-    !(qIds.length && qIds.slice(0, 2).every((id) => answers[id] === 0) && score?.score === 0),
-    JSON.stringify(score).slice(0, 80),
-  );
+  if (scoreRes.status === 429) {
+    // The in-memory rate limit (5 submissions / IP / hour on the deployed
+    // server per the same x-forwarded-for we can't vary) blocks repeated
+    // local pushes. The limit being hit is itself evidence the route and
+    // guard work; note it loudly, don't fake a pass.
+    check("/api/score reached but rate-limited (repeated runs hit the 5/hour guard) — rerun later or use a fresh IP", false, String(scoreRes.status));
+  } else {
+    check("/api/score → 200", scoreRes.status === 200, `${scoreRes.status} ${JSON.stringify(score).slice(0, 120)}`);
+    check("score computed from answers", typeof score?.score === "number" && score.score >= 0, String(score?.score));
+    check(
+      "leaky answers do not score perfectly healthy",
+      !(qIds.slice(0, 2).every((id) => answers[id] === 0) && score?.score === 0),
+      JSON.stringify(score).slice(0, 80),
+    );
+  }
 
   // 4. Ambassador ask-back.
   // Signed in (or not): POST /api/ambassador. When a session cookie is present
