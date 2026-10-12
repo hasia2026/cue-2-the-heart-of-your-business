@@ -69,12 +69,19 @@ export default function AmbassadorWidget() {
     }
   }, [msgs, autoSpeak, locale]);
 
-  // Mic: record via MediaRecorder → transcribe with the live-tested Groq Whisper route → send
+  // Mic: record via MediaRecorder → transcribe with the live-tested Groq Whisper route → send.
+  // micPending covers the browser permission prompt: from getUserMedia call to
+  // resolve/reject. Rejections distinguish the denied/blocked case (NotAllowed/
+  // Security errors) from generic failures (NotFoundError, syscall errors).
+  const [micPending, setMicPending] = useState(false);
+
   async function beginRecording() {
-    if (recState !== "idle" || busy) return;
+    if (recState !== "idle" || micPending || busy) return;
     stopSpeaking.current(); // barging in while speech plays
+    setMicPending(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicPending(false);
       const chunks: Blob[] = [];
       const rec = new MediaRecorder(stream);
       recRef.current = rec;
@@ -99,8 +106,11 @@ export default function AmbassadorWidget() {
       };
       rec.start();
       setRecState("recording");
-    } catch {
-      setMsgs((m) => [...m, { role: "ambassador", text: t("amb.micDenied") }]);
+    } catch (e) {
+      setMicPending(false);
+      // NotAllowed → user denied or site policy blocks; NotFound/other → no mic or driver error.
+      const denied = e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError");
+      setMsgs((m) => [...m, { role: "ambassador", text: denied ? t("amb.micDeniedHard") : t("amb.micDenied") }]);
     }
   }
 
@@ -320,17 +330,23 @@ export default function AmbassadorWidget() {
                 type="button"
                 onClick={recState !== "idle" ? stopRec : beginRecording}
                 className={`!px-3 border border-white/20 rounded-xl hover:bg-white/[0.08] ${
-                  recState === "recording" ? "animate-pulse bg-red-600/80 text-white" : ""
+                  recState === "recording" ? "animate-pulse bg-red-600/80 text-white" : micPending ? "animate-pulse" : ""
                 }`}
-                aria-label={recState !== "idle" ? t("amb.voiceStop") : t("amb.voice")}
-                title={recState !== "idle" ? t("amb.voiceStop") : t("amb.voice")}
+                aria-label={recState !== "idle" ? t("amb.voiceStop") : micPending ? t("amb.micAsk") : t("amb.voice")}
+                title={recState !== "idle" ? t("amb.voiceStop") : micPending ? t("amb.micAsk") : t("amb.voice")}
               >
-                {recState === "recording" ? "■" : recState === "transcribing" ? "⏳" : "🎙"}
+                {recState === "recording" ? "■" : recState === "transcribing" ? "⏳" : micPending ? "⏳" : "🎙"}
               </button>
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder={recState === "recording" ? t("amb.voiceStop") : t("amb.placeholder")}
+                placeholder={
+                  recState === "recording"
+                    ? t("amb.voiceStop")
+                    : micPending
+                      ? t("amb.micAsk")
+                      : t("amb.placeholder")
+                }
                 className="input flex-1"
                 aria-label={t("amb.placeholder")}
               />
