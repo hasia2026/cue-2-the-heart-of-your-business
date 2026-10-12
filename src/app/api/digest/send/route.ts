@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { buildDigestData, renderDigest } from "@/lib/digest";
+import { sql } from "@/lib/db";
+import { buildDigestData, renderDigest, renderDigestHtml } from "@/lib/digest";
 import { mailerConnected, sendMail } from "@/lib/mailer";
 import { whatsappConnected, sendWhatsAppText } from "@/lib/whatsapp";
 
@@ -17,6 +18,7 @@ export async function GET(req: Request) {
 
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);
+  const html = renderDigestHtml(data);
   const subject = `CUE weekly digest — ${data.orgName}`;
 
   const url = new URL(req.url);
@@ -25,12 +27,15 @@ export async function GET(req: Request) {
   }
 
   const mail = mailerConnected()
-    ? await sendMail({ to: session.user.email, subject, text })
+    ? await sendMail({ to: session.user.email, subject, text, html })
     : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };
 
   let whatsapp: { sent: boolean; error?: string } | null = null;
   if (whatsappConnected()) {
-    const waTo = process.env.WHATSAPP_DIGEST_TO?.trim();
+    // Same precedence as the cron route: captured owner number first.
+    const [profile] = await sql`
+      select whatsapp_number from business_profiles where organization_id = ${session.organizationId}`;
+    const waTo = String(profile?.whatsapp_number ?? "").trim() || process.env.WHATSAPP_DIGEST_TO?.trim();
     if (waTo) whatsapp = await sendWhatsAppText(waTo, text);
   }
 
@@ -46,7 +51,7 @@ export async function POST() {
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);
   const mail = mailerConnected()
-    ? await sendMail({ to: session.user.email, subject: `CUE weekly digest — ${data.orgName}`, text })
+    ? await sendMail({ to: session.user.email, subject: `CUE weekly digest — ${data.orgName}`, text, html: renderDigestHtml(data) })
     : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };
   return NextResponse.json({ sent: mail.sent, error: mail.error ?? null, preview: text });
 }
