@@ -29,6 +29,30 @@ export async function updateProfile(formData: FormData) {
   revalidatePath("/compass");
 }
 
+export async function updateDigestSettings(formData: FormData) {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+  const on = String(formData.get("digestOn") ?? "") === "on";
+  const rawDay = Number(String(formData.get("digestDay") ?? ""));
+  const day = Number.isInteger(rawDay) && rawDay >= 0 && rawDay <= 6 ? rawDay : 1;
+  // Owner WhatsApp destination for digests — empty clears it (honest degrade
+  // on the cron route when WHATSAPP is not actually configured).
+  const waRaw = String(formData.get("whatsappNumber") ?? "").trim();
+  const wa = /^[+]?[0-9]{7,15}$/.test(waRaw) ? waRaw.replace("+", "") : null;
+
+  await sql`
+    update business_profiles set
+      digest_on = ${on}, digest_day = ${day}, whatsapp_number = ${wa}
+    where organization_id = ${orgId}`;
+
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "DIGEST_SETTINGS_UPDATED",
+    detail: on ? `weekly digest on (day ${day})` : "weekly digest off",
+  });
+  revalidatePath("/settings");
+}
+
 export async function updateVocab(formData: FormData) {
   const session = await requireSessionAction();
   const orgId = session.organizationId;

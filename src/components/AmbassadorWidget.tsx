@@ -38,6 +38,21 @@ export default function AmbassadorWidget() {
     setSpeakingIdx(null);
   });
 
+  // Speech text: TTS must never narrate symbols ("**", "/", "—", "|").
+  // Whitelist approach — keep letters (any script: en/es/vi/ar), digits, and
+  // real sentence punctuation; drop everything symbol-like. URLs and markdown
+  // links get humanized first so labels survive the whitelist.
+  function speakableText(raw: string): string {
+    return raw
+      .replace(/https?:\/\/\S+/g, " a link. ")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // [label](url) → label
+      .replace(/[*_`#>~]+/g, " ")               // markdown syntax noise (**, __, `)
+      .replace(/^\s*[-•]\s+/gm, "")             // leading bullet dashes
+      .replace(/[^\p{L}\p{N}\s.,?!'’%$-]/gu, " ") // drop / \ | — ( ) [ ] = etc.
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
   // Speak an ambassador answer with the browser's built-in speechSynthesis (offline, zero cost)
   function speak(text: string, i: number) {
     if (!("speechSynthesis" in window)) return;
@@ -46,7 +61,7 @@ export default function AmbassadorWidget() {
       return;
     }
     stopSpeaking.current();
-    const u = new SpeechSynthesisUtterance(text);
+    const u = new SpeechSynthesisUtterance(speakableText(text));
     u.lang = SPEECH_LANG[locale] ?? "en-US";
     u.onend = stopSpeaking.current;
     u.onerror = stopSpeaking.current;
@@ -60,7 +75,7 @@ export default function AmbassadorWidget() {
     const last = msgs[msgs.length - 1];
     if (last && last.role === "ambassador" && msgs.length > 1) {
       const i = msgs.length - 1;
-      const u = new SpeechSynthesisUtterance(last.text);
+      const u = new SpeechSynthesisUtterance(speakableText(last.text));
       u.lang = SPEECH_LANG[locale] ?? "en-US";
       u.onend = () => setSpeakingIdx((cur) => (cur === i ? null : cur));
       u.onerror = () => setSpeakingIdx((cur) => (cur === i ? null : cur));

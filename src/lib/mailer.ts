@@ -11,7 +11,7 @@ export function mailFrom(): string {
   return process.env.MAIL_FROM ?? "CUE <onboarding@resend.dev>";
 }
 
-export async function sendMail(opts: { to: string; subject: string; text: string }): Promise<SendResult> {
+export async function sendMail(opts: { to: string; subject: string; text: string; html?: string }): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { connected: false, sent: false, error: "RESEND_API_KEY not set" };
   try {
@@ -22,6 +22,8 @@ export async function sendMail(opts: { to: string; subject: string; text: string
         from: mailFrom(),
         to: opts.to,
         subject: opts.subject,
+        // HTML when available; plain text is Resend's required fallback body.
+        ...(opts.html ? { html: opts.html } : {}),
         text: opts.text,
       }),
     });

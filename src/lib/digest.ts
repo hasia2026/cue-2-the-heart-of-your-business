@@ -89,8 +89,32 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   return { orgName: org.name, openLeaks, pendingDecisions, approvedThisWeek, moneyFound };
 }
 
-/** Plain-text rendering — the same body goes to email and WhatsApp. */
+/** Plain-text rendering — the same body goes to WhatsApp and the email fallback. */
 export function renderDigest(d: DigestData): string {
   const section = (s: DigestSection) => `${s.heading}\n${s.lines.join("\n")}`;
   return `CUE weekly digest — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.approvedThisWeek, d.moneyFound].map(section).join("\n\n")}`;
+}
+
+/** HTML rendering — same builder data, four styled cards; plain text is the fallback. */
+export function renderDigestHtml(d: DigestData): string {
+  const card = (s: DigestSection, accent: string) => `
+    <div style="background:#141428;border-radius:12px;padding:18px 20px;margin:0 0 14px;border-left:4px solid ${accent};">
+      <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b93b8;margin-bottom:8px;">${esc(s.heading)}</div>
+      ${s.lines.map((l) => `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${esc(l)}</div>`).join("")}
+    </div>`;
+  return `<!doctype html><html><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+    <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
+      <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7c6cff;margin-bottom:6px;">CUE · weekly digest</div>
+      <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:18px;">${esc(d.orgName)}</div>
+      ${card(d.openLeaks, "#f87171")}
+      ${card(d.pendingDecisions, "#c084fc")}
+      ${card(d.approvedThisWeek, "#22d3ee")}
+      ${card(d.moneyFound, "#34d399")}
+      <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>
+    </div>
+  </body></html>`;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

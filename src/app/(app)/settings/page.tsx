@@ -1,7 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { PROVIDERS } from "@/lib/ambassador";
-import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateVocab } from "./actions";
+import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateVocab } from "./actions";
 import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import { getT } from "@/lib/locale";
@@ -79,6 +79,40 @@ export default async function SettingsPage({
           </div>
           <div className="md:col-span-2">
             <button className="btn-primary">{t("settings.saveProfile")}</button>
+          </div>
+        </form>
+      </section>
+
+      {/* Weekly digest card: on/off, send day, owner WhatsApp destination. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Weekly digest</h2>
+        <p className="muted mb-4 text-xs">One email (and WhatsApp, when a number is set) summarizing open leaks, approvals, and money found — sent on the day you pick.</p>
+        <form action={updateDigestSettings} className="grid gap-4 md:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-xl border border-white/[0.06] px-4 py-3">
+            <input type="checkbox" name="digestOn" defaultChecked={profile?.digest_on ?? true} className="h-4 w-4 accent-cue-blue" />
+            <div>
+              <div className="font-medium text-navy-100">Send the weekly digest</div>
+              <div className="muted text-xs">Off means CUE still creates the digest content but does not email it.</div>
+            </div>
+          </label>
+          <div>
+            <label className="label" htmlFor="digestDay">Send day</label>
+            <select id="digestDay" name="digestDay" defaultValue={String(profile?.digest_day ?? 1)} className="input">
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+              <option value="0">Sunday</option>
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="label" htmlFor="whatsappNumber">WhatsApp number for the digest (optional, E.164)</label>
+            <input id="whatsappNumber" name="whatsappNumber" defaultValue={profile?.whatsapp_number ?? ""} className="input" placeholder="+15551234567" />
+          </div>
+          <div className="md:col-span-2">
+            <button className="btn-primary">Save digest settings</button>
           </div>
         </form>
       </section>
