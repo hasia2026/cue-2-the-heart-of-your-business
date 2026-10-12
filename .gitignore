@@ -6,6 +6,7 @@ out/
 *.tsbuildinfo
 server.log
 .vercel
+.vercel-token
 tools/
 .freebuff/
 .tour-build/
