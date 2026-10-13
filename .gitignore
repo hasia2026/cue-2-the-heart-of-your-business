@@ -10,3 +10,5 @@ server.log
 tools/
 .freebuff/
 .tour-build/
+
+.vercel
