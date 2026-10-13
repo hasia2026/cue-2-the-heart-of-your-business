@@ -1,12 +1,20 @@
 // Lightweight uptime/error monitor — no external SDK. Writes deduped
 // error events to Postgres and alerts the operator via the existing
 // Resend mailer when a cron heartbeat finds problems.
-import { createHash } from "node:crypto";
 import { sql } from "./db";
 import { sendMail, mailerConnected } from "./mailer";
 
+// FNV-1a in plain JS — deterministic enough for dedupe, and avoids a
+// node:crypto import that webpack dev compilation of instrumentation can't
+// handle ("node:" scheme is not handled by plugins).
 export function fingerprintOf(message: string, digest?: string | null): string {
-  return createHash("sha256").update(`${message}:${digest ?? ""}`).digest("hex").slice(0, 48);
+  const input = `${message}:${digest ?? ""}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16) + "-" + input.length.toString(16);
 }
 
 export type MonitorEvent = {
