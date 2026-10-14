@@ -65,15 +65,100 @@
     border-top: 1px solid #223351;
   }
   figcaption b { color: #e6edf5; display: block; margin-bottom: 2px; }
+  figure img { cursor: zoom-in; }
+  /* Lightbox: click a screenshot to view it full-size; tall pages scroll. Arrows navigate, Esc closes */
+  #lightbox {
+    position: fixed;
+    inset: 0;
+    display: none;
+    background: rgba(2, 6, 14, 0.92);
+    z-index: 100;
+    overflow: auto;
+    padding: 56px 24px;
+    text-align: center;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox .lb-wrap { display: inline-block; max-width: 96%; }
+  #lightbox img {
+    /* Render at readable size (not shrink-to-fit) and let tall pages scroll */
+    width: min(1400px, 92vw);
+    max-width: none;
+    height: auto;
+    border-radius: 10px;
+    border: 1px solid #2a3b5c;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  }
+  #lightbox .lb-cap {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    color: #b9c7da;
+    background: rgba(16, 27, 46, 0.85);
+    border: 1px solid #223351;
+    border-radius: 999px;
+    padding: 6px 14px;
+    white-space: nowrap;
+    z-index: 102;
+  }
+  #lightbox .lb-btn {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(16, 27, 46, 0.85);
+    color: #e6edf5;
+    border: 1px solid #223351;
+    border-radius: 999px;
+    font-size: 22px;
+    line-height: 1;
+    padding: 12px 16px;
+    cursor: pointer;
+    z-index: 102;
+  }
+  #lightbox .lb-btn:hover { background: #14243c; }
+  #lightbox .lb-prev { left: 18px; }
+  #lightbox .lb-next { right: 18px; }
+  #lightbox .lb-close {
+    position: fixed;
+    top: 16px;
+    right: 18px;
+    transform: none;
+    font-size: 18px;
+    padding: 8px 14px;
+    z-index: 102;
+  }
+  #lightbox .hint {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #7b8ba3;
+    background: rgba(16, 27, 46, 0.85);
+    border: 1px solid #223351;
+    border-radius: 999px;
+    padding: 6px 12px;
+    white-space: nowrap;
+    z-index: 102;
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>CUE — Product Tour Screenshots</h1>
-  <p>22 screenshots across both demo orgs: Northgate Auto Group (dealership) and Summit Air Heating &amp; Cooling (HVAC).</p>
+  <p>23 screenshots across both demo orgs: Northgate Auto Group (dealership) and Summit Air Heating &amp; Cooling (HVAC).</p>
 </header>
 <nav id="toc"></nav>
 <main id="gallery"></main>
+<div id="lightbox" aria-hidden="true">
+  <button class="lb-btn lb-close" title="Close (Esc)">✕ Close</button>
+  <div class="hint">Tall pages scroll · ‹ › or ← → to move</div>
+  <button class="lb-btn lb-prev" title="Previous (←)">‹</button>
+  <div class="lb-wrap"><img id="lb-img" src="" alt="" /></div>
+  <button class="lb-btn lb-next" title="Next (→)">›</button>
+  <div class="lb-cap" id="lb-cap"></div>
+</div>
 <script>
   const shots = [
     ["landing-hero", "Landing hero", "Public homepage with the five CUE loops and Revi mascot."],
@@ -96,11 +181,32 @@
     ["lab", "Innovation Lab", "Experiment ideas board."],
     ["ecosystem", "Ecosystem", "Partner integrations."],
     ["settings", "Settings", "Org settings and AI configuration."],
+    ["northgate-dashboard", "Northgate dashboard (latest)", "Fresh capture of the Northgate Auto Group dashboard with the auto dealership pack."],
     ["book-call", "Book a call", "Scheduling page for pilot calls."],
     ["partners", "Partners", "Partner program page."]
   ];
   const toc = document.getElementById("toc");
   const gallery = document.getElementById("gallery");
+  const lightbox = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lb-img");
+  const lbCap = document.getElementById("lb-cap");
+  let lbIndex = -1;
+  function openLightbox(i) {
+    lbIndex = (i + shots.length) % shots.length;
+    const [file, title, desc] = shots[lbIndex];
+    lbImg.src = file + ".png";
+    lbImg.alt = title;
+    lbCap.textContent = title + " — " + desc;
+    lightbox.classList.add("open");
+    lightbox.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+  function closeLightbox() {
+    lightbox.classList.remove("open");
+    lightbox.setAttribute("aria-hidden", "true");
+    lbImg.src = "";
+    document.body.style.overflow = "";
+  }
   for (const [file, title, desc] of shots) {
     const a = document.createElement("a");
     a.href = "#" + file;
@@ -112,6 +218,8 @@
     img.src = file + ".png";
     img.alt = title;
     img.loading = "lazy";
+    img.title = "Click to view larger";
+    img.addEventListener("click", () => openLightbox(shots.findIndex(s => s[0] === file)));
     const cap = document.createElement("figcaption");
     const b = document.createElement("b");
     b.textContent = title;
@@ -120,6 +228,16 @@
     fig.append(img, cap);
     gallery.appendChild(fig);
   }
+  document.querySelector(".lb-close").addEventListener("click", closeLightbox);
+  document.querySelector(".lb-prev").addEventListener("click", () => openLightbox(lbIndex - 1));
+  document.querySelector(".lb-next").addEventListener("click", () => openLightbox(lbIndex + 1));
+  lightbox.addEventListener("click", (e) => { if (e.target === lightbox) closeLightbox(); });
+  document.addEventListener("keydown", (e) => {
+    if (!lightbox.classList.contains("open")) return;
+    if (e.key === "Escape") closeLightbox();
+    else if (e.key === "ArrowLeft") openLightbox(lbIndex - 1);
+    else if (e.key === "ArrowRight") openLightbox(lbIndex + 1);
+  });
 </script>
 </body>
 </html>
