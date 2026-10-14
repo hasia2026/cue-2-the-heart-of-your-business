@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CUE — Scan Call Leave-Behind</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #1E1B3A;
+    font-size: 9pt;
+    line-height: 1.35;
+    max-width: 210mm;
+    margin: 0 auto;
+    background: #fff;
+  }
+  .page { padding: 9mm; }
+
+  /* Header — CUE brand bar, consistent with the vertical one-pagers */
+  header {
+    background: linear-gradient(120deg, #050113, #1C1244);
+    color: #fff;
+    border-radius: 12px;
+    padding: 11px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header .logo { font-size: 21pt; font-weight: 800; letter-spacing: 1px; }
+  header .logo span { color: #38BDF8; }
+  header .tag { margin-left: auto; text-align: right; font-size: 8.5pt; color: #A79FD4; }
+  header .tag strong { color: #FB923C; font-size: 9.5pt; }
+
+  h1 { font-size: 15pt; margin: 10px 0 3px; letter-spacing: -0.2px; }
+  .sub { color: #5C548C; font-size: 8.5pt; max-width: 180mm; }
+
+  /* The one bold element: the hand-filled dollar well */
+  .well-block {
+    margin: 12px 0 10px;
+    border: 2px solid #2E8BFF;
+    border-radius: 12px;
+    padding: 9px 16px 11px;
+    background: #F5F8FE;
+  }
+  .well-block .lead { font-size: 9pt; color: #2A2255; }
+  .big-well {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .big-well .cur { font-size: 28pt; font-weight: 800; color: #2E8BFF; padding-bottom: 2px; }
+  .big-well .dollars {
+    flex: 1;
+    min-height: 30pt;
+    border-bottom: 3px dotted #2E8BFF;
+    /* faint ruled guide for handwriting */
+    background:
+      linear-gradient(to bottom, transparent 22pt, #C7DBF9 22pt, #C7DBF9 22.5pt, transparent 22.5pt)
+      no-repeat 0 6pt;
+  }
+  .big-well .per {
+    font-size: 9pt;
+    color: #5C548C;
+    padding-bottom: 5px;
+    white-space: nowrap;
+  }
+  .well-note { font-size: 7.5pt; color: #8B84B0; margin-top: 5px; }
+
+  /* Leak checklist */
+  h2 {
+    font-size: 11pt;
+    color: #2A2255;
+    margin: 11px 0 4px;
+    padding-left: 8px;
+    border-left: 4px solid #2E8BFF;
+  }
+  table.leaks { width: 100%; border-collapse: collapse; }
+  table.leaks th {
+    text-align: left;
+    font-size: 8pt;
+    font-weight: 600;
+    color: #5C548C;
+    border-bottom: 1px solid #E4E1F4;
+    padding: 2px 6px;
+  }
+  table.leaks td { padding: 6px; border-bottom: 1px solid #EFEDF8; font-size: 8.5pt; }
+  table.leaks .box {
+    width: 12px; height: 12px;
+    border: 1.5px solid #2E8BFF;
+    border-radius: 3px;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  table.leaks .name { font-weight: 600; padding-left: 8px; }
+  table.leaks .name small { display: inline; font-weight: 400; color: #5C548C; font-size: 8pt; }
+  .well-s {
+    display: inline-block;
+    min-width: 26mm;
+    border-bottom: 2px dotted #2E8BFF;
+    text-align: right;
+    padding: 0 6px 1px;
+    color: #8B84B0;
+  }
+
+  /* Next steps */
+  .steps { display: flex; gap: 8px; margin-top: 6px; }
+  .step { flex: 1; border: 1.5px solid #E4E1F4; border-radius: 10px; padding: 7px 10px; }
+  .step b { color: #2E8BFF; font-size: 8.5pt; display: block; margin-bottom: 2px; }
+  .step p { font-size: 8pt; color: #3F3966; }
+
+  .metric {
+    margin-top: 9px;
+    background: #F6F5FC;
+    border: 1.5px solid #E4E1F4;
+    border-radius: 10px;
+    padding: 7px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .metric .k { font-size: 8.5pt; color: #2A2255; font-weight: 600; white-space: nowrap; }
+  .metric .w { flex: 1; border-bottom: 2px dotted #7C6FD0; min-height: 10pt; }
+  .metric .date { display: flex; gap: 4px; align-items: center; }
+  .metric .date i {
+    font-style: normal; color: #5C548C; font-size: 8pt; white-space: nowrap;
+  }
+  .metric .dw { min-width: 22mm; border-bottom: 2px dotted #7C6FD0; min-height: 11pt; }
+
+  /* Guarantee */
+  .guarantee {
+    margin-top: 9px;
+    border: 2px solid #FB923C;
+    border-radius: 12px;
+    padding: 8px 14px;
+    background: #FFF8F1;
+  }
+  .guarantee b { color: #C2560A; }
+  .guarantee .word {
+    display: inline-block;
+    min-width: 30mm;
+    border-bottom: 2px dotted #FB923C;
+  }
+  .guarantee p { font-size: 8.5pt; color: #4A3417; }
+
+  footer {
+    margin-top: 9px;
+    padding-top: 6px;
+    border-top: 1px solid #E4E1F4;
+    font-size: 8pt;
+    color: #5C548C;
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+  }
+  footer .rep { margin-left: auto; display: flex; gap: 8px; align-items: baseline; }
+  .well-f { display: inline-block; min-width: 20mm; border-bottom: 1.5px dotted #8B84B0; min-height: 9pt; }
+
+  .fineprint { font-size: 7pt; color: #8B84B0; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo">CU<span>E</span></div>
+    <div style="font-size:9.5pt; color:#E7E4F8;">AI Business Operating System<br><strong style="color:#FB923C;">The Heart of Your Business</strong></div>
+    <div class="tag">Built by HASI Technologies<br>hasi.tech</div>
+  </header>
+
+  <h1>The numbers we saw on your records, {Date}</h1>
+  <div class="sub">Every figure on this page came from <strong>your own exports</strong> during today's scan — no estimates, no industry averages. Each one traces to a real record; you saw it on screen.</div>
+
+  <!-- The one bold element -->
+  <div class="well-block">
+    <div class="lead"><strong>What you're leaving on the table right now:</strong> the total the scan identified across all leak types.</div>
+    <!-- filled in by hand with the prospect during the scan call -->
+    <div class="big-well">
+      <span class="cur">$</span>
+      <span class="dollars" aria-label="hand-write the scan total here"></span>
+      <span class="per">in the next 30&nbsp;days alone</span>
+    </div>
+    <div class="well-note">This is the same total from the screen — same detectors, same records. It keeps moving until the leaks close.</div>
+  </div>
+
+  <section>
+    <h2>The leaks found</h2>
+    <table class="leaks">
+      <tr><th style="width:20px;">✓</th><th>Leak</th><th style="width:30mm;">Count</th><th style="width:42mm;">Value</th></tr>
+      <tr>
+        <td><span class="box"></span></td>
+        <td class="name">Work finished, never invoiced <small>— completed jobs whose invoice never went out, checked against your own SOP</small></td>
+        <td><span class="well-s"></span></td>
+        <td><span class="well-s"></span></td>
+      </tr>
+      <tr>
+        <td><span class="box"></span></td>
+        <td class="name">Leads that went cold quietly <small>— no contact logged past your follow-up window, each with a dollar value attached</small></td>
+        <td><span class="well-s"></span></td>
+        <td><span class="well-s"></span></td>
+      </tr>
+      <tr>
+        <td><span class="box"></span></td>
+        <td class="name">Aging units / quotes past their reprice window <small>— your policy already allows the move; nobody pulled the trigger</small></td>
+        <td><span class="well-s"></span></td>
+        <td><span class="well-s"></span></td>
+      </tr>
+      <tr>
+        <td><span class="box"></span></td>
+        <td class="name">Other leaks from your records <small>— anything the scan surfaced outside the three categories above</small></td>
+        <td><span class="well-s"></span></td>
+        <td><span class="well-s"></span></td>
+      </tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>What a 30-day pilot does about it</h2>
+    <div class="steps">
+      <div class="step"><b>CUE watches</b><p>Reads your live exports against the same detectors you saw today. Nothing changes in your workflow.</p></div>
+      <div class="step"><b>CUE prepares</b><p>Every finding arrives with the record attached and a suggested action — priced, ready, evidenced.</p></div>
+      <div class="step"><b>You decide</b><p>Nothing moves without your approval. CUE waits, logs, and reports what was recovered against the metric we set today.</p></div>
+    </div>
+  </section>
+
+  <div class="metric">
+    <span class="k">Our agreed success metric:</span>
+    <span class="w" aria-label="hand-write the agreed pilot metric"></span>
+    <span class="date"><i>Pilot starts</i><span class="dw"></span></span>
+  </div>
+
+  <div class="guarantee">
+    <p><b>Pay for proof:</b> if the pilot doesn't identify at least <b>$10,000</b> in documented leakage from your records, it costs <span class="word"></span> — and you keep every finding, on the record, yours to hand to anyone. That was the deal before we ran the scan today; it's still the deal.</p>
+  </div>
+
+  <footer>
+    <div>Questions before Monday — <span class="well-f"></span> hasi.tech</div>
+    <div class="rep">
+      <span>Your contact:</span>
+      <span class="well-f"></span>
+      <span class="well-f"></span>
+    </div>
+  </footer>
+
+  <p class="fineprint">Sample totals shown to other stores: $4,951 unbilled repair orders · $460,000 in leads with no follow-up · $66,000 of aging inventory past its reprice date. Your page is your store, not theirs — those numbers are theirs.</p>
+
+</div>
+</body>
+</html>
