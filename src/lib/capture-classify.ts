@@ -56,9 +56,93 @@ export type DuplicateHit = {
   how: string; // human explanation of why it matched
 };
 
+// ── Fuzzy near-duplicate matching ───────────────────────────────────
+// Identical-file captures burn their byte hash, but a re-exported PDF,
+// a slightly cropped screenshot, or a re-pasted note with an edited line
+// hashes differently — near-duplicates need a similarity check instead.
+// Word-set Jaccard over trimmed tokens: cheap, language-agnostic, and
+// stable for the styles of "same doc again" CUE actually sees (same file
+// re-named "(1)", same note re-typed, same quote re-pasted).
+
+function tokens(s: string, minLen = 3): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((w) => w.length >= minLen),
+  );
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared++;
+  return shared / (a.size + b.size - shared);
+}
+
+export type FuzzyCandidate = {
+  id: string;
+  title: string;
+  fileName: string | null;
+  text: string | null;
+};
+
+/** Best fuzzy match for the incoming capture among the org's recent
+ *  documents, or null. Two similarity channels:
+ *  1. Title: incoming title (cleaned file name / note excerpt) vs each
+ *     document's title — near-identical wording (≥ 2 shared meaningful
+ *     tokens and ≥ 70% token overlap) catches "report (1).pdf" copies.
+ *  2. Text: pasted note vs a document's extracted text — ≥ 85% word
+ *     overlap catches a note re-typed with small edits.
+ */
+export function findFuzzyDuplicate(
+  candidate: { title: string; text: string | null },
+  docs: FuzzyCandidate[],
+): { doc: FuzzyCandidate; how: string } | null {
+  const candTitle = tokens(candidate.title);
+  let best: { doc: FuzzyCandidate; how: string; score: number } | null = null;
+  for (const doc of docs) {
+    // 1. Title channel — require ≥2 shared tokens so a lone word like
+    // "invoice" on both sides of two different suppliers' files can't flag.
+    const docTitle = tokens(`${doc.title ?? ""} ${doc.fileName ?? ""}`);
+    let shared = 0;
+    for (const w of candTitle) if (docTitle.has(w)) shared++;
+    const titleScore = jaccard(candTitle, docTitle);
+    if (shared >= 2 && titleScore >= 0.7 && titleScore > (best?.score ?? 0)) {
+      best = {
+        doc,
+        how: `very similar title to another capture (${Math.round(titleScore * 100)}% overlap)`,
+        score: titleScore,
+      };
+    }
+    // 2. Text channel — only for pasted notes, against extracted text.
+    if (candidate.text) {
+      const a = tokens(candidate.text.slice(0, 4000));
+      const b = tokens((doc.text ?? "").slice(0, 4000));
+      const textScore = jaccard(a, b);
+      if (textScore >= 0.85 && textScore > (best?.score ?? 0)) {
+        best = {
+          doc,
+          how: `nearly the same text as "${doc.title}" (${Math.round(textScore * 100)}% overlap)`,
+          score: textScore,
+        };
+      }
+    }
+  }
+  return best ? { doc: best.doc, how: best.how } : null;
+}
+
 export async function findDuplicateCapture(
   orgId: string,
-  opts: { hash: string | null; fileName: string | null; sizeBytes: number | null },
+  opts: {
+    hash: string | null;
+    fileName: string | null;
+    sizeBytes: number | null;
+    // Fuzzy inputs (optional): a human title for the new capture and, for
+    // pasted notes, its raw text. When null the fuzzy pass is skipped.
+    title?: string | null;
+    text?: string | null;
+  },
 ): Promise<DuplicateHit | null> {
   const { hash, fileName, sizeBytes } = opts;
   if (hash) {
@@ -92,6 +176,40 @@ export async function findDuplicateCapture(
         uploadedAt: String(hit.uploaded_at),
         how: "same file name and size already captured",
       };
+    }
+  }
+  // Fuzzy near-duplicates: recent captures (90 days) with similar titles
+  // or near-identical note text. Runs on the small recent set so the
+  // comparison is a few KB of work, not a table scan of similarities.
+  if (opts.title || opts.text) {
+    try {
+      const recent = await sql`
+        select id, title, file_name, extracted_text, uploaded_at from documents
+        where organization_id = ${orgId} and uploaded_at > now() - interval '90 days'
+        order by uploaded_at desc limit 200`;
+      const fuzzy = findFuzzyDuplicate(
+        { title: opts.title ?? "", text: opts.text ?? null },
+        recent.map(
+          (d): FuzzyCandidate => ({
+            id: String(d.id),
+            title: String(d.title ?? ""),
+            fileName: d.file_name ? String(d.file_name) : null,
+            text: d.extracted_text ? String(d.extracted_text) : null,
+          }),
+        ),
+      );
+      if (fuzzy) {
+        const at = recent.find((d) => String(d.id) === fuzzy.doc.id)?.uploaded_at;
+        return {
+          docId: fuzzy.doc.id,
+          title: fuzzy.doc.title,
+          uploadedAt: at ? String(at) : "",
+          how: fuzzy.how,
+        };
+      }
+    } catch {
+      // Fuzzy is best-effort hardening — a query hiccup must never block a
+      // legitimate capture; the exact-match checks above already ran.
     }
   }
   return null;

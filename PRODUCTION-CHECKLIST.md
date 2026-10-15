@@ -12,6 +12,10 @@
 - [x] Grounded CUE AI (answers from real data; refuses to fabricate)
 - [x] i18n EN/ES/VI/AR with RTL Arabic
 - [x] Auto-dealership Industry Pack demo (Northgate Auto Group)
+- [x] Migrations shipped and idempotent: `migrate-departments-dedupe.sql` (unique `(organization_id, name)` folder index) and `migrate-doc-content-hash.sql` (`documents.content_hash` + org/hash index) — see DEPLOY.md
+- [x] Text-size accessibility with **Large (112.5%) as the default** for new sessions (Standard / XL / Huge options; Settings + header `Aa` control, cookie-applied before first paint)
+- [x] Display accessibility toggles beside text size: Reduce motion, High contrast, Strong focus outlines (cookie-driven, server-applied classes)
+- [x] Capture duplicate detector: exact content hash, legacy name+size fallback, and fuzzy near-duplicate pass (title & note-text similarity over the last 90 days, with a "Save anyway" escape hatch)
 - [x] Typecheck clean · production build passes · 17/17 smoke checks green
 
 ## 🔒 Before first real customer

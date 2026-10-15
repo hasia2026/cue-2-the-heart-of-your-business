@@ -6,6 +6,7 @@ import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
 import TextSizePicker from "@/components/TextSizePicker";
+import AccessibilityToggles from "@/components/AccessibilityToggles";
 import { getT } from "@/lib/locale";
 import type { DictKey } from "@/lib/i18n";
 
@@ -126,6 +127,13 @@ export default async function SettingsPage({
           Makes everything throughout CUE bigger — menus, cards, buttons, and forms. Large is the default.
         </p>
         <TextSizePicker />
+      </section>
+
+      {/* Accessibility — display options beyond size, same cookie pattern. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Display accessibility</h2>
+        <p className="muted mb-4 text-xs">On/off toggles next to the text-size setting — they apply to the whole app on the next render.</p>
+        <AccessibilityToggles />
       </section>
 
       {/* Industry pack switcher: flips every label pack-wide; per-label

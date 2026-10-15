@@ -4,6 +4,7 @@ import "./globals.css";
 import AmbassadorWidget from "@/components/AmbassadorWidget";
 import { getT } from "@/lib/locale";
 import { TEXT_SCALE_COOKIE, getTextScalePercent } from "@/lib/text-scale";
+import { activeA11yClasses } from "@/lib/accessibility";
 
 export const metadata: Metadata = {
   title: "CUE — The Heart of Your Business",
@@ -15,8 +16,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { locale, rtl } = await getT();
   const jar = await cookies();
   const scale = getTextScalePercent(jar.get(TEXT_SCALE_COOKIE)?.value);
+  const a11y = activeA11yClasses((name) => jar.get(name)?.value);
   return (
     <html lang={locale} dir={rtl ? "rtl" : "ltr"} suppressHydrationWarning
+      className={a11y.join(" ")}
       // Accessibility: root font-size scale (Settings → Text size). Applied
       // server-side from the cookie so the first paint is already correct.
       style={{ fontSize: `${scale}%` }}>

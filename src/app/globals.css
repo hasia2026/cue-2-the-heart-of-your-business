@@ -207,3 +207,52 @@ body {
     pointer-events: none;
   }
 }
+
+/* ── Accessibility toggles (Settings → Display accessibility) ────────
+   Applied as <html> classes server-side from cookies (see layout.tsx),
+   so the rules below must sit outside @layer components to win over
+   utility classes. */
+
+/* Reduce motion: neutralize animations, transitions, and smooth scroll.
+   Mirrors prefers-reduced-motion semantics for a manual opt-in. */
+html.a11y-reduce-motion *,
+html.a11y-reduce-motion *::before,
+html.a11y-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast: brighter text, stronger borders, underlined links.
+   !important lets the toggle win over the utility classes it targets. */
+html.a11y-contrast body {
+  color: #e8eaf6;
+}
+html.a11y-contrast .muted,
+html.a11y-contrast .text-navy-300,
+html.a11y-contrast .text-navy-300\/60,
+html.a11y-contrast .text-navy-300\/70,
+html.a11y-contrast .label {
+  color: #d7dcf8 !important;
+}
+html.a11y-contrast a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+html.a11y-contrast .input,
+html.a11y-contrast .card,
+html.a11y-contrast button {
+  border-color: rgba(255, 255, 255, 0.32) !important;
+}
+
+/* Strong focus outlines: keep keyboard focus unmistakable on every
+   interactive element (browsers default rings are easy to lose on dark). */
+html.a11y-strong-focus *:focus-visible {
+  outline: 3px solid #7dd3fc !important;
+  outline-offset: 2px !important;
+}
+html.a11y-strong-focus *:focus {
+  outline: 3px solid #7dd3fc;
+  outline-offset: 2px;
+}

@@ -78,6 +78,12 @@ export async function captureDocument(formData: FormData) {
       hash: contentHash,
       fileName: hasFile ? file!.name : null,
       sizeBytes: hasFile ? file!.size : null,
+      // Fuzzy near-duplicate inputs — the same titles the insert below
+      // derives: cleaned file name for uploads, note excerpt for pastes.
+      title: hasFile
+        ? file!.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
+        : note.slice(0, 60) || "Captured note",
+      text: hasFile ? null : note || null,
     });
     if (duplicate) {
       await logAudit({
