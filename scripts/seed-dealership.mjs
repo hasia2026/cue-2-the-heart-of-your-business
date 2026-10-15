@@ -413,6 +413,23 @@ async function main() {
       (${orgId}, 'SYSTEM', NULL, 'WORKFLOW_CREATED', 'Workflow', ${wf.id}, 'Billing sprint with owner + tasks.', ${daysAgo(1)})`;
 
     await sql`commit`;
+
+    // Fresh databases may predate the dedupe migration — guarantee the demo
+    // org has at most one department per name, then verify (the unique
+    // departments_org_name_key index makes this a no-op unless the DB never
+    // got scripts/migrate-departments-dedupe.sql applied).
+    await sql`delete from departments using (
+      select id, row_number() over (partition by organization_id, name order by id) as rn
+      from departments
+    ) dupes where departments.id = dupes.id and dupes.rn > 1`;
+    const [dupeCheck] = await sql`
+      select count(*)::int as n from (
+        select organization_id, name from departments group by 1, 2 having count(*) > 1
+      ) d`;
+    if (dupeCheck.n > 0) {
+      throw new Error(`Duplicate department names remain (${dupeCheck.n}) — run scripts/migrate-departments-dedupe.sql`);
+    }
+
     console.log("Seeded: Northgate Auto Group (auto dealership demo).");
     console.log("  customers 18 · vehicles 18 · deals 9 · service_orders 10 · leads 15 · insights 3");
   } catch (e) {
