@@ -7,6 +7,7 @@ out/
 server.log
 .vercel
 .vercel-token
+.run/
 tools/
 .freebuff/
 .tour-build/
