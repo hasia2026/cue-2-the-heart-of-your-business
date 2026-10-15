@@ -23,6 +23,7 @@ export function isRtl(locale: Locale): boolean {
 // Flat dictionaries. English is the source of truth; others may be partial.
 const en = {
   "nav.dashboard": "Dashboard",
+  "nav.intake": "Intake",
   "nav.compass": "Company Compass",
   "nav.capture": "Capture",
   "nav.understand": "Understand",
@@ -427,6 +428,7 @@ export type DictKey = keyof typeof en;
 
 const vi: Partial<Record<DictKey, string>> = {
   "nav.dashboard": "Bảng điều khiển",
+  "nav.intake": "Tiếp nhận",
   "nav.compass": "La bàn công ty",
   "nav.capture": "Thu thập",
   "nav.understand": "Hiểu",
@@ -807,6 +809,7 @@ const vi: Partial<Record<DictKey, string>> = {
 
 const ar: Partial<Record<DictKey, string>> = {
   "nav.dashboard": "لوحة القيادة",
+  "nav.intake": "الاستقبال",
   "nav.compass": "بوصلة الشركة",
   "nav.capture": "التقاط",
   "nav.understand": "الفهم",
@@ -1187,6 +1190,7 @@ const ar: Partial<Record<DictKey, string>> = {
 
 const es: Partial<Record<DictKey, string>> = {
   "nav.dashboard": "Panel",
+  "nav.intake": "Incorporación",
   "nav.compass": "Brújula de empresa",
   "nav.capture": "Capturar",
   "nav.understand": "Entender",

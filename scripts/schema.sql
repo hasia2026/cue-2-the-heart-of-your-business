@@ -45,6 +45,7 @@ create table if not exists business_profiles (
   values_text text,
   operational_priorities text,
   onboarding_step int not null default 10,
+  intake_state jsonb not null default '{}'::jsonb,
   locale text not null default 'en'
 );
 
