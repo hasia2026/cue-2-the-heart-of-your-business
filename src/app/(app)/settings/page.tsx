@@ -5,6 +5,7 @@ import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSe
 import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
+import TextSizePicker from "@/components/TextSizePicker";
 import { getT } from "@/lib/locale";
 import type { DictKey } from "@/lib/i18n";
 
@@ -116,6 +117,15 @@ export default async function SettingsPage({
             <button className="btn-primary">Save digest settings</button>
           </div>
         </form>
+      </section>
+
+      {/* Accessibility — text size scales the whole app via the root font. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Text size (accessibility)</h2>
+        <p className="muted mb-4 text-xs">
+          Makes everything throughout CUE bigger — menus, cards, buttons, and forms. Large is the default.
+        </p>
+        <TextSizePicker />
       </section>
 
       {/* Industry pack switcher: flips every label pack-wide; per-label

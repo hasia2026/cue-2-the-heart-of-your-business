@@ -111,6 +111,9 @@ create table if not exists departments (
   description text
 );
 create index if not exists departments_org_idx on departments(organization_id);
+-- One folder name per org: makes find-or-create folder filing race-safe
+-- (fileToFolder relies on the unique violation to coalesce concurrent inserts).
+create unique index if not exists departments_org_name_key on departments(organization_id, name);
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'employees_dept_fk') then
@@ -261,6 +264,10 @@ create table if not exists documents (
   share_expires timestamptz
 );
 create index if not exists documents_org_idx on documents(organization_id);
+-- Duplicate detector: sha256 of the uploaded file bytes (or normalized note
+-- text), set by captureDocument and checked before insert.
+alter table documents add column if not exists content_hash text;
+create index if not exists documents_org_hash_idx on documents(organization_id, content_hash);
 
 create table if not exists knowledge_items (
   id uuid primary key default gen_random_uuid(),

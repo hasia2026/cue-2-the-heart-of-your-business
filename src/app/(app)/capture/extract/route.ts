@@ -1,14 +1,15 @@
-// Image text extraction endpoint: runs the Groq vision OCR on an uploaded
-// image, writes the extracted text into the document, re-classifies its
-// kind/department suggestion, and builds knowledge items — the same pipeline
-// a text capture goes through, so the item becomes searchable immediately.
-// Bring-your-own-key: per-org Groq key (ai_settings) or server GROQ_API_KEY.
+// Image text extraction endpoint (primary OCR): runs the Groq vision model
+// on an uploaded image and passes the text through applyExtractedText —
+// reclassifies, files into the auto folder, and builds knowledge items so
+// the document is searchable immediately. Bring-your-own-key: per-org Groq
+// key (ai_settings) or server GROQ_API_KEY. With no key configured the
+// client falls back to on-device Tesseract OCR (free, no key) — this route
+// answers 503 so the client knows when to do that.
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { logAudit } from "@/lib/audit";
-import { classifyCapture, fileToFolder, FOLDER_FOR_KIND } from "@/lib/capture-classify";
+import { applyExtractedText } from "@/lib/ocr-apply";
 import { extractImageText } from "@/lib/ocr";
 
 export const runtime = "nodejs";
@@ -42,50 +43,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No readable text found in the image — it's saved as MEDIA." }, { status: 422 });
     }
 
-    // Re-classify with the real content and file it into the matching folder.
-    const cls = classifyCapture(`${doc.title} ${text}`);
-    await sql`update documents set extracted_text = ${text.slice(0, 20000)}, kind = ${cls.kind}, status = 'PROCESSED' where id = ${doc.id}`;
-
-    // Re-file into the auto folder for the new kind. If the doc was manually
-    // moved to a folder that is NOT an auto-folder, leave it (manual wins);
-    // otherwise follow the classification (e.g. MEDIA image → Invoices folder).
-    const [current] = await sql`
-      select dp.name as folder from documents d
-      left join departments dp on dp.id = d.department_id
-      where d.id = ${doc.id}`;
-    const autoFolders = Object.values(FOLDER_FOR_KIND) as string[];
-    const currentIsAuto = !current?.folder || autoFolders.includes(String(current.folder));
-    if (currentIsAuto) {
-      const folder = await fileToFolder(orgId, cls.kind);
-      if (folder) await sql`update documents set department_id = ${folder.id} where id = ${doc.id}`;
-    }
-
-    // Knowledge items from the extracted content (dedupe by title).
-    const [existing] = await sql`
-      select id from knowledge_items where document_id = ${doc.id} limit 1`;
-    if (!existing) {
-      await sql`
-        insert into knowledge_items (organization_id, document_id, title, content, category, tags, status)
-        values (${orgId}, ${doc.id}, ${doc.title}, ${text.slice(0, 20000)},
-          ${cls.kind === "POLICY" ? "POLICY" : cls.kind === "PROCEDURE" ? "PROCEDURE" : "HISTORY"},
-          ${cls.tags.join(",")}, 'ASSUMPTION')`;
-    }
-
-    await logAudit({
-      organizationId: orgId,
+    const applied = await applyExtractedText({
+      orgId,
       actorId: session.user.id,
-      action: "DOCUMENT_EXTRACTED",
-      targetType: "Document",
-      targetId: doc.id,
-      detail: `OCR via ${model}; classified ${cls.kind}${cls.tags.length ? `, tagged ${cls.tags.join(", ")}` : ""}`,
-      metadata: { model, kind: cls.kind, tags: cls.tags, chars: text.length },
+      docId: doc.id as string,
+      title: doc.title as string,
+      text,
+      model,
     });
 
     revalidatePath("/capture");
     revalidatePath("/knowledge");
-    return NextResponse.json({ ok: true, kind: cls.kind, tags: cls.tags, chars: text.length, model });
+    return NextResponse.json({ ok: true, kind: applied.kind, tags: applied.tags, chars: applied.chars, model, folder: applied.folder });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Extraction failed";
+    // 503 = not configured (client should try the on-device fallback),
+    // 502 = provider error.
     const status = /not configured/i.test(message) ? 503 : 502;
     return NextResponse.json({ error: message }, { status });
   }

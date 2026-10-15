@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import AmbassadorWidget from "@/components/AmbassadorWidget";
 import { getT } from "@/lib/locale";
+import { TEXT_SCALE_COOKIE, getTextScalePercent } from "@/lib/text-scale";
 
 export const metadata: Metadata = {
   title: "CUE — The Heart of Your Business",
@@ -11,8 +13,13 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { locale, rtl } = await getT();
+  const jar = await cookies();
+  const scale = getTextScalePercent(jar.get(TEXT_SCALE_COOKIE)?.value);
   return (
-    <html lang={locale} dir={rtl ? "rtl" : "ltr"} suppressHydrationWarning>
+    <html lang={locale} dir={rtl ? "rtl" : "ltr"} suppressHydrationWarning
+      // Accessibility: root font-size scale (Settings → Text size). Applied
+      // server-side from the cookie so the first paint is already correct.
+      style={{ fontSize: `${scale}%` }}>
       <head>
         {/* Apply the saved theme before first paint — no light/dark flash. */}
         <script

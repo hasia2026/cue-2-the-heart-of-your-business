@@ -4,7 +4,31 @@ import { revalidatePath } from "next/cache";
 import { requireSessionAction } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
-import { classifyCapture, fileToFolder } from "@/lib/capture-classify";
+import { classifyCapture, fileToFolder, findDuplicateCapture, hashContent, normalizeTextHash } from "@/lib/capture-classify";
+import { applyExtractedText } from "@/lib/ocr-apply";
+
+// On-device OCR fallback: the browser runs Tesseract.js (free, no API key)
+// when no Groq key is configured, then sends the raw text here. Same
+// post-processing as the server route — reclassify, refile, knowledge.
+export async function applyOcrText(docId: string, text: string) {
+  const session = await requireSessionAction();
+  const clean = text.trim();
+  if (!clean) return { ok: false as const, error: "No extracted text to save." };
+  const [doc] = await sql`
+    select id, title from documents where id = ${docId} and organization_id = ${session.organizationId}`;
+  if (!doc) return { ok: false as const, error: "Document not found in your organization." };
+  const applied = await applyExtractedText({
+    orgId: session.organizationId,
+    actorId: session.user.id,
+    docId: doc.id as string,
+    title: doc.title as string,
+    text: clean,
+    model: "tesseract.js (on-device)",
+  });
+  revalidatePath("/capture");
+  revalidatePath("/knowledge");
+  return { ...applied };
+}
 
 const STOP = new Set(["the", "and", "for", "with", "this", "that", "from", "our", "are", "was", "were", "will", "have", "has", "not", "any", "all"]);
 
@@ -31,10 +55,46 @@ export async function captureDocument(formData: FormData) {
 
   const file = formData.get("file") as File | null;
   const note = String(formData.get("note") ?? "").trim();
-  const isImage = Boolean(file && file.type.startsWith("image/"));
+  // A "real" file has bytes and a name. Empty file inputs, phantom zero-byte
+  // File entries (e.g. a cleared picker leaves a nameless 0-byte File), and
+  // pasted Blob objects with no filename are all treated as if no file was
+  // uploaded — they fall back to the note path like every other capture.
+  const hasFile = Boolean(file && file.size > 0 && String(file.name ?? "").trim());
+  const isImage = hasFile && Boolean(file!.type.startsWith("image/"));
   const extract = String(formData.get("extract") ?? "") === "1";
-  if (!file || file.size === 0) {
+  const ignoreDuplicate = String(formData.get("ignoreDuplicate") ?? "") === "1";
+  if (!hasFile) {
     if (!note) throw new Error("Provide a file or a note");
+  }
+
+  // Duplicate detector: sha256 of the file bytes (or normalized note text)
+  // checked against this org's existing documents. Blocked unless the user
+  // explicitly confirms "Save anyway".
+  const contentHash = hasFile
+    ? hashContent(Buffer.from(await file!.arrayBuffer()))
+    : note ? normalizeTextHash(note) : null;
+  if (!ignoreDuplicate) {
+    const duplicate = await findDuplicateCapture(orgId, {
+      hash: contentHash,
+      fileName: hasFile ? file!.name : null,
+      sizeBytes: hasFile ? file!.size : null,
+    });
+    if (duplicate) {
+      await logAudit({
+        organizationId: orgId,
+        actorId: session.user.id,
+        action: "DOCUMENT_DUPLICATE_BLOCKED",
+        targetType: "Document",
+        targetId: duplicate.docId,
+        detail: `Capture blocked — ${duplicate.how}: "${duplicate.title}"`,
+        metadata: { duplicate, hash: contentHash },
+      });
+      revalidatePath("/capture");
+      return {
+        ok: false, docId: null, kind: "", tags: [] as string[], folder: null, needsOcr: false,
+        duplicate,
+      };
+    }
   }
 
   // Image without "extract": save as-is, register only, no OCR. The client
@@ -42,8 +102,8 @@ export async function captureDocument(formData: FormData) {
   const isNonExtractImage = isImage && !extract;
   const kind0 = isNonExtractImage ? "MEDIA" : "OTHER";
 
-  const classifyText = `${file?.name ?? ""} ${note}`;
-  const looksAiChat = classifyCapture(note).kind === "AI_CHAT" && !file;
+  const classifyText = `${hasFile ? file!.name : ""} ${note}`;
+  const looksAiChat = classifyCapture(note).kind === "AI_CHAT" && !hasFile;
   if (isImage && !extract) {
     // Image saved as-is — no OCR, MEDIA kind, "Extract & file" offered next.
   }
@@ -52,7 +112,7 @@ export async function captureDocument(formData: FormData) {
     : looksAiChat
       ? { kind: "AI_CHAT", tags: ["ai-chat"] }
       : classifyCapture(classifyText);
-  const kind = isNonExtractImage ? kind0 : (cls.kind === "OTHER" && file && !isImage ? "MEDIA" : cls.kind);
+  const kind = isNonExtractImage ? kind0 : (cls.kind === "OTHER" && hasFile && !isImage ? "MEDIA" : cls.kind);
 
   const extracted = isNonExtractImage
     ? ""
@@ -60,15 +120,15 @@ export async function captureDocument(formData: FormData) {
       ? formatAiChat(note)
       : `Captured file: ${file!.name} (${file!.type || "unknown type"}, ${Math.round(file!.size / 1024)} KB). Full content extraction (OCR/parser) activates when a document processor is connected — the item is registered, classified, and searchable now.`;
 
-  const title = file ? file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
+  const title = hasFile ? file!.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ")
     : looksAiChat ? `AI chat — ${note.slice(0, 50)}` : note.slice(0, 60) || "Captured note";
 
   const [doc] = await sql`
-    insert into documents (organization_id, title, file_name, mime_type, size_bytes, kind, status, extracted_text, source)
+    insert into documents (organization_id, title, file_name, mime_type, size_bytes, kind, status, extracted_text, source, content_hash)
     values (${orgId}, ${title},
-      ${file?.name ?? `note-${Date.now()}.txt`}, ${file?.type || "text/plain"}, ${file ? file.size : note.length},
+      ${hasFile ? file!.name : `note-${Date.now()}.txt`}, ${hasFile ? (file!.type || "text/plain") : "text/plain"}, ${hasFile ? file!.size : note.length},
       ${kind}, ${isNonExtractImage ? "UPLOADED" : "PROCESSED"}, ${extracted},
-      ${file ? "UPLOAD" : "IMPORT"})
+      ${hasFile ? "UPLOAD" : "IMPORT"}, ${contentHash})
     returning id`;
 
   // Auto-file into the folder for this kind (find-or-create a departments row).
@@ -110,5 +170,5 @@ export async function captureDocument(formData: FormData) {
 
   revalidatePath("/capture");
   revalidatePath("/knowledge");
-  return { ok: true, docId: doc.id, kind, tags: cls.tags, folder: folder?.name ?? null, needsOcr: isNonExtractImage };
+  return { ok: true, docId: doc.id, kind, tags: cls.tags, folder: folder?.name ?? null, needsOcr: isNonExtractImage, duplicate: null };
 }

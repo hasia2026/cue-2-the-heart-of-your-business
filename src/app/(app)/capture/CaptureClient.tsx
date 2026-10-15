@@ -2,7 +2,10 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { captureDocument } from "./actions";
+import { captureDocument, applyOcrText } from "./actions";
+import { readImageOnDevice } from "@/lib/tesseract-client";
+
+const OCR_SETUP_HINT = "For the most accurate extraction, save a Groq API key in Settings → AI Ambassador (or GROQ_API_KEY server-side) — CUE then reads it with a vision model. The free on-device OCR stays available either way.";
 import { useLocale } from "@/components/useLocale";
 
 export default function CaptureClient() {
@@ -27,6 +30,73 @@ export default function CaptureClient() {
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [pendingDocId, setPendingDocId] = useState<string | null>(null);
+  const [dup, setDup] = useState<{ docId: string; title: string; uploadedAt: string; how: string } | null>(null);
+  const lastFdRef = useRef<FormData | null>(null);
+
+  async function runCapture(fd: FormData) {
+    setBusy(true);
+    setDone(null);
+    setFail(false);
+    setDup(null);
+    setStep(1);
+    pickedFileRef.current = fileRef.current?.files?.[0] ?? null;
+    const timer = setInterval(() => setStep((s) => Math.min(s + 1, 4)), 320);
+    try {
+      const res = await captureDocument(fd);
+      if (res.duplicate) {
+        // Duplicate detector: same content already captured — show the match
+        // and let the user confirm or cancel.
+        setDup(res.duplicate);
+        lastFdRef.current = fd;
+        return;
+      }
+      setStep(5);
+      const folder = res.folder ? `, filed to ${res.folder}` : "";
+      const tpl = res.tags.length ? t("capture.doneTags") : t("capture.donePlain");
+      let msg = tpl.replace("{kind}", res.kind).replace("{tags}", res.tags.join(", ")) + folder;
+      if (res.needsOcr) {
+        msg = `Image saved to ${res.folder ?? "Images & Media"}. Want CUE to read the text and file it?`;
+        setPendingDocId(res.docId);
+        setOcrError(null);
+      } else {
+        setPendingDocId(null);
+      }
+      setDone(msg);
+      formRef.current?.reset();
+      setIsImage(false);
+      setExtractChoice("ask");
+      router.refresh();
+    } catch (err) {
+      setFail(true);
+      setDone(err instanceof Error ? err.message : t("capture.failed"));
+    } finally {
+      clearInterval(timer);
+      setBusy(false);
+    }
+  }
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (busy) return;
+    const fd = new FormData(e.currentTarget);
+    if (isImage) fd.set("extract", extractChoice === "extract" ? "1" : "0");
+    fd.delete("ignoreDuplicate");
+    await runCapture(fd);
+  }
+
+  async function saveAnyway() {
+    if (busy) return;
+    const prev = lastFdRef.current;
+    if (!prev) { setDup(null); return; }
+    // Copy the original payload (FormData isn't cloneable via constructor)
+    // and flag past the duplicate gate.
+    const fd = new FormData();
+    prev.forEach((v, k) => {
+      if (k !== "imgextract") fd.append(k, v);
+    });
+    fd.set("ignoreDuplicate", "1");
+    await runCapture(fd);
+  }
 
   async function toggleRecording() {
     setVoiceError(null);
@@ -69,60 +139,46 @@ export default function CaptureClient() {
     }
   }
 
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    setDone(null);
-    setFail(false);
-    setStep(1);
-    const fd = new FormData(e.currentTarget);
-    if (isImage) fd.set("extract", extractChoice === "extract" ? "1" : "0");
-    pickedFileRef.current = fileRef.current?.files?.[0] ?? null;
-    const timer = setInterval(() => setStep((s) => Math.min(s + 1, 4)), 320);
-    try {
-      const res = await captureDocument(fd);
-      setStep(5);
-      const folder = res.folder ? `, filed to ${res.folder}` : "";
-      const tpl = res.tags.length ? t("capture.doneTags") : t("capture.donePlain");
-      let msg = tpl.replace("{kind}", res.kind).replace("{tags}", res.tags.join(", ")) + folder;
-      if (res.needsOcr) {
-        msg = `Image saved to ${res.folder ?? "Images & Media"}. Want CUE to read the text and file it?`;
-        setPendingDocId(res.docId);
-        setOcrError(null);
-      } else {
-        setPendingDocId(null);
-      }
-      setDone(msg);
-      formRef.current?.reset();
-      setIsImage(false);
-      setExtractChoice("ask");
-      router.refresh();
-    } catch (err) {
-      setFail(true);
-      setDone(err instanceof Error ? err.message : t("capture.failed"));
-    } finally {
-      clearInterval(timer);
-      setBusy(false);
-    }
-  }
-
+  // Fallback chain: (1) server vision OCR — per-org Groq key or the server
+  // GROQ_API_KEY; (2) if no key is configured (503), on-device Tesseract.js
+  // (free, no key) in the browser, applied via the applyOcrText action.
   async function extractNow(docId: string) {
     setOcrBusy(true);
     setOcrError(null);
     try {
       if (!pickedFileRef.current) throw new Error("Pick the image again to extract from it.");
+      const imgFile = pickedFileRef.current;
+
+      // (1) Server-side vision OCR.
       const fd = new FormData();
       fd.append("docId", docId);
-      fd.append("file", pickedFileRef.current);
+      fd.append("file", imgFile);
       const res = await fetch("/capture/extract", { method: "POST", body: fd });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || "Extraction failed");
-      const filed = j.folder ? `, filed to ${j.folder}` : "";
-      setDone(`Extracted ${j.chars.toLocaleString()} characters — classified ${j.kind}${filed}. It's searchable now.`);
+      if (res.ok) {
+        const j = await res.json();
+        const filed = j.folder ? `, filed to ${j.folder}` : "";
+        setDone(`Extracted ${j.chars.toLocaleString()} characters — classified ${j.kind}${filed}. It's searchable now.`);
+        router.refresh();
+        return;
+      }
+      const jErr = await res.json().catch(() => ({ error: "Extraction failed" }));
+      if (res.status !== 503) throw new Error(jErr.error || "Extraction failed");
+
+      // (2) On-device fallback — free, no key needed.
+      const local = await readImageOnDevice(imgFile);
+      if (!local) {
+        throw new Error(`No readable text found on this device either. ` + OCR_SETUP_HINT);
+      }
+      const applied = await applyOcrText(docId, local);
+      if (!applied.ok) throw new Error(applied.error ?? "Saving the extracted text failed");
+      const filed = applied.folder ? `, filed to ${applied.folder}` : "";
+      setDone(
+        `Extracted ${applied.chars.toLocaleString()} characters on this device (free OCR, no API key) — classified ${applied.kind}${filed}. It's searchable now.`,
+      );
       router.refresh();
     } catch (err) {
-      setOcrError(err instanceof Error ? err.message : "Extraction failed");
+      const msg = err instanceof Error ? err.message : "Extraction failed";
+      setOcrError(/not configured|on-device|on this device/i.test(msg) ? msg : `${msg} — ${OCR_SETUP_HINT}`);
     } finally {
       setOcrBusy(false);
     }
@@ -218,6 +274,21 @@ export default function CaptureClient() {
             )}
           </div>
           {ocrError && <p className="mt-2 text-xs text-red-300">{ocrError}</p>}
+        </div>
+      )}
+
+      {dup && (
+        <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>
+              Looks like a duplicate — <strong className="font-semibold">“{dup.title}”</strong> was
+              already captured on {new Date(dup.uploadedAt).toLocaleDateString()} ({dup.how}).
+            </span>
+            <button className="btn-ghost !px-3 !py-1.5 text-xs" onClick={() => setDup(null)}>Cancel</button>
+            <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy} onClick={saveAnyway}>
+              {busy ? "Saving…" : "Save anyway"}
+            </button>
+          </div>
         </div>
       )}
     </section>

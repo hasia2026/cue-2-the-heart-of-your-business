@@ -1,5 +1,6 @@
 // Shared capture classification + auto-filing. One home for the rules so
 // notes, pasted AI chats, and OCR'd images all land in the same folders.
+import { createHash } from "node:crypto";
 import { sql } from "@/lib/db";
 
 export type CaptureClass = { kind: string; tags: string[] };
@@ -30,6 +31,70 @@ export const FOLDER_FOR_KIND: Record<string, string> = {
 export function classifyCapture(text: string): CaptureClass {
   const rule = RULES.find((r) => r.match.test(text));
   return { kind: rule?.kind ?? "OTHER", tags: rule?.tags ?? [] };
+}
+
+// ── Duplicate detector ────────────────────────────────────────────────
+// The capture flow computes a content hash (sha256 of the uploaded file's
+// bytes for uploads; whitespace-normalized note text for pasted notes) and
+// checks it against the org's existing documents before inserting, so the
+// same photo or transcribed note can't pile up as mystery copies.
+
+export function hashContent(data: Buffer | string): string {
+  return createHash("sha256").update(data).digest("hex").toUpperCase();
+}
+
+/** Text capture hash: case/whitespace-insensitive so retype + paste of the
+ *  same note still matches. */
+export function normalizeTextHash(text: string): string {
+  return hashContent(text.toLowerCase().replace(/\s+/g, " "));
+}
+
+export type DuplicateHit = {
+  docId: string;
+  title: string;
+  uploadedAt: string;
+  how: string; // human explanation of why it matched
+};
+
+export async function findDuplicateCapture(
+  orgId: string,
+  opts: { hash: string | null; fileName: string | null; sizeBytes: number | null },
+): Promise<DuplicateHit | null> {
+  const { hash, fileName, sizeBytes } = opts;
+  if (hash) {
+    const [hit] = await sql`
+      select id, title, uploaded_at from documents
+      where organization_id = ${orgId} and content_hash = ${hash}
+      order by uploaded_at desc limit 1`;
+    if (hit) {
+      return {
+        docId: hit.id as string,
+        title: hit.title as string,
+        uploadedAt: String(hit.uploaded_at),
+        how: "identical content already captured",
+      };
+    }
+  }
+  // Legacy fallback: rows captured before content_hash existed are still
+  // caught when the exact same file name AND byte size were uploaded.
+  if (fileName && sizeBytes != null) {
+    const [hit] = await sql`
+      select id, title, uploaded_at from documents
+      where organization_id = ${orgId}
+        and lower(file_name) = lower(${fileName})
+        and size_bytes = ${sizeBytes}
+        and content_hash is null
+      order by uploaded_at desc limit 1`;
+    if (hit) {
+      return {
+        docId: hit.id as string,
+        title: hit.title as string,
+        uploadedAt: String(hit.uploaded_at),
+        how: "same file name and size already captured",
+      };
+    }
+  }
+  return null;
 }
 
 /** Find-or-create the org's auto folder for a kind, by folder name.

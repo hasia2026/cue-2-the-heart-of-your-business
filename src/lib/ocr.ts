@@ -14,7 +14,7 @@ const PROMPT = `Read all visible text in this image. Transcribe it exactly — p
 export async function extractImageText(file: File, orgId: string): Promise<OcrResult> {
   const key = (await getGroqKey(orgId)) ?? process.env.GROQ_API_KEY ?? null;
   if (!key) {
-    throw new Error("Extraction not configured — save a Groq key in Settings → AI Ambassador or set GROQ_API_KEY");
+    throw new Error("Groq key not configured — the client falls back to on-device OCR; save a Groq key in Settings → AI Ambassador or set GROQ_API_KEY for the most accurate reads");
   }
   if (file.size > MAX_BYTES) {
     throw new Error("Image too large for extraction (max ~16 MB)");
