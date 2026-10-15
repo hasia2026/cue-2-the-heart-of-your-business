@@ -328,7 +328,7 @@ async function main() {
         ${`7 completed service orders totaling $4,951.80 have no invoice. Oldest is 15 days old, violating the 24-hour RO invoicing SOP.`},
         'HIGH', 4951.80,
         ${sql.json([
-          { label: "RO-to-Invoice SOP (24h SLA)", kind: "KNOWLEDGE", ref: "PROCEDURE" },
+          { dedupe: "unbilled_service", label: "RO-to-Invoice SOP (24h SLA)", kind: "KNOWLEDGE", ref: "PROCEDURE" },
           { label: "7 service orders with completed_at set and invoiced_at null", kind: "QUERY", ref: "service_orders" },
         ])},
         'Cash sits on completed work; customers who are never billed will not chase the dealership to pay. The SOP sets a 24h SLA; the oldest violation is 15 days.',
@@ -351,7 +351,7 @@ async function main() {
         '14 leads valued at ~$460k have sat unanswered — the oldest 21 days. Internal lessons show leads contacted within 24h close 3x more.',
         'HIGH', 460300,
         ${sql.json([
-          { label: "14 leads with status NEW and no last_contact_at", kind: "QUERY", ref: "leads" },
+          { dedupe: "stale_leads", label: "14 leads with status NEW and no last_contact_at", kind: "QUERY", ref: "leads" },
           { label: "Lesson: internet leads decay after 48h", kind: "KNOWLEDGE", ref: "LESSON" },
         ])},
         'Follow-up speed is the strongest controllable predictor of close rate in the store''s own history.',
@@ -373,7 +373,7 @@ async function main() {
         '5 used vehicles (incl. U-8808 at 72 days, U-8810 at 64) exceed the 60-day aging threshold from the goal sheet. Carrying cost ~$40/unit/day.',
         'MEDIUM', 66500,
         ${sql.json([
-          { label: "vehicles where listed_at older than 60 days and status AVAILABLE", kind: "QUERY", ref: "vehicles" },
+          { dedupe: "aging_inventory", label: "vehicles where listed_at older than 60 days and status AVAILABLE", kind: "QUERY", ref: "vehicles" },
           { label: "Goal: cut used days-on-lot below 45", kind: "GOAL", ref: "goals" },
         ])},
         'The discount-authority policy already grants +$1,000 pricing power past 60 days — unused so far on these units.',

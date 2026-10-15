@@ -354,9 +354,11 @@ export function parseEvidence(raw: unknown): { items: EvidenceRef[]; dedupe?: st
 }
 
 /** Per-org leak totals for the scan-call leave-behind.
- *  Mirrors the same queries the detectors run, grouped into the four
- *  leave-behind rows: unbilled work, cold leads, aging inventory/quotes,
- *  and everything else. Only counts categories with findings. */
+ *  Reads ONLY the OPEN insights — the same source the dashboard's "at stake"
+ *  tile and the report page sum — grouped into the four leave-behind rows by
+ *  detector dedupe signature: unbilled work, cold leads, aging inventory/
+ *  quotes, and everything else. Because both pages sum the same insight rows,
+ *  the paper sheet can never disagree with the screen. */
 export type LeakTotals = {
   orgName: string;
   total: number;
@@ -366,46 +368,34 @@ export type LeakTotals = {
 export async function getLeakTotals(organizationId: string): Promise<LeakTotals> {
   const [org] = await sql`select name from organizations where id = ${organizationId}`;
 
-  // 1) Completed-but-unbilled service work (detector: detectUnbilledService)
-  const [unbilled] = await sql`
-    select count(*)::int as n, coalesce(sum(amount), 0)::float as total
-    from service_orders
-    where organization_id = ${organizationId} and status = 'COMPLETED' and invoiced_at is null`;
-
-  // 2) Stale leads (detector: detectStaleLeads)
-  const [leads] = await sql`
-    select count(*)::int as n, coalesce(sum(est_value), 0)::float as total
-    from leads
-    where organization_id = ${organizationId} and status in ('NEW','CONTACTED')
-      and coalesce(last_contact_at, created_at) < now() - interval '5 days'`;
-
-  // 3) Aging inventory (detector: detectAgingInventory)
-  const [aging] = await sql`
-    select count(*)::int as n, coalesce(sum(list_price), 0)::float as total
-    from vehicles
-    where organization_id = ${organizationId} and status = 'AVAILABLE' and listed_at < now() - interval '60 days'`;
-
-  // 4) Everything else the detectors flag: unrecoverable finance bottleneck,
-  //    overdue invoices, agreement renewals + proposals — summed from OPEN
-  //    insights so the leave-behind stays in sync with what the app already
-  //    shows, without duplicating each detector's SQL.
-  const [other] = await sql`
-    select count(*)::int as n, coalesce(sum(impact_value), 0)::float as total
+  const open = await sql`
+    select coalesce(evidence->>'dedupe', '') as dedupe,
+      coalesce(impact_value, 0)::float as value,
+      evidence
     from insights
-    where organization_id = ${organizationId} and status = 'OPEN'
-      and evidence->>'dedupe' in ('finance_bottleneck','overdue_invoices')
-      or organization_id = ${organizationId} and status = 'OPEN'
-      and evidence->>'dedupe' like 'agreement_%'`;
+    where organization_id = ${organizationId} and status = 'OPEN'`;
 
   const rows: LeakTotals["rows"] = [];
-  if (unbilled?.n > 0)
-    rows.push({ key: "unbilled", label: "Work finished, never invoiced", detail: "completed jobs whose invoice never went out, checked against your own SOP", count: unbilled.n, value: Number(unbilled.total) });
-  if (leads?.n >= 3)
-    rows.push({ key: "leads", label: "Leads that went cold quietly", detail: "no contact logged past your follow-up window, each with a dollar value attached", count: leads.n, value: Number(leads.total) });
-  if (aging?.n >= 3)
-    rows.push({ key: "aging", label: "Aging units / quotes past their reprice window", detail: "your policy already allows the move; nobody pulled the trigger", count: aging.n, value: Number(aging.total) });
-  if (other?.n > 0)
-    rows.push({ key: "other", label: "Other leaks from your records", detail: "anything the scan surfaced outside the three categories above", count: other.n, value: Number(other.total) });
+  // Materialize into plain typed rows (postgres.js Row is an opaque intersect).
+  const leaks = open.map((r) => ({ dedupe: String(r.dedupe ?? ""), value: Number(r.value) }));
+  const push = (key: string, label: string, detail: string, items: { dedupe: string; value: number }[]) => {
+    if (items.length > 0)
+      rows.push({
+        key, label, detail,
+        count: items.length,
+        value: items.reduce((s, r) => s + Number(r.value), 0),
+      });
+  };
+
+  const byDedupe = (pred: (d: string) => boolean) => leaks.filter((r) => pred(r.dedupe));
+  push("unbilled", "Work finished, never invoiced", "completed jobs whose invoice never went out, checked against your own SOP",
+    byDedupe((d) => d === "unbilled_service"));
+  push("leads", "Leads that went cold quietly", "no contact logged past your follow-up window, each with a dollar value attached",
+    byDedupe((d) => d === "stale_leads"));
+  push("aging", "Aging units / quotes past their reprice window", "your policy already allows the move; nobody pulled the trigger",
+    byDedupe((d) => d === "aging_inventory"));
+  push("other", "Other leaks from your records", "anything the scan surfaced outside the three categories above",
+    byDedupe((d) => d !== "unbilled_service" && d !== "stale_leads" && d !== "aging_inventory"));
 
   const total = rows.reduce((s, r) => s + r.value, 0);
   return {
