@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { hashPassword, createSessionCookie } from "@/lib/auth";
 import { sendMail, mailerConnected } from "@/lib/mailer";
 import { logAudit } from "@/lib/audit";
+import { allow, actionKey } from "@/lib/rate-limit";
 
 const TTL_MS = 60 * 60 * 1000; // 60 minutes
 
@@ -36,6 +37,12 @@ export async function requestPasswordResetAction(
 ): Promise<ResetFormState> {
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   if (!email) return { error: "Enter your email address first." };
+
+  // Token-minting + email surface — 5 requests/hour/IP. Uniform rejection
+  // text (same as a wrong-format email) so it leaks nothing about accounts.
+  if (!allow(await actionKey("reset-request"), 5, 3600_000)) {
+    return { error: "Too many reset attempts — try again later." };
+  }
 
   if (!mailerConnected()) {
     return {
@@ -91,6 +98,11 @@ export async function resetPasswordAction(
   const token = String(fd.get("token") ?? "");
   const password = String(fd.get("password") ?? "");
   const confirm = String(fd.get("confirm") ?? "");
+  // Token-consumption guess guard on top of the single-use + hashed-token
+  // design — 10 tries/hour/IP makes brute-forcing 256-bit tokens pointless.
+  if (!allow(await actionKey("reset-consume"), 10, 3600_000)) {
+    return { error: "Too many attempts — try again later." };
+  }
   if (password.length < 8) return { error: "Password must be at least 8 characters" };
   if (password !== confirm) return { error: "Passwords do not match" };
 

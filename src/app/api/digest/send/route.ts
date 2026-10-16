@@ -4,6 +4,7 @@ import { sql } from "@/lib/db";
 import { buildDigestData, renderDigest, renderDigestHtml } from "@/lib/digest";
 import { mailerConnected, sendMail } from "@/lib/mailer";
 import { whatsappConnected, sendWhatsAppText } from "@/lib/whatsapp";
+import { rateLimitResult } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,15 @@ export async function POST() {
   const session = await getSession();
   if (!session || session.role !== "OWNER") {
     return NextResponse.json({ error: "Owner access required" }, { status: 403 });
+  }
+  // This POST sends mail (and WhatsApp) — 10/hour/org stops a client hammering
+  // the endpoint into a resend storm against the free email tier.
+  const rl = rateLimitResult(`digest:${session.organizationId}`, 10, 3600_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Digest send limit reached — try again in ${rl.retryAfterSecs}s.` },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSecs) } },
+    );
   }
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);

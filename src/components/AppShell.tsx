@@ -39,7 +39,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       title: "Command",
       items: [
         { href: "/dashboard", label: t("nav.dashboard"), icon: "◎" },
-        { href: "/intake", label: t("nav.intake"), icon: "⇥" },
+        { href: "/intake", label: t("nav.intake"), icon: "⇥", children: [{ href: "/intake/import", label: t("nav.import") }] },
       ],
     },
     {

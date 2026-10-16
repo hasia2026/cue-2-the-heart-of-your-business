@@ -10,6 +10,7 @@ import {
   sendQuoteEmail,
   quoteLocale,
 } from "@/lib/quote";
+import { rateLimitResult } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,16 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Sign in first" }, { status: 401 });
   const orgId = session.organizationId;
+
+  // Email-sending surface — 20 sends/org/hour keeps a runaway UI loop from
+  // burning the Resend free tier or spamming customers.
+  const rl = rateLimitResult(`quotes:${orgId}`, 20, 3600_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: `Quote send limit reached — try again in ${rl.retryAfterSecs}s.` },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSecs) } },
+    );
+  }
 
   const body = await req.json().catch(() => null);
   const customerId = typeof body?.customerId === "string" ? body.customerId : null;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import Stripe from "stripe";
+import { rateLimitResult } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   const origin = req.nextUrl.origin;
@@ -12,6 +13,13 @@ export async function GET(req: NextRequest) {
   const priceId = process.env.STRIPE_PRICE_ID;
   if (!key || !priceId) {
     return NextResponse.redirect(`${origin}/settings?billing=not_configured`);
+  }
+
+  // Checkout session creation is rate-limited per org — 20/hour covers normal
+  // retry patterns while stopping loops from hammering Stripe's API quota.
+  const rl = rateLimitResult(`billing:${session.organizationId}`, 20, 3600_000);
+  if (!rl.ok) {
+    return NextResponse.redirect(`${origin}/settings?billing=rate_limited`);
   }
 
   const stripe = new Stripe(key);

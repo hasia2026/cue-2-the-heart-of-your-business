@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import Stripe from "stripe";
+import { clientKey, rateLimitResult } from "@/lib/rate-limit";
+
+// Public GET that mints Stripe account links — cheap-to-forged surface, so
+// 10 starts/hour/IP. Legit partners onboarding need at most a few; a flooder
+// wastes Stripe API calls and could trip their rate limits for real users.
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const origin = req.nextUrl.origin;
   if (!code) return NextResponse.redirect(`${origin}/partners`);
+
+  const rl = rateLimitResult(clientKey(req, "partners"), 10, 3600_000);
+  if (!rl.ok) {
+    return NextResponse.redirect(`${origin}/partners?connect=rate_limited`);
+  }
 
   const [partner] = await sql`
     select id, stripe_account_id from partners where code = ${code} and status = 'ACTIVE'`;

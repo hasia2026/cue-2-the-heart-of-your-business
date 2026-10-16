@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sql } from "@/lib/db";
 import { computeLeakScore, QUESTIONS, REVENUE_BRACKETS, type AnswerIndex } from "@/lib/leak-score";
+import { rateLimitResult, clientKey } from "@/lib/rate-limit";
 
 const answerSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 const bodySchema = z.object({
@@ -12,22 +13,11 @@ const bodySchema = z.object({
   answers: z.record(z.string().max(40), answerSchema),
 });
 
-// Lightweight in-memory rate limit: 5 submissions per IP per hour.
-const hits = new Map<string, { n: number; reset: number }>();
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const h = hits.get(ip);
-  if (!h || h.reset < now) {
-    hits.set(ip, { n: 1, reset: now + 3600_000 });
-    return false;
-  }
-  h.n += 1;
-  return h.n > 5;
-}
-
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (rateLimited(ip)) {
+  // Public, anonymous lead capture that writes a DB row — 5/hour/IP is a
+  // generous ceiling for a human answering the 60-second form once.
+  const rl = rateLimitResult(clientKey(req, "score"), 5, 3600_000);
+  if (!rl.ok) {
     return NextResponse.json({ error: "Too many attempts — try again later." }, { status: 429 });
   }
 

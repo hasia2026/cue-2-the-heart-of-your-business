@@ -24,6 +24,7 @@ export function isRtl(locale: Locale): boolean {
 const en = {
   "nav.dashboard": "Dashboard",
   "nav.intake": "Intake",
+  "nav.import": "Import CSV",
   "nav.compass": "Company Compass",
   "nav.capture": "Capture",
   "nav.understand": "Understand",
@@ -429,6 +430,7 @@ export type DictKey = keyof typeof en;
 const vi: Partial<Record<DictKey, string>> = {
   "nav.dashboard": "Bảng điều khiển",
   "nav.intake": "Tiếp nhận",
+  "nav.import": "Nhập CSV",
   "nav.compass": "La bàn công ty",
   "nav.capture": "Thu thập",
   "nav.understand": "Hiểu",
@@ -810,6 +812,7 @@ const vi: Partial<Record<DictKey, string>> = {
 const ar: Partial<Record<DictKey, string>> = {
   "nav.dashboard": "لوحة القيادة",
   "nav.intake": "الاستقبال",
+  "nav.import": "استيراد CSV",
   "nav.compass": "بوصلة الشركة",
   "nav.capture": "التقاط",
   "nav.understand": "الفهم",
@@ -1191,6 +1194,7 @@ const ar: Partial<Record<DictKey, string>> = {
 const es: Partial<Record<DictKey, string>> = {
   "nav.dashboard": "Panel",
   "nav.intake": "Incorporación",
+  "nav.import": "Importar CSV",
   "nav.compass": "Brújula de empresa",
   "nav.capture": "Capturar",
   "nav.understand": "Entender",

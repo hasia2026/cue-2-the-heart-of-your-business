@@ -5,8 +5,14 @@ import { sql } from "@/lib/db";
 import { hashPassword, verifyPassword, createSessionCookie, destroySession, requireSessionAction } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { runDetectors } from "@/lib/intelligence";
+import { allow, actionKey } from "@/lib/rate-limit";
 
 export async function signUpAction(formData: FormData) {
+  // Anonymous write path (creates users + orgs) — 5 signups/hour/IP blunts
+  // bulk account creation while a human retrying a mistyped form passes.
+  if (!allow(await actionKey("signup"), 5, 3600_000)) {
+    throw new Error("Too many sign-up attempts — try again later.");
+  }
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
@@ -54,6 +60,12 @@ export async function signUpAction(formData: FormData) {
 }
 
 export async function signInAction(formData: FormData) {
+  // Credential-guessing guard: 10 attempts / 15 min / IP. Note this counts
+  // every attempt (success included) so the shared demo credential in CI —
+  // one signin per e2e run — stays far under the ceiling.
+  if (!allow(await actionKey("signin"), 10, 900_000)) {
+    throw new Error("Too many sign-in attempts — try again in a few minutes.");
+  }
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const [user] = await sql`select id, password_hash from users where email = ${email}`;

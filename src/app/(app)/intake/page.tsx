@@ -51,6 +51,13 @@ export default async function IntakePage() {
     },
     {
       n: 4,
+      title: "Import your real records from a CSV",
+      why: "Drop a DMS inventory list, customer roster, or billing export — map the columns once and CUE turns the file into queryable records.",
+      done: Boolean((intakeState.csvImport as { done?: boolean } | undefined)?.done),
+      cta: { href: "/intake/import", label: "Open the importer" },
+    },
+    {
+      n: 5,
       title: "Run the leak scan (Understand)",
       why: "The deterministic detectors read your captured data and surface unbilled work, aging inventory, and stale leads.",
       done: insightCount > 0,
