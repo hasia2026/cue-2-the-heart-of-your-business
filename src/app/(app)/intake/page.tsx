@@ -52,7 +52,7 @@ export default async function IntakePage() {
     {
       n: 4,
       title: "Import your real records from a CSV",
-      why: "Drop a DMS inventory list, customer roster, or billing export — map the columns once and CUE turns the file into queryable records.",
+      why: "Drop a DMS inventory list, customer roster, or billing export — map the columns once and CUE turns the file into queryable records. No customer list yet? Tick “create missing customers” and invoice imports materialize any new customers they reference."}
       done: Boolean((intakeState.csvImport as { done?: boolean } | undefined)?.done),
       cta: { href: "/intake/import", label: "Open the importer" },
     },

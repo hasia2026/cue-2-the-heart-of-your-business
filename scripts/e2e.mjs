@@ -112,9 +112,15 @@ async function main() {
 
   const email = `e2e-${Date.now()}@cue-e2e.invalid`;
   const answers = Object.fromEntries(qIds.map((id, i) => [id, i < 2 ? 0 : 3])); // leak heavy on the first two
+  // The leak-score limiter is IP-keyed (5/hour via x-forwarded-for). Send a
+  // run-unique synthetic IP so the limiter bucket is always fresh in dev —
+  // repeated pushes no longer trip the guard (the deliberate 429 coverage on
+  // /api/quotes below still exercises the limiter itself). On real a Vercel
+  // edge overrides client-supplied x-forwarded-for, so prod limiting is unaffected.
+  const e2eIp = () => `10.${(Math.random() * 255) | 0}.${(Math.random() * 255) | 0}.${(Math.random() * 255) | 0}`;
   const scoreRes = await fetch(BASE + "/api/score", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-forwarded-for": e2eIp() },
     body: JSON.stringify({
       email,
       businessName: "E2E Smoke Co",
@@ -124,21 +130,13 @@ async function main() {
     }),
   });
   const score = await scoreRes.json().catch(() => ({}));
-  if (scoreRes.status === 429) {
-    // The in-memory rate limit (5 submissions / IP / hour on the deployed
-    // server per the same x-forwarded-for we can't vary) blocks repeated
-    // local pushes. The limit being hit is itself evidence the route and
-    // guard work; note it loudly, don't fake a pass.
-    check("/api/score reached but rate-limited (repeated runs hit the 5/hour guard) — rerun later or use a fresh IP", false, String(scoreRes.status));
-  } else {
-    check("/api/score → 200", scoreRes.status === 200, `${scoreRes.status} ${JSON.stringify(score).slice(0, 120)}`);
-    check("score computed from answers", typeof score?.score === "number" && score.score >= 0, String(score?.score));
-    check(
-      "leaky answers do not score perfectly healthy",
-      !(qIds.slice(0, 2).every((id) => answers[id] === 0) && score?.score === 0),
-      JSON.stringify(score).slice(0, 80),
-    );
-  }
+  check("/api/score → 200", scoreRes.status === 200, `${scoreRes.status} ${JSON.stringify(score).slice(0, 120)}`);
+  check("score computed from answers", typeof score?.score === "number" && score.score >= 0, String(score?.score));
+  check(
+    "leaky answers do not score perfectly healthy",
+    !(qIds.slice(0, 2).every((id) => answers[id] === 0) && score?.score === 0),
+    JSON.stringify(score).slice(0, 80),
+  );
 
   // 4. Ambassador ask-back.
   // Signed in (or not): POST /api/ambassador. When a session cookie is present
@@ -278,6 +276,11 @@ async function main() {
     // Localized quote: resolve Yolanda's id via the probe, then preview via route.
     const y = JSON.parse(probe("customer"));
     if (y) {
+      // /api/quotes/send is limited at 20 previews/hour per ORG (per-instance
+      // in-memory bucket, documented in src/lib/rate-limit.ts). Previews count
+      // against the real bucket, so after the 20th consecutive run the org
+      // trips and only these quote checks fail — the guard working as
+      // designed. Report it loudly instead of faking a pass.
       const qRes = await fetch(BASE + "/api/quotes/send", {
         method: "POST", headers: { "Content-Type": "application/json", cookie },
         body: JSON.stringify({ customerId: y.id, title: "E2E quote", items: [{ description: "Fixture quote line", amount: 1000 }], preview: true }),
