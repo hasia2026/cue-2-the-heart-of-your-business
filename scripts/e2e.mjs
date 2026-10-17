@@ -296,7 +296,204 @@ async function main() {
     }
   }
 
-  // 7. Auth guards still up.
+  // 7. CSV importer — validate the real server action over the wire, and
+  //    prove a blocked-only fixture writes nothing before/after, plus the
+  //    create-missing-customers path, all against a per-run throwaway that
+  //    cleanup removes. Server actions are called exactly the way the
+  //    browser calls them: action id from the served client chunk + RSC
+  //    flight, then cleaned with a db-probe. Snooping a per-run unique
+  //    invoice-number prefix keeps reruns from colliding with any org's
+  //    real data. If the fixture customer already exists, cleanup restores
+  //    it, then verifies counts return to baseline; if not, cleanup asserts
+  //    the audit event was written.
+  if (cookie) {
+    const page = await fetch(BASE + "/intake/import", { headers: { cookie } });
+    check("/intake/import renders for signed-in owner", page.status === 200, String(page.status));
+    const html = await page.text();
+    // Chunk refs appear as script srcs and inside the RSC flight payload.
+    // The importer loads its actions chunk through a DYNAMIC import, so its
+    // URL only exists as a webpack chunk number ("s.e(6599)") plus an
+    // id-to-hash map inside the webpack runtime — the scan resolves both.
+    const chunkRe = new RegExp('/chunks/([^"?]+)[.]js', 'g');
+    const numRe = new RegExp('[.]e[(]([0-9]{2,5})[)]', 'g');
+    const hashRe = new RegExp('([0-9]{2,5}):"([0-9a-f]{16,})"', 'g');
+    const idRe = new RegExp('"([0-9a-f]{40,})",[a-zA-Z_$.]+[.]callServer,void 0,[a-zA-Z_$.]+[.]findSourceMapURL,"(csv(?:Parse|Preview|Commit)Action)"', 'g');
+    let ids = null;
+    const seen = new Set();
+    const nums = new Set(); // dynamic chunk numbers, e.g. 6599
+    const hash = new Map(); // chunk number -> content hash (from r.u map)
+    const queue = [...new Set([...html.matchAll(chunkRe)].map((m) => m[1]))];
+    while (queue.length && !ids && seen.size < 60) {
+      const ref = queue.shift();
+      if (seen.has(ref)) continue;
+      seen.add(ref);
+      const c = await fetch(`${BASE}/_next/static/chunks/${ref}.js`);
+      if (!c.ok) continue;
+      const js = await c.text();
+      const found = [...js.matchAll(idRe)].map((m) => [m[2], m[1]]);
+      if (found.length) { ids = Object.fromEntries(found); break; }
+      for (const m of js.matchAll(numRe)) nums.add(m[1]);
+      for (const m of js.matchAll(hashRe)) hash.set(m[1], m[2]);
+      for (const n of nums) if (hash.has(n) && !seen.has(`${n}.${hash.get(n)}`)) queue.push(`${n}.${hash.get(n)}`);
+    }
+    check("csv action ids found in client bundle", !!ids?.csvPreviewAction && !!ids?.csvCommitAction && !!ids?.csvParseAction,
+      ids ? Object.keys(ids).join(",") : "none of " + seen.size + " chunks");
+
+    // Call a server action the same way the client does, via RSC protocol,
+    // and decode the action's flight response: the return value arrives as
+    // a plain-JSON object line ("1:{...}") inside the text/x-component stream.
+    // json is undefined when the response is an error page instead.
+    const parseActionResult = (text) => {
+      let last;
+      for (const line of text.split("\n")) {
+        const idx = line.indexOf(":");
+        if (idx < 1 || !/^\d+$/.test(line.slice(0, idx))) continue;
+        try {
+          const obj = JSON.parse(line.slice(idx + 1));
+          if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+            if ("valid" in obj || "imported" in obj) return obj;
+            last = obj;
+          }
+        } catch { /* not the result line */ }
+      }
+      return last;
+    };
+    const callAction = async (id, args) => {
+      const res = await fetch(BASE + "/intake/import", {
+        method: "POST",
+        headers: {
+          "Next-Action": id,
+          "Content-Type": "text/plain;charset=UTF-8",
+          cookie,
+        },
+        body: JSON.stringify(args),
+      });
+      const text = await res.text();
+      return { status: res.status, json: parseActionResult(text), text: text.slice(0, 300) };
+    };
+
+    const runId = Date.now().toString(36);
+    const IN_CUST = `E2E Same Co ${runId}`;   // pre-existing → row VALID
+    const MISS_CUST = `E2E Ghost Co ${runId}`; // unknown → row BLOCKED
+
+    const { execFileSync } = await import("node:child_process");
+    const probe = (mode, ...args) => {
+      const out = execFileSync(process.execPath, ["--env-file=.env", "scripts/e2e-db-probe.mjs", mode, ...args], { encoding: "utf8" });
+      return JSON.parse(out.trim().split("\n").pop());
+    };
+
+    // End-of-run sweep: delete everything the importer smoke created, put
+    // the intake flag back, and require the org's row counts to return to
+    // the pre-test baseline — the demo org must exit as it entered.
+    const caseCleanup = (before, intakeBefore, runId, IN_CUST, MISS_CUST) => {
+      const cleaned = probe("cleanup-importer-smoke", orgId, `INV${runId}-10`, IN_CUST, `INV${runId}-11`, MISS_CUST);
+      check("cleanup: imported invoices + fixture customers removed",
+        cleaned?.ok === true && cleaned?.customers === before?.customers && cleaned?.invoices === before?.invoices,
+        `after cleanup: customers ${cleaned?.customers}, invoices ${cleaned?.invoices}; baseline ${before?.customers}/${before?.invoices}`);
+      if (intakeBefore !== "probe-unavailable") {
+        probe("restore-intake-csv-flag", orgId, JSON.stringify(intakeBefore));
+      }
+    };
+
+    // Which org does this deployment's owner session actually belong to?
+    // Resolved by the demo owner email (same one we signed in with) — no
+    // assumption about which seed ran or where the fixture customer lives.
+    let orgOk = false;
+    let orgName = "";
+    let orgId = "";
+    try {
+      const org = probe("org-for-email", OWNER_EMAIL);
+      if (!org?.found) {
+        check("importer smoke: owner org resolved", false, `no org for ${OWNER_EMAIL} — is the demo seeded on this target?`);
+      } else { orgOk = true; orgName = org.name; orgId = org.orgId; }
+    } catch (e) {
+      check("importer smoke: probe helper", false, String(e.message).slice(0, 120));
+    }
+    if (orgOk) {
+      // Baseline row counts — captured BEFORE the fixture customer exists,
+      // so after cleanup the org must match exactly what it entered with.
+      const before = probe("counts-for-org", orgId);
+
+      // Snapshot what the import-commit flow turns on (intake checklist
+      // marks the CSV step done on first import) so cleanup can put it back.
+      let intakeBefore = null;
+      try { intakeBefore = probe("csv-intake-flag", orgId).value; }
+      catch { intakeBefore = "probe-unavailable"; }
+
+      // Fixture customer the valid row bills to (already in the org = row
+      // VALID even without the create-missing option). Idempotent per name.
+      try { probe("ensure-fixture-customer", orgId, IN_CUST); }
+      catch (e) { check("importer smoke: fixture customer", false, String(e.message).slice(0, 120)); }
+
+      // Build the blocked-only file.
+      const csvBlocked = [
+        "invoice number,customer,amount,type,status,issued_at",
+        `INV${runId}-1,${IN_CUST},not-a-number,SERVICE,SENT,2026-02-01`,
+        `INV${runId}-2,${MISS_CUST},250.00,SERVICE,SENT,2026-02-01`,
+      ].join("\n");
+      const map = { number: "invoice number", customer: "customer", amount: "amount", kind: "type", status: "status", issued_at: "issued_at" };
+
+      const pr = await callAction(ids.csvPreviewAction, ["INVOICES", csvBlocked, map]);
+      check("csvPreviewAction → 200", pr.status === 200, `${pr.status} ${pr.text.slice(0, 120)}`);
+      const prev = pr.json ?? {};
+      check("preview: both rows blocked", prev?.blocked === 2 && prev?.valid === 0,
+        `valid=${prev?.valid} blocked=${prev?.blocked} errors=${JSON.stringify(prev?.errors ?? []).slice(0, 160)}`);
+      check("preview: amount + unknown-customer errors flagged", (prev?.errors ?? []).some((e) => e?.field === "amount") && (prev?.errors ?? []).some((e) => e?.field === "customer"),
+        JSON.stringify((prev?.errors ?? []).slice(0, 3)));
+
+      // The guard under test: commit a file where EVERY row is blocked.
+      const countsPre = probe("counts-for-org", orgId); // fixture included
+      const cm = await callAction(ids.csvCommitAction, ["INVOICES", csvBlocked, map]);
+      check("csvCommitAction → 200", cm.status === 200, `${cm.status} ${cm.text.slice(0, 120)}`);
+      const commit = cm.json ?? {};
+      check("commit: nothing imported (all rows blocked)", commit?.imported === 0, JSON.stringify(commit).slice(0, 120));
+      const after = probe("counts-for-org", orgId);
+      check("DB row counts unchanged (blocked-only file writes nothing)",
+        countsPre?.customers === after?.customers && countsPre?.invoices === after?.invoices,
+        `customers ${countsPre?.customers}→${after?.customers}, invoices ${countsPre?.invoices}→${after?.invoices}`);
+
+      // Positive-path trace: a clean row must actually reach the DB.
+      const csvClean = [
+        "invoice number,customer,amount,type,status,issued_at",
+        `INV${runId}-10,${IN_CUST},125.50,SERVICE,SENT,2026-02-02`,
+      ].join("\n");
+      const pr2 = await callAction(ids.csvPreviewAction, ["INVOICES", csvClean, map]);
+      const prev2 = pr2.json ?? {};
+      check("clean row previews as fully valid", prev2?.valid === 1 && prev2?.blocked === 0,
+        `valid=${prev2?.valid} blocked=${prev2?.blocked} errors=${JSON.stringify(prev2?.errors ?? []).slice(0, 160)}`);
+      const cm2 = await callAction(ids.csvCommitAction, ["INVOICES", csvClean, map]);
+      const commit2 = cm2.json ?? {};
+      check("clean row imports exactly 1", commit2?.imported === 1, JSON.stringify(commit2).slice(0, 120));
+      const row = probe("invoice-by-number", `INV${runId}-10`);
+      check("imported invoice exists in DB with correct amount", !!row?.found && Number(row?.amount) === 125.5,
+        JSON.stringify(row).slice(0, 140));
+
+      // createMissingCustomers: the option on — unknown billed-to customer
+      // must be created in the SAME transaction that inserts its invoice.
+      const csvCreate = [
+        "invoice number,customer,amount,type,status,issued_at",
+        `INV${runId}-11,${MISS_CUST},88.25,SERVICE,SENT,2026-02-03`,
+      ].join("\n");
+      const pr3 = await callAction(ids.csvPreviewAction, ["INVOICES", csvCreate, map, { createMissingCustomers: true }]);
+      const prev3 = pr3.json ?? {};
+      check("create-missing preview: row valid, customer promised",
+        prev3?.valid === 1 && (prev3?.customersToCreate ?? []).includes(MISS_CUST),
+        `valid=${prev3?.valid} toCreate=${JSON.stringify(prev3?.customersToCreate ?? [])}`);
+      const cm3 = await callAction(ids.csvCommitAction, ["INVOICES", csvCreate, map, { createMissingCustomers: true }]);
+      const commit3 = cm3.json ?? {};
+      check("create-missing commit: 1 invoice + 1 customer created",
+        commit3?.imported === 1 && commit3?.customersCreated === 1,
+        JSON.stringify(commit3).slice(0, 140));
+      const row2 = probe("invoice-by-number", `INV${runId}-11`);
+      check("create-missing invoice exists in DB", !!row2?.found, JSON.stringify(row2).slice(0, 140));
+
+      caseCleanup(before, intakeBefore, runId, IN_CUST, MISS_CUST);
+    } else {
+      check("importer smoke: fixture org resolvable", false, `no org for ${OWNER_EMAIL} — is the demo seeded on this target?`);
+    }
+  }
+
+  // 8. Auth guards still up.
   const digestUnauth = await fetch(BASE + "/api/digest/send");
   check("/api/digest/send unauthenticated → 401", digestUnauth.status === 401, String(digestUnauth.status));
   const quoteUnauth = await fetch(BASE + "/api/quotes/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });

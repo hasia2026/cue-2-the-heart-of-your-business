@@ -41,7 +41,7 @@ function PasteBox({ onUse }: { onUse: (text: string, name?: string) => void }) {
 const KIND_META: { id: Kind; title: string; blurb: string; icon: string }[] = [
   { id: "VEHICLES", title: "Vehicles", blurb: "Plate lists / DMS inventory exports", icon: "🚗" },
   { id: "CUSTOMERS", title: "Customers", blurb: "Customer rosters from your CRM export", icon: "🧑" },
-  { id: "INVOICES", title: "Invoices", blurb: "Billing exports — customers must exist first", icon: "🧾" },
+  { id: "INVOICES", title: "Invoices", blurb: "Billing exports — unknown customers can be created on import", icon: "🧾" },
 ];
 
 export default function Importer({ canImport }: { canImport: boolean }) {
@@ -55,6 +55,7 @@ export default function Importer({ canImport }: { canImport: boolean }) {
   const [commit, setCommit] = useState<CsvCommit | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [createCustomers, setCreateCustomers] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadFile = useCallback(async (file: File) => {
@@ -88,7 +89,7 @@ export default function Importer({ canImport }: { canImport: boolean }) {
     setError(null);
     try {
       const { csvPreviewAction } = await import("./actions");
-      const res = await csvPreviewAction(kind, csv, mapping);
+      const res = await csvPreviewAction(kind, csv, mapping, { createMissingCustomers: createCustomers });
       setPreview(res);
       setStep(3);
     } catch (e) {
@@ -104,7 +105,7 @@ export default function Importer({ canImport }: { canImport: boolean }) {
     setError(null);
     try {
       const { csvCommitAction } = await import("./actions");
-      const res = await csvCommitAction(kind, csv, mapping);
+      const res = await csvCommitAction(kind, csv, mapping, { createMissingCustomers: createCustomers });
       setCommit(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -236,6 +237,22 @@ export default function Importer({ canImport }: { canImport: boolean }) {
               {busy ? "Validating…" : "Validate rows"}
             </button>
           </div>
+          {kind === "INVOICES" && (
+            <label className="flex items-start gap-3 rounded-xl border border-white/[0.06] px-4 py-3">
+              <input
+                type="checkbox"
+                className="mt-1 accent-cue-blue"
+                checked={createCustomers}
+                onChange={(e) => setCreateCustomers(e.target.checked)}
+              />
+              <span>
+                <span className="text-sm text-navy-100">Create customers that aren&apos;t in CUE yet</span>
+                <span className="muted block text-xs">
+                  When on, rows billed to an unknown customer get a new customer record — no prior customers import needed.
+                </span>
+              </span>
+            </label>
+          )}
         </section>
       )}
 
@@ -244,6 +261,7 @@ export default function Importer({ canImport }: { canImport: boolean }) {
           {commit ? (
             <div className="rounded-xl border border-cue-green/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
               ✓ Imported <strong>{commit.imported}</strong> {kind.toLowerCase()} record(s)
+              {commit.customersCreated > 0 && <> — created <strong>{commit.customersCreated}</strong> new customer(s)</>}
               {commit.skipped > 0 && <> — skipped {commit.skipped} row(s) that still failed validation</>}. They&apos;re live in{" "}
               {kind === "VEHICLES" ? "your vehicles" : kind === "CUSTOMERS" ? "your customers" : "your invoices"} — the
               detectors read them from now on.
@@ -262,6 +280,11 @@ export default function Importer({ canImport }: { canImport: boolean }) {
                   ? `✓ All ${preview.valid} row(s) look good — ready to import into ${kind.toLowerCase()}.`
                   : `${preview.valid} row(s) ready · ${preview.blocked} blocked (problems listed below). Blocked rows are skipped on import.`}
               </div>
+              {preview.customersToCreate.length > 0 && (
+                <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
+                  Will create {preview.customersToCreate.length} new customer(s): {preview.customersToCreate.join(", ")}
+                </div>
+              )}
               {preview.errors.slice(0, 50).map((e, i) => (
                 <div key={`${e.index}-${i}`} className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                   Row {e.index + 1}{e.field ? ` · ${e.field}` : ""}: {e.message}

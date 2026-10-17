@@ -10,6 +10,7 @@
 import postgres from "postgres";
 
 const mode = process.argv[2] ?? "insights";
+const args = process.argv.slice(3);
 if (!process.env.DATABASE_URL) {
   console.error("DATABASE_URL is not set");
   process.exit(1);
@@ -65,6 +66,56 @@ try {
         where organization_id = ${org.id} and name = 'Ms. Yolanda Reyes'`;
       console.log(JSON.stringify(c ? { id: c.id, locale: c.preferred_locale } : null));
     }
+  } else if (mode === "org-for-email") {
+    // The org the demo owner belongs to (first membership wins).
+    const [m] = await sql`
+      select m.organization_id, o.name from members m
+      join users u on u.id = m.user_id
+      join organizations o on o.id = m.organization_id
+      where u.email = ${args[0]}
+      order by m.organization_id
+      limit 1`;
+    console.log(JSON.stringify(m ? { found: true, orgId: m.organization_id, name: m.name } : { found: false }));
+  } else if (mode === "counts-for-org") {
+    const [{ count: customers }] = await sql`select count(*)::int as count from customers where organization_id = ${args[0]}`;
+    const [{ count: invoices }] = await sql`select count(*)::int as count from invoices where organization_id = ${args[0]}`;
+    console.log(JSON.stringify({ ok: true, customers, invoices }));
+  } else if (mode === "ensure-fixture-customer") {
+    // e2e fixture: a customer the import's valid row can bill to. Created
+    // under the e2e runner's per-run-unique name; removed again at cleanup.
+    const exist = await sql`select 1 from customers where organization_id = ${args[0]} and name = ${args[1]}`;
+    if (!exist.length) {
+      await sql`insert into customers (organization_id, name, type) values (${args[0]}, ${args[1]}, 'RETAIL')`;
+      console.log(JSON.stringify({ ok: true, created: true }));
+    } else {
+      console.log(JSON.stringify({ ok: true, created: false }));
+    }
+  } else if (mode === "invoice-by-number") {
+    const [inv] = await sql`
+      select number, amount, status, kind, organization_id, customer_id from invoices where number = ${args[0]} limit 1`;
+    console.log(JSON.stringify(inv ? { found: true, ...inv, amount: Number(inv.amount) } : { found: false }));
+  } else if (mode === "csv-intake-flag") {
+    const [p] = await sql`select intake_state -> 'csvImport' as flag from business_profiles where organization_id = ${args[0]}`;
+    console.log(JSON.stringify({ ok: true, value: p?.flag ?? null }));
+  } else if (mode === "restore-intake-csv-flag") {
+    // Puts business_profiles.intake_state.csvImport back to the pre-test value.
+    const prior = args[1] === "null" ? null : JSON.parse(args[1]);
+    if (prior == null) {
+      await sql`update business_profiles set intake_state = intake_state - 'csvImport' where organization_id = ${args[0]}`;
+    } else {
+      await sql`update business_profiles set intake_state = jsonb_set(intake_state, '{csvImport}', ${JSON.stringify(prior)}::jsonb, true) where organization_id = ${args[0]}`;
+    }
+    console.log(JSON.stringify({ ok: true, value: prior }));
+  } else if (mode === "cleanup-importer-smoke") {
+    // Deletes the throwaway invoices and (if e2e created them) the fixture
+    // customers — args alternate: orgId, [invoiceNumber, customerName]...
+    for (let i = 1; i + 1 < args.length; i += 2) {
+      await sql`delete from invoices where organization_id = ${args[0]} and number = ${args[i]}`;
+      await sql`delete from customers where organization_id = ${args[0]} and name = ${args[i + 1]}`;
+    }
+    const [{ count: customers }] = await sql`select count(*)::int as count from customers where organization_id = ${args[0]}`;
+    const [{ count: invoices }] = await sql`select count(*)::int as count from invoices where organization_id = ${args[0]}`;
+    console.log(JSON.stringify({ ok: true, customers, invoices }));
   } else {
     console.error("unknown mode: " + mode);
     process.exit(1);
