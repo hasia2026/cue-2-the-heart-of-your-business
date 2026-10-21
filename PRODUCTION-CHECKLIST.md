@@ -19,12 +19,33 @@
 - [x] Typecheck clean · production build passes · 17/17 smoke checks green
 
 ## 🔒 Before first real customer
-- [ ] Rotate Supabase DB password (owner committed to this) + create least-privilege app role
-- [ ] Generate a fresh `CUE_SESSION_SECRET` for production (never reuse dev)
-- [ ] Enable Supabase PITR / scheduled backups
-- [ ] Wire password-reset email (Resend or SMTP) — schema + tokens already exist
-- [ ] Rate-limit `/api/assistant` + auth actions for public exposure
-- [ ] Decide RLS posture (app-layer isolation now; optional Supabase Auth + RLS later)
+- [x] Rate-limit `/api/assistant` + auth actions for public exposure
+      (assistant 30/min/org, signup 5/h/IP, signin 10/15min, reset-request 5/h,
+      reset-consume 10/h — `src/lib/rate-limit.ts` shared limiter, per-instance
+      on Vercel; generous so normal usage + e2e never trips them)
+- [x] Password-reset email wired via Resend ([reset-actions.ts](src/app/signin/reset-actions.ts):
+      hashed single-use token, 60-min TTL, uniform rejection text, honest error
+      when RESEND_API_KEY is missing or the address is unverified)
+      → **remaining owner step:** set `RESEND_API_KEY` + verified `MAIL_FROM`
+      in Vercel env; the code path is live either way
+- [x] E2E gates green on every push (pre-push hook) — false-positive refresh
+      probe fixed to verify via audit trail (ffe91db)
+- [ ] Rotate Supabase DB password + least-privilege app role — **owner console step**:
+      ① Supabase → Settings → Database → Reset database password; ② copy the
+      new password into the `DATABASE_URL` pooler connection string in
+      Vercel env vars (and local `.env`); ③ optional least-privilege role:
+      `create role cue_app nol; grant usage on schema public to cue_app;
+      grant all on all tables/sequences in schema public to cue_app` then
+      use `cue_app` instead of `postgres` in the URL (password-in-URL is the
+      simpler Vercel option; dedicated role is the cleaner audit story)
+- [ ] Fresh production `CUE_SESSION_SECRET` — **owner step**: `openssl rand -hex 32`
+      locally, paste into Vercel env var `CUE_SESSION_SECRET` (Production only,
+      distinct from dev). Rotating signs out all existing sessions; do it
+      before the pilot invite, not after
+- [ ] Enable Supabase PITR / scheduled backups — **owner console step**:
+      Supabase → Settings → Backups → enable PITR (Pro plan+) or verify the
+      included daily backup reached last-green state. Postgres best practice:
+      restore into a scratch DB once to prove the backup is usable, not just present
 
 ## 🚀 Pilot hardening (first 5 dealerships)
 - [ ] Replace seeded demo evidence refs with live DMS export (CSV ingest in Capture)
