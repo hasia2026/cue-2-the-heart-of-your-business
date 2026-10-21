@@ -8,6 +8,7 @@ server.log
 .vercel
 .vercel-token
 .run/
+.tmp-vtest/
 tools/
 .freebuff/
 .tour-build/
