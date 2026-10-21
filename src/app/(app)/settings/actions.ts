@@ -12,6 +12,8 @@ import {
   type AmbassadorTone,
 } from "@/lib/workspace-profile";
 import { MODULES, FIXED_MODULES, isModule, type ModuleKey } from "@/lib/modules";
+import { renderQuoteHtml } from "@/lib/quote";
+import { renderDigestHtml } from "@/lib/digest";
 
 export async function updateProfile(formData: FormData) {
   const session = await requireSessionAction();
@@ -315,4 +317,135 @@ export async function isModuleEnabled(orgId: string, pathModule: string): Promis
   if (!isModule(pathModule)) return true;
   const p = await getWorkspaceProfile(orgId);
   return p.modules[pathModule as ModuleKey]?.enabled !== false;
+}
+
+// ── Branding preview ──
+// Renders the real quote-HTML and digest-HTML builders with the org's stored
+// profile (or a dry-run variant built from form fields, so the owner can see
+// unsaved choices first). Returns raw HTML strings; the form shows them in iframes.
+
+export type PreviewInput = {
+  brandName: string | null;
+  accent: string | null;
+  logoUrl: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+};
+
+export async function previewBranding(
+  form: Partial<Record<"brandName" | "brandAccent" | "brandAccentCustom" | "contactPhone" | "contactEmail" | "useUnsaved", FormDataEntryValue | null>>,
+): Promise<{ ok: boolean; error?: string; quote?: string; digest?: string }> {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+
+  // Dry-run variant from the unsaved form when asked; otherwise the stored profile.
+  const useUnsaved = String(form.useUnsaved ?? "") === "1";
+  const ws = await getWorkspaceProfile(orgId);
+  const [orgRow] = await sql`select name from organizations where id = ${orgId}`;
+  const orgName = (orgRow?.name as string) ?? "";
+  const accent = useUnsaved
+    ? validAccent(String(form.brandAccentCustom ?? "")) ?? validAccent(String(form.brandAccent ?? ""))
+    : ws.brandAccent;
+  const input: PreviewInput = {
+    brandName: useUnsaved
+      ? String(form.brandName ?? "").trim() || orgName
+      : ws.brandNameOverride || orgName,
+    accent,
+    logoUrl: ws.brandLogoUrl,
+    contactPhone: useUnsaved ? String(form.contactPhone ?? "").trim() || null : ws.brandContactPhone,
+    contactEmail: useUnsaved ? String(form.contactEmail ?? "").trim() || null : ws.brandContactEmail,
+  };
+
+  // Real deterministic builders — only sample payloads differ.
+  const sampleQuote = await sql`
+    select c.name as customer_name, c.preferred_locale
+    from customers c where c.organization_id = ${orgId} order by c.created_at desc limit 1`;
+  const customer = sampleQuote[0];
+  const quote = renderQuoteHtml(
+    {
+      customerName: customer?.customer_name as string ?? "Walk-in customer",
+      customerEmail: null,
+      title: "Sample estimate — see your branding on a real quote",
+      items: [
+        { description: "Sample line item", amount: 120 },
+        { description: "Sample second item", amount: 240 },
+      ],
+      notes: "This is a preview only — nothing was sent.",
+      validUntil: new Date(Date.now() + 14 * 864e5).toLocaleDateString("en-US"),
+    },
+    (customer?.preferred_locale as string | null) ?? "en",
+    { name: input.brandName, accent: input.accent, logo: input.logoUrl, contactPhone: input.contactPhone, contactEmail: input.contactEmail },
+  );
+
+  const digest = renderDigestHtml(buildSampleDigest(input.brandName ?? "Your business"), {
+    name: input.brandName,
+    accent: input.accent,
+    logo: input.logoUrl,
+    contactPhone: input.contactPhone,
+    contactEmail: input.contactEmail,
+  });
+
+  return { ok: true, quote, digest };
+}
+
+function buildSampleDigest(orgName: string) {
+  return {
+    orgName,
+    openLeaks: { heading: "Open revenue leaks (1) — $4,951 at stake", lines: ["• [HIGH] Sample leak — $4,951 (preview)"] },
+    pendingDecisions: { heading: "Decisions awaiting your approval (1)", lines: ["• Sample decision — $1,200 (preview)"] },
+    actionItems: { heading: "Action items with owners (1 open)", lines: ["• [MEDIUM] Sample task — owner: (you)"] },
+    approvedThisWeek: { heading: "Approvals this week (0)", lines: ["• No new approvals in the last 7 days."] },
+    moneyFound: { heading: "Money found / recovered", lines: ["• Total recovered / protected: $0 (preview)"] },
+  };
+}
+
+const LOGO_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml"]);
+const LOGO_MAX_BYTES = 200 * 1024;
+
+export async function uploadLogo(formData: FormData) {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+
+  const file = formData.get("logo") as File | null;
+  if (!file || file.size === 0) return { ok: false as const, error: "Choose a logo file first." };
+  if (!LOGO_MIMES.has(file.type)) {
+    return { ok: false as const, error: "Logo must be PNG, JPEG, WebP, or SVG." };
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    return { ok: false as const, error: `Logo is too large (${Math.round(file.size / 1024)} KB) — 200 KB max.` };
+  }
+
+  const data = Buffer.from(await file.arrayBuffer());
+  await sql`
+    insert into workspace_logos (organization_id, mime, data, updated_at)
+    values (${orgId}, ${file.type}, ${data}, now())
+    on conflict (organization_id) do update set
+      mime = excluded.mime, data = excluded.data, updated_at = now()`;
+  const logoUrl = `/api/workspace/logo/${orgId}`;
+  await upsertWorkspaceProfile(orgId, { brand_logo_url: logoUrl });
+
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_LOGO_UPLOADED",
+    detail: `Brand logo uploaded (${file.type}, ${Math.round(file.size / 1024)} KB)`,
+  });
+  revalidatePath("/settings");
+  revalidatePath("/onboarding");
+  revalidatePath("/dashboard");
+  return { ok: true as const, error: null };
+}
+
+export async function removeLogo() {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+  await sql`delete from workspace_logos where organization_id = ${orgId}`;
+  // Clears the stored URL too; a pasted external URL can be re-entered anytime.
+  await sql`update workspace_profiles set brand_logo_url = null where organization_id = ${orgId}`;
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_LOGO_REMOVED", detail: "Brand logo removed",
+  });
+  revalidatePath("/settings");
+  revalidatePath("/onboarding");
+  return { ok: true as const, error: null };
 }

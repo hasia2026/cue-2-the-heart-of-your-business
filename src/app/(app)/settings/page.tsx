@@ -219,6 +219,7 @@ export default async function SettingsPage({
           savePersona={savePersona}
           saveBranding={saveBranding}
           saveModules={saveModules}
+          logoUrl={(ws.brandLogoUrl ?? "").includes("/api/workspace/logo/") ? ws.brandLogoUrl : null}
         />
         <div className="mt-4">
           <a href="/onboarding" className="text-xs text-cyan-300 hover:underline">Re-run the guided setup →</a>

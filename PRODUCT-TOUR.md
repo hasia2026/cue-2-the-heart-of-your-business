@@ -30,6 +30,9 @@ A 20-minute "CUE scan call." Renders a live Calendly calendar when `CALENDLY_URL
 
 ![ calendar or email fallback ](docs/screenshots/book-call.png)
 
+### Compare (`/compare`)
+CUE versus the incumbent tools — the honest positioning page: CRMs and FSM tools store and run the front door, CUE sits above them auditing what happened after. Ends with the same two calls to action (free Revenue Leak Score, book the scan).
+
 ### Partner program (`/partners`)
 Referral partners earn **50% recurring revenue**, with lifetime link attribution and automatic Stripe Connect splits (fair clawback on refunds). Degrades to a signup form when Stripe isn't configured.
 
@@ -49,6 +52,24 @@ The morning view — essentials only: priority insight (with evidence drawer), b
 **How to use it:** open it first every day; act on the priority insight.
 **Why it matters:** answers "what should I do today" in one glance.
 
+### Workspace Studio — make the workspace yours
+Three owner-tailorable layers, all backed by one per-org profile and wired through every branded surface:
+
+1. **Ambassador persona** — name it, pick its avatar emoji, write its opening greeting, choose its voice (friendly / formal / concise / enthusiastic). The chat bubble on every page, its LLM voice, and the page footer all follow.
+2. **Branding** — business name, **logo upload from your computer** (PNG/JPEG/WebP/SVG ≤200 KB, stored per-org and served from a stable public URL email clients can load) or a pasted URL, accent color, contact phone/email, theme default. These flow into **customer-facing quotes**, the **weekly digest email**, and the printed **leave-behind page**.
+3. **Live preview** — before saving, render your choices through the *real* quote and digest builders with sample data in an in-page iframe. "Preview these unsaved edits" shows the form as-typed; "Preview saved branding" shows what's live now. Nothing is sent.
+4. **Module layout** — hide modules you don't use and rename them to your vocabulary. The sidebar follows; disabled module routes fall back to the dashboard (Dashboard and Settings always stay).
+
+Where to find it:
+- **Wizard:** `/onboarding` — the guided 3-step setup for non-technical owners, skippable at every step.
+- **DIY:** Settings → **Workspace Studio** — same controls, plus "Re-run the guided setup."
+- **Prompt:** the dashboard shows a setup checklist card until the steps are done (owners/admins/managers only).
+
+![ workspace studio: upload + live preview ](docs/screenshots/workspace-studio.png)
+![ onboarding wizard ](docs/screenshots/onboarding.png)
+
+**Why it matters:** a workspace that adapts to the business — every branded artifact outgoing carries the owner's identity, not CUE's.
+
 ### Sidebar pulse
 The five loop parents show live attention counts — open insights (Understand), approvals waiting (Enhance), open tasks (Execute) — so the navigation itself tells you where attention is needed. Badges appear only for real open items.
 
@@ -59,11 +80,17 @@ The five loop parents show live attention counts — open insights (Understand),
 ## 3 · Capture loop
 
 ### Capture (`/capture`)
-Bring the business's reality in: documents (trade sheets, repair orders, invoices) via the Document Manager, stored in **private storage** and served through an authenticated signed-file route — no public URLs.
+Bring the business's reality in — every input lands here:
+
+- **Document upload** — files are stored in **private storage** and served through an authenticated signed-file route; no public URLs.
+- **Paste / voice note capture** — a pasted AI conversation becomes a formatted transcript doc; a spoken note transcribes (Groq Whisper) and files like any upload.
+- **Automatic classification** — every capture is classified (POLICY / PROCEDURE / AI_CHAT / MEDIA / …), auto-filed into a folder, tagged, deduplicated by content hash (re-posts are blocked with a "Save anyway" choice), and made searchable in Knowledge immediately.
+- **On-device OCR fallback** — with no Groq key configured, the browser's Tesseract extracts image text; extracted text is re-read, reclassified, and applied server-side as a real edit.
+- **Extract & file / Assign re-read** — an image can be extracted after upload; after a policy edit, a manager assigns Everyone or a department to re-read it, and outstanding reads track on People → Reading queue.
 
 ![ upload list with statuses ](docs/screenshots/capture-document-manager.png)
 
-**Why it matters:** everything downstream is only as smart as what you capture.
+**Why it matters:** everything downstream is only as smart as what you capture — classification, dedupe, and filing are CUE's job, not the staff's.
 
 ### Market Signals (`/signals`)
 Inbound market mentions and Google Business Profile activity land via authenticated webhooks (`/api/ingest/signals`, `/api/ingest/google`), deduped and classified by intent (BUY / SELL / SERVICE) — any signal converts to a lead or insight in one click.
@@ -98,7 +125,9 @@ The institutional memory: policies, procedures, decisions, lessons — searchabl
 ### Enhance (`/enhance`)
 The improvement workshop, four tabs:
 
-- **Pricing Studio** — industry-aware pricing (e.g., aging-vehicle repricing: days-on-lot + floor → suggested price + impact). **Capture** saves it locally; **Send for approval** creates a PENDING recommendation in Execute.
+- **Pricing Studio** — industry-aware pricing (jobs from labor/parts/overhead; aging-vehicle repricing from days-on-lot + floor). Every suggestion shows **why this price** line by line; members can send their price upward for approval. **Capture** saves it into Knowledge; **Send for approval** creates a PENDING recommendation in Execute.
+- **Service price book** — per-service labor rates (standalone vs cheaper add-on) plus named **assemblies** that bundle services into one quotable job; assemblies flow into quotes.
+- **Quotes** — localized quote sending (EN/ES/VI/AR by customer preference), rendered from **your Workspace Studio brand** (name, logo, accent, contact footer).
 - **Brand Studio** — market-facing copy and offers.
 - **CX signals** — customer-experience trends.
 - **Process candidates** — friction points worth turning into workflows.
@@ -113,14 +142,17 @@ The improvement workshop, four tabs:
 ## 6 · Execute loop
 
 ### Execute (`/execute`)
-Where approved ideas become reality: **Approvals** (PENDING recommendations → Approve/Reject), **Workflows** (multi-step plays CUE generates), **Tasks** (assigned and tracked). Verified flow: approve a $4,515 repricing → *Create workflow* → workflow + open task with the price instruction attached.
+Where approved ideas become reality: **Approvals** (PENDING recommendations → Approve/Reject), **Workflows** (multi-step plays CUE generates), **Tasks** (assigned and tracked, with owners and aging). Verified flow: approve a $4,515 repricing → *Create workflow* → workflow + open task with the price instruction attached.
 
 ![ pending approval → approve → workflow ](docs/screenshots/execute-approvals.png)
 
-**Why it matters:** the loop actually *closes* — a decision becomes a done thing.
+### Accounts receivable (`/pipeline` → AR tile / /api/invoices + /api/reminders)
+Two collection motions, both owner-approved before anything sends:
+- **One-click payment reminders** — pull still-unpaid invoices into a WhatsApp-first (else email) nudge in the customer's own language.
+- **Automated cadence** — approve the cadence once in Settings (every 3/7/14 days) and a daily cron runs it; paid invoices drop off automatically; the owner's custom message template (with per-language placeholders) overrides the built-in drafts.
 
 ### Pipeline (`/pipeline`)
-Leads, deals, inventory aging, service orders, and appointments in one dealership-aware view; 360° detail per lead/customer.
+Leads, deals, inventory aging, service orders, and appointments in one dealership-aware view; 360° detail per lead/customer; the **unscheduled board** groups unassigned maintenance work by area for dispatching.
 
 ![ leads + deals + inventory aging ](docs/screenshots/pipeline.png)
 
@@ -132,7 +164,7 @@ All real numbers: leaks found vs. acted vs. open, dollars at stake, the human-de
 **Why it matters:** accountability — it shows the human was in charge and the money moved.
 
 ### People (`/people`)
-Employees, departments, roles, open-task load, training assignments — the org context CUE reasons with.
+Employees, departments, roles, open-task load, training assignments — the org context CUE reasons with. Includes the **sales leaderboard** (closed units + gross by closer) and the clickable **weekly schedule** grid (AM/PM/DOUBLE/OFF; managers edit, everyone sees). **Maintenance-agreement renewals** surface on Understand when agreements are within 30 days of ending.
 
 ![ roster + departments + training load ](docs/screenshots/people.png)
 
@@ -165,7 +197,7 @@ Every integration labeled honestly: **DEMO** (sample data), **AVAILABLE** (archi
 ![ status-badged integration grid ](docs/screenshots/ecosystem.png)
 
 ### Settings (`/settings`)
-Profile, the **AI ladder** (how much autonomy CUE has), team/roles, and the full **audit trail**.
+Business profile, vocabulary overrides with industry packs, the weekly digest (email + WhatsApp, chosen send day), AR reminder cadence + custom message template, text size and display accessibility, the **AI ladder** (how much autonomy CUE has), **Workspace Studio** (persona / branding / preview / modules — see §2), the AI Ambassador LLM key, team/roles, subscription (Stripe), Message-the-builder feedback, and the full **audit trail**.
 
 ![ AI ladder + audit log ](docs/screenshots/settings.png)
 
