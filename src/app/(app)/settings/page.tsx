@@ -1,7 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { PROVIDERS } from "@/lib/ambassador";
-import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateVocab } from "./actions";
+import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateReminderCadence, updateReminderTemplate, updateVocab } from "./actions";
 import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
@@ -116,6 +116,61 @@ export default async function SettingsPage({
           </div>
           <div className="md:col-span-2">
             <button className="btn-primary">Save digest settings</button>
+          </div>
+        </form>
+      </section>
+
+      {/* Automated AR reminders: the owner-approved cadence. Off until the
+          owner here says so — the daily cron then sends localized payment
+          reminders for still-unpaid invoices at the chosen interval. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Automated payment reminders</h2>
+        <p className="muted mb-4 text-xs">
+          Approve a cadence once and CUE reminds customers with unpaid invoices — at that interval, in each customer's
+          own language, WhatsApp first where a number is on file (else email). Pays itself: a customer who pays drops
+          off automatically. Nothing sends until you approve here.
+        </p>
+        <form action={updateReminderCadence} className="grid gap-4 md:grid-cols-2">
+          <label className="flex items-center gap-3 rounded-xl border border-white/[0.06] px-4 py-3">
+            <input type="checkbox" name="remindersOn" defaultChecked={profile?.reminders_on ?? false} className="h-4 w-4 accent-cue-blue" />
+            <div>
+              <div className="font-medium text-navy-100">Run the reminder cadence</div>
+              <div className="muted text-xs">This approval is what enables the automated daily cron send.</div>
+            </div>
+          </label>
+          <div>
+            <label className="label" htmlFor="remindersEveryDays">Cadence</label>
+            <select id="remindersEveryDays" name="remindersEveryDays" defaultValue={String(profile?.reminders_every_days ?? 7)} className="input">
+              <option value="3">Every 3 days</option>
+              <option value="7">Weekly</option>
+              <option value="14">Every 2 weeks</option>
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <button className="btn-primary">Save reminder cadence</button>
+          </div>
+        </form>
+
+        {/* Owner-editable message template: the free-text layer on top of the
+            localized drafts. Placeholders fill in each customer's language. */}
+        <form action={updateReminderTemplate} className="mt-4">
+          <label className="label" htmlFor="reminderTemplate">Message template (optional)</label>
+          <textarea
+            id="reminderTemplate"
+            name="reminderTemplate"
+            rows={6}
+            maxLength={4000}
+            defaultValue={profile?.reminder_template ?? ""}
+            className="input"
+            placeholder={"Friendly payment nudge placeholders:\n{name} — customer\n{invoices} — their unpaid invoice list\n{total} — amount due\n{days} — days since oldest due date\n{overdue} — the localized overdue sentence"}
+          />
+          <p className="muted mt-1 text-xs">
+            Leave empty to send the built-in drafts. Placeholders fill in each customer's own language — {"{invoices}"} and {"{total}"} are
+            always appended if left out, so a reminder never goes out without the amount. Teams that send WhatsApp reminders
+            keep this short, one sentence plus the subtotal.
+          </p>
+          <div className="mt-2">
+            <button className="btn-primary">Save template</button>
           </div>
         </form>
       </section>

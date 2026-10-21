@@ -6,6 +6,7 @@ export type DigestData = {
   orgName: string;
   openLeaks: DigestSection;
   pendingDecisions: DigestSection;
+  actionItems: DigestSection;
   approvedThisWeek: DigestSection;
   moneyFound: DigestSection;
 };
@@ -39,6 +40,18 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
     where organization_id = ${orgId}
       and status = 'APPROVED' and decided_at > now() - interval '7 days'
     order by decided_at desc`;
+
+  // Meeting-agenda layer: who owns what this week. Open tasks with their
+  // human owner (role-based default assignment already lands in
+  // tasks.assignee_id via workflows.ts; unassigned tasks surface as “owner: none”
+  // so the agenda shows the true accountability gap).
+  const openItems = await sql`
+    select t.title, t.priority, t.status, e.name as owner
+    from tasks t
+    left join employees e on e.id = t.assignee_id
+    where t.organization_id = ${orgId} and t.status in ('OPEN','IN_PROGRESS')
+    order by case t.priority when 'HIGH' then 0 when 'MEDIUM' then 1 else 2 end, t.created_at asc
+    limit 6`;
 
   // Same recovered-money proxies the end-of-pilot report uses (report/page.tsx).
   const [dollars] = await sql`
@@ -76,6 +89,15 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   };
   if (!approvedThisWeek.lines.length) approvedThisWeek.lines.push("• No new approvals in the last 7 days.");
 
+  const actionItems: DigestSection = {
+    heading: `Action items with owners (${openItems.length} open)`,
+    lines: openItems.map(
+      (t) =>
+        `• [${t.priority}] ${t.title} — owner: ${t.owner ?? "UNASSIGNED"}${t.status === "IN_PROGRESS" ? " (in progress)" : ""}`,
+    ),
+  };
+  if (!actionItems.lines.length) actionItems.lines.push("• No open tasks — run the approved workflows from Execute.");
+
   const moneyFound: DigestSection = {
     heading: "Money found / recovered",
     lines: [
@@ -86,13 +108,15 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
     ],
   };
 
-  return { orgName: org.name, openLeaks, pendingDecisions, approvedThisWeek, moneyFound };
+  return { orgName: org.name, openLeaks, pendingDecisions, actionItems, approvedThisWeek, moneyFound };
 }
 
-/** Plain-text rendering — the same body goes to WhatsApp and the email fallback. */
+/** Plain-text rendering — the same body goes to WhatsApp and the email fallback.
+ *  Framed as the owner's Monday agenda: it doubles as the weekly meeting
+ *  structure — leaks → decisions → who owns what → what was approved → money. */
 export function renderDigest(d: DigestData): string {
   const section = (s: DigestSection) => `${s.heading}\n${s.lines.join("\n")}`;
-  return `CUE weekly digest — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.approvedThisWeek, d.moneyFound].map(section).join("\n\n")}`;
+  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.moneyFound].map(section).join("\n\n")}`;
 }
 
 /** HTML rendering — same builder data, four styled cards; plain text is the fallback. */
@@ -108,6 +132,7 @@ export function renderDigestHtml(d: DigestData): string {
       <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:18px;">${esc(d.orgName)}</div>
       ${card(d.openLeaks, "#f87171")}
       ${card(d.pendingDecisions, "#c084fc")}
+      ${card(d.actionItems, "#7c6cff")}
       ${card(d.approvedThisWeek, "#22d3ee")}
       ${card(d.moneyFound, "#34d399")}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>

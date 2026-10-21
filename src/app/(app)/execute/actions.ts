@@ -36,7 +36,18 @@ export async function decideRec(recId: string, decision: "APPROVED" | "REJECTED"
   revalidatePath("/execute");
   revalidatePath("/enhance");
   revalidatePath("/understand");
-  return { ok: true };
+
+  // Stopping at a log row left approved decisions parked until someone found
+  // the “Create workflow” button. Approving now immediately generates the
+  // follow-up artifacts — workflow + data-driven tasks with owners and
+  // deadlines — exactly the manual generator's behavior. EXECUTING each task
+  // still needs a human, so the human-in-control guarantee is unchanged.
+  let taskCount: number | undefined;
+  if (decision === "APPROVED") {
+    const result = await createWorkflowFromRecommendation(session.organizationId, session.user.id, recId);
+    if (result.ok) taskCount = result.taskCount ?? 0;
+  }
+  return { ok: true, taskCount };
 }
 
 export async function generateWorkflow(recId: string) {

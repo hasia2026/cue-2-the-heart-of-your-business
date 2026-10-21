@@ -48,8 +48,12 @@ export default function ExecuteClient({ tasks, workflows, approvedRecs, pendingR
     setBusyId(recId);
     setMsg(null);
     try {
-      await decideRec(recId, decision);
-      setMsg(decision === "APPROVED" ? t("approvals.approved") : t("approvals.rejectedMsg"));
+      const r = await decideRec(recId, decision);
+      setMsg(
+        decision === "APPROVED"
+          ? `${t("approvals.approved")}${typeof r?.taskCount === "number" ? ` Workflow created with ${r.taskCount} task(s) — owners assigned. Execute each one manually.` : ""}`
+          : t("approvals.rejectedMsg"),
+      );
       startTransition(() => router.refresh());
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Failed");

@@ -6,7 +6,21 @@ import { resetPasswordAction, type ResetFormState } from "@/app/signin/reset-act
 
 const initialState: ResetFormState = { error: null };
 
-export default function ResetPasswordForm({ token }: { token: string }) {
+export default function ResetPasswordForm({
+  token,
+  passwordLabel,
+  confirmLabel,
+  submitLabel,
+  savingLabel,
+  backLabel,
+}: {
+  token: string;
+  passwordLabel: string;
+  confirmLabel: string;
+  submitLabel: string;
+  savingLabel: string;
+  backLabel: string;
+}) {
   const [state, formAction, pending] = useActionState(resetPasswordAction, initialState);
 
   return (
@@ -16,18 +30,18 @@ export default function ResetPasswordForm({ token }: { token: string }) {
       )}
       <input type="hidden" name="token" value={token} />
       <div>
-        <label className="label" htmlFor="password">New password</label>
+        <label className="label" htmlFor="password">{passwordLabel}</label>
         <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
       </div>
       <div>
-        <label className="label" htmlFor="confirm">Confirm new password</label>
+        <label className="label" htmlFor="confirm">{confirmLabel}</label>
         <PasswordInput id="confirm" name="confirm" required minLength={8} autoComplete="new-password" />
       </div>
       <button className="btn-primary w-full" disabled={pending}>
-        {pending ? "Saving…" : "Set new password"}
+        {pending ? savingLabel : submitLabel}
       </button>
       <p className="muted text-center text-xs">
-        <a href="/signin" className="text-cue-blue hover:underline">Back to sign in</a>
+        <a href="/signin" className="text-cue-blue hover:underline">{backLabel}</a>
       </p>
     </form>
   );

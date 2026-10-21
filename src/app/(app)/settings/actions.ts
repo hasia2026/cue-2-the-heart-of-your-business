@@ -71,6 +71,51 @@ export async function updateDigestSettings(formData: FormData) {
   revalidatePath("/settings");
 }
 
+/** Owner approval of the automated AR reminder cadence. reminders_on is
+ *  OFF by default — checking it here is the approval that arms the daily
+ *  cron (GET /api/reminders). The interval is clamped to the shipped options
+ *  so a hand-form can't arm hourly spam. */
+export async function updateReminderCadence(formData: FormData) {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+  if (session.role === "MEMBER") throw new Error("Only owners, admins and managers can set the reminder cadence.");
+  const on = String(formData.get("remindersOn") ?? "") === "on";
+  const rawEvery = Number(String(formData.get("remindersEveryDays") ?? ""));
+  const every = [3, 7, 14].includes(rawEvery) ? rawEvery : 7;
+
+  await sql`
+    update business_profiles set
+      reminders_on = ${on}, reminders_every_days = ${every}
+    where organization_id = ${orgId}`;
+
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "REMINDER_CADENCE_UPDATED",
+    detail: on ? `automated payment reminder cadence approved (every ${every} day(s))` : "automated payment reminders off",
+  });
+  revalidatePath("/settings");
+}
+
+/** Owner-editable message template for payment reminders. Placeholders
+ *  ({name} {days} {overdue} {invoices} {total}) get filled in each customer's
+ *  language; blank clears back to the built-in localized drafts. */
+export async function updateReminderTemplate(formData: FormData) {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+  if (session.role === "MEMBER") throw new Error("Only owners, admins and managers can edit the reminder template.");
+  const raw = String(formData.get("reminderTemplate") ?? "").slice(0, 4000).trim();
+  const template = raw || null;
+
+  await sql`update business_profiles set reminder_template = ${template} where organization_id = ${orgId}`;
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "REMINDER_TEMPLATE_UPDATED",
+    detail: template ? "custom reminder template saved" : "reminder template cleared — built-in drafts in use",
+  });
+  revalidatePath("/settings");
+  revalidatePath("/pipeline");
+}
+
 export async function updateVocab(formData: FormData) {
   const session = await requireSessionAction();
   const orgId = session.organizationId;

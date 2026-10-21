@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import SopRecorder from "./SopRecorder";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,9 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
           </a>
         ))}
       </div>
+
+      {/* Voice SOP prototype: record a walkthrough, CUE drafts the procedure. */}
+      <SopRecorder />
 
       <section className="space-y-2.5">
         {items.map((k) => (

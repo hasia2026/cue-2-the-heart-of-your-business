@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import { PRICING_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
 import PricingStudio from "./PricingStudio";
+import PriceBookClient from "./PriceBookClient";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,38 @@ export default async function EnhancePage() {
   const assets = await sql`
     select id, name, kind, description, status from brand_assets
     where organization_id = ${orgId} order by kind, name`;
+
+  // Service price book — offerings with dual labor rates + assemblies of
+  // pre-built lines. Tables are created by migrate-pricebook.sql; empty is
+  // fine, the client renders empty states for orgs that haven't used it yet.
+  const offeringRows = await sql`
+    select id, name, description, parts_cost as "partsCost",
+      labor_rate_standalone as "rateStandalone", labor_rate_addon as "rateAddon",
+      labor_hours as "laborHours"
+    from service_offerings where organization_id = ${orgId} order by name`;
+  const assemblyRows = await sql`
+    select a.id, a.name, a.description,
+      json_agg(json_build_object('offeringId', i.offering_id, 'name', o.name, 'mode', i.pricing_mode)
+        order by i.position) as lines
+    from service_assemblies a
+    left join service_assembly_items i on i.assembly_id = a.id
+    left join service_offerings o on o.id = i.offering_id
+    where a.organization_id = ${orgId}
+    group by a.id, a.name, a.description
+    order by a.name`;
+  const offerings = offeringRows.map((o) => ({
+    id: String(o.id), name: String(o.name), description: o.description ? String(o.description) : null,
+    partsCost: Number(o.partsCost) || 0, rateStandalone: Number(o.rateStandalone) || 0,
+    rateAddon: Number(o.rateAddon) || 0, laborHours: Number(o.laborHours) || 0,
+  }));
+  const assemblies = assemblyRows.map((a) => {
+    type Line = { offeringId: string; name: string; mode: "STANDALONE" | "ADDON" };
+    const raw = Array.isArray(a.lines) ? (a.lines as unknown[]) : [];
+    const lines: Line[] = raw
+      .filter((l): l is Line => Boolean(l) && typeof l === "object" && "offeringId" in (l as object))
+      .map((l) => ({ offeringId: String((l as Line).offeringId), name: String((l as Line).name), mode: (l as Line).mode === "ADDON" ? "ADDON" : "STANDALONE" }));
+    return { id: String(a.id), name: String(a.name), description: a.description ? String(a.description) : null, lines };
+  });
   const csSignals = await sql`
     select summary, channel, direction, occurred_at, c.name as customer
     from communications co join customers c on c.id = co.customer_id
@@ -50,6 +83,8 @@ export default async function EnhancePage() {
         vehicles={vehicles}
         labels={buildLabels(PRICING_LABEL_KEYS, t)}
       />
+
+      <PriceBookClient offerings={offerings} assemblies={assemblies} canEdit={session.role !== "MEMBER"} />
 
       <section>
         <h2 className="section-title mb-3">Brand Studio</h2>

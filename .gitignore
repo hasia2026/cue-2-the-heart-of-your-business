@@ -14,3 +14,4 @@ tools/
 
 .vercel
 .run-server.log
+.tmp-logs/

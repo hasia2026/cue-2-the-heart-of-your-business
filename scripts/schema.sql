@@ -46,7 +46,13 @@ create table if not exists business_profiles (
   operational_priorities text,
   onboarding_step int not null default 10,
   intake_state jsonb not null default '{}'::jsonb,
-  locale text not null default 'en'
+  locale text not null default 'en',
+  -- automated AR reminder cadence (owner-approved; see migrate-reminders-cadence.sql)
+  reminders_on boolean not null default false,
+  reminders_every_days int not null default 7,
+  last_reminder_sent_at timestamptz,
+  -- owner-editable message template; null = built-in localized drafts
+  reminder_template text
 );
 
 create table if not exists goals (
@@ -69,10 +75,13 @@ create table if not exists customers (
   type text not null default 'RETAIL', -- dealership: RETAIL | WHOLESALE | FLEET
   status text not null default 'ACTIVE',
   preferred_locale text,
+  -- town/area for the dispatch board's unscheduled-maintenance grouping
+  area text,
   notes text,
   created_at timestamptz not null default now()
 );
 create index if not exists customers_org_idx on customers(organization_id);
+create index if not exists customers_org_area_idx on customers(organization_id, area);
 
 create table if not exists maintenance_agreements (
   id uuid primary key default gen_random_uuid(),
@@ -104,6 +113,35 @@ create table if not exists employees (
   hire_date date
 );
 create index if not exists employees_org_idx on employees(organization_id);
+
+-- Weekly standing roster — dealership managers edit it directly. Realistic
+-- read: change the template week more often than any single date.
+create table if not exists employee_shifts (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  day_of_week int not null check (day_of_week between 0 and 6),
+  shift text not null check (shift in ('AM', 'PM', 'DOUBLE', 'OFF'))
+);
+create unique index if not exists employee_shifts_unique on employee_shifts(employee_id, day_of_week);
+create index if not exists employee_shifts_org_idx on employee_shifts(organization_id, day_of_week);
+
+-- Policy-update acknowledgment loop: re-reads assigned after an SOP change.
+create table if not exists reading_assignments (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  document_id uuid not null references documents(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  status text not null default 'ASSIGNED', -- ASSIGNED | READ
+  note text,
+  assigned_by uuid references users(id) on delete set null,
+  assigned_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create unique index if not exists reading_assignments_doc_emp_unique
+  on reading_assignments(document_id, employee_id);
+create index if not exists reading_assignments_org_status_idx
+  on reading_assignments(organization_id, status);
 
 create table if not exists departments (
   id uuid primary key default gen_random_uuid(),
@@ -152,11 +190,15 @@ create table if not exists deals (
   deal_type text not null default 'USED', -- NEW | USED
   status text not null default 'NEGOTIATING', -- NEGOTIATING | PENDING_FINANCE | WON | LOST
   amount numeric(12,2) not null default 0,
+  -- the closer of record — backs the sales leaderboard (People) and the
+  -- closer column on Pipeline → Deals
+  sold_by_id uuid references employees(id),
   finance_sent_at timestamptz,
   closed_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index if not exists deals_org_idx on deals(organization_id);
+create index if not exists deals_org_sold_idx on deals(organization_id, sold_by_id);
 
 create table if not exists service_orders (
   id uuid primary key default gen_random_uuid(),

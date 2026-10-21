@@ -39,6 +39,18 @@ export default async function DashboardPage() {
     where t.organization_id = ${orgId} and t.status in ('OPEN','IN_PROGRESS')
     order by case t.priority when 'HIGH' then 0 when 'MEDIUM' then 1 else 2 end limit 3`;
 
+  // Scorecard status inputs: high-severity exposure and task aging.
+  const [highOpen] = await sql`
+    select count(*)::int as n from insights
+    where organization_id = ${orgId} and status = 'OPEN' and severity = 'HIGH'`;
+  const [agingTasks] = await sql`
+    select count(*)::int as n from tasks
+    where organization_id = ${orgId} and status in ('OPEN','IN_PROGRESS')
+      and created_at < now() - interval '7 days'`;
+  const [overdueInv] = await sql`
+    select count(*)::int as n from invoices
+    where organization_id = ${orgId} and status = 'OVERDUE'`;
+
   const collected = Math.round(revenue?.collected ?? 0);
   const overdue = Math.round(revenue?.overdue ?? 0);
   const stake = Math.round(atStake?.total ?? 0);
@@ -57,6 +69,21 @@ export default async function DashboardPage() {
     { label: t("dash.collected"), value: fmt(collected), cap: t("dash.revenueSignals"), dot: "text-emerald-300", icon: "$" },
   ];
   const healthStroke = health.grade === "HEALTHY" ? "#34d399" : health.grade === "WATCH" ? "#fbbf24" : "#f87171";
+
+  // Live scorecard — leading indicators with status chips, all from the same
+  // live tables. Thresholds are deliberately simple and stable so an owner can
+  // predict a chip flip without recalculating it.
+  type Chip = { label: "ON TRACK" | "ATTENTION" | "AT RISK"; cls: string };
+  const ok: Chip = { label: "ON TRACK", cls: "badge-green" };
+  const watch: Chip = { label: "ATTENTION", cls: "badge-orange" };
+  const risk: Chip = { label: "AT RISK", cls: "badge-red" };
+  const scorecard: { label: string; value: string; chip: Chip }[] = [
+    { label: "Open revenue leaks", value: `${insights.length} · ${fmt(stake)}`, chip: highOpen?.n ? risk : insights.length ? watch : ok },
+    { label: "Decisions awaiting approval", value: String(pending?.n ?? 0), chip: (pending?.n ?? 0) > 5 ? watch : ok },
+    { label: "Tasks aging past 7 days", value: String(agingTasks?.n ?? 0), chip: (agingTasks?.n ?? 0) > 0 ? watch : ok },
+    { label: "Overdue AR invoices", value: `${overdueInv?.n ?? 0} · ${fmt(overdue)}`, chip: overdue > 0 || (overdueInv?.n ?? 0) > 0 ? risk : ok },
+    { label: "Collected this org", value: fmt(collected), chip: collected > 0 ? ok : watch },
+  ];
 
   return (
     <div className="space-y-4">
@@ -153,6 +180,24 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
+
+          {/* Live scorecard — leading indicators with status chips */}
+          <section className="card min-w-0 p-5">
+            <div className="mb-3 flex items-baseline justify-between">
+              <h2 className="eyebrow">Scorecard</h2>
+              <a href="/report" className="text-xs text-cyan-300 hover:underline">Full report →</a>
+            </div>
+            <div className="space-y-2">
+              {scorecard.map((row) => (
+                <div key={row.label} className="flex items-center gap-3 text-sm">
+                  <span className="min-w-0 flex-1 truncate text-navy-100">{row.label}</span>
+                  <span className="muted shrink-0 font-semibold">{row.value}</span>
+                  <span className={`badge shrink-0 ${row.chip.cls}`}>{row.chip.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="muted mt-3 text-[11px]">Computed from live records — chips flip on stable thresholds (any HIGH leak, overdue AR, tasks older than 7 days, &gt;5 pending decisions).</p>
+          </section>
 
           {/* Bottom band: activity */}
           <section className="card min-w-0 p-5">

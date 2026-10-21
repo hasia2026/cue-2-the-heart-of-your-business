@@ -62,6 +62,19 @@ export default async function PilotReportPage() {
   const decided = approved + rejected + deferred;
   const decisionRate = leaks.total ? Math.round((Math.min(decided, leaks.total) / leaks.total) * 100) : 0;
 
+  // Projected monthly recovery: only the dollars still genuinely on the
+  // table — insights whose status is OPEN. Dismissed/deferred leaks don't
+  // inflate the projection because the owner decided not to chase them.
+  const [proj] = await sql`
+    select coalesce(sum(impact_value),0)::float as open_estimate
+    from insights where organization_id = ${orgId} and status = 'OPEN'`;
+  const projected = Math.max(0, Number(proj?.open_estimate ?? 0));
+
+  // Conversion copy math: earned per-day framing from the audit trail, and
+  // how many times the still-open recovery covers the plan price.
+  const perDay = Math.round(Number(leaks.impact_total ?? 0) / daysLive);
+  const planCover = Math.floor(projected / 299);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Report header */}
@@ -69,10 +82,14 @@ export default async function PilotReportPage() {
         <div className="text-xs uppercase tracking-widest text-cue-blue">End-of-pilot report</div>
         <h1 className="mt-1 text-2xl font-bold text-white">{org.name}</h1>
         <p className="muted mt-1 text-sm">{daysLive} days on CUE · generated {new Date().toLocaleDateString()} from the live audit trail</p>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <div>
             <div className="kpi text-cue-green">{money(recovered)}</div>
             <div className="mt-1 text-xs text-navy-300">revenue recovered / protected</div>
+          </div>
+          <div>
+            <div className="kpi text-cue-blue">{money(projected)}</div>
+            <div className="mt-1 text-xs text-navy-300">projected if open leaks close</div>
           </div>
           <div>
             <div className="kpi">{leaks.total}</div>
@@ -157,10 +174,23 @@ export default async function PilotReportPage() {
       <section className="card border-cue-blue/30 bg-cue-blue/[0.06] p-7 text-center">
         <h2 className="text-xl font-bold text-white">The math going forward</h2>
         <p className="mx-auto mt-2 max-w-lg text-sm text-navy-100">
-          CUE found <strong>{money(leaks.impact_total)}</strong> at stake in {daysLive} days — and
-          your team recovered <strong className="text-cue-green">{money(recovered)}</strong> of it.
-          The Operator plan is <strong>$299/month</strong>: roughly one recovered repair order pays
-          for the year.
+          Over {daysLive} days, CUE kept {money(perDay)}/day of found money on your radar —
+          and your team captured <strong className="text-cue-green">{money(recovered)}</strong> of it.
+        </p>
+        <p className="mx-auto mt-2 max-w-lg text-sm text-navy-100">
+          {/* projection from OPEN insights only — decided leaks leave the number */}
+          {projected > 0 ? (
+            <>
+              The leak engine still sees <strong>{money(projected)}/month</strong> on the table — that&apos;s
+              {planCover >= 2 ? ` ${planCover}× the Operator plan` : " roughly the Operator plan"} at <strong>$299/month</strong>,
+              before your team touches it. Clear the open list and the plan is covered by recovered work alone.
+            </>
+          ) : (
+            <>
+              Every detected leak has been decided. The Operator plan is <strong>$299/month</strong> — the next
+              leak CUE catches is the one that pays for it.
+            </>
+          )}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <span className="badge-blue">Annual: 2 months free</span>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { createWorkflowFromRecommendation } from "@/lib/workflows";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -20,6 +21,14 @@ export async function POST(req: Request) {
     where id = ${recId}`;
   if (rec.insight_id && decision !== "DEFERRED") {
     await sql`update insights set status = ${decision === "REJECTED" ? "DISMISSED" : "ACTION_TAKEN"} where id = ${rec.insight_id}`;
+  }
+  // Same chaining as decideRec in execute/actions: an approved recommendation
+  // immediately generates its follow-up artifacts (workflow + data-driven
+  // tasks + draft quotes), so both approval surfaces seed execution the same
+  // way instead of parking the decision on a log row. Tasks still require a
+  // human to complete — nothing runs automatically.
+  if (decision === "APPROVED") {
+    await createWorkflowFromRecommendation(session.organizationId, session.user.id, recId);
   }
   await logAudit({
     organizationId: session.organizationId,

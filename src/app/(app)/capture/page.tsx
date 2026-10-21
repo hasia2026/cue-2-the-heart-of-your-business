@@ -27,6 +27,7 @@ export default async function CapturePage({
     select d.id, d.title, d.kind, d.status, d.uploaded_at, d.size_bytes, d.extracted_text,
       d.department_id, d.share_token is not null as has_share,
       (select count(*) from knowledge_items k where k.document_id = d.id)::int as knowledge_count,
+      (select count(*) from reading_assignments ra where ra.document_id = d.id and ra.status = 'ASSIGNED')::int as re_read_outstanding,
       (select name from departments dp where dp.id = d.department_id) as department_name
     from documents d left join departments dp2 on dp2.id = d.department_id
     where d.organization_id = ${orgId}
@@ -120,13 +121,13 @@ export default async function CapturePage({
               doc={{
                 id: d.id, title: d.title, kind: d.kind, status: d.status,
                 uploaded_at: String(d.uploaded_at), size_bytes: Number(d.size_bytes),
-                knowledge_count: Number(d.knowledge_count), extracted_text: d.extracted_text,
-              }}
-              canManage={session.role !== "MEMBER"}
-              departments={departments.map((dp) => ({ id: dp.id, name: dp.name }))}
-              currentDept={d.department_name ?? null}
-              hasShare={Boolean(d.has_share)}
-            />
+                knowledge_count: Number(d.knowledge_count), re_read_outstanding: Number(d.re_read_outstanding),
+                extracted_text: d.extracted_text,
+              }}                canManage={session.role !== "MEMBER"}
+                departments={departments.map((dp) => ({ id: dp.id, name: dp.name }))}
+                currentDept={d.department_name ?? null}
+                hasShare={Boolean(d.has_share)}
+              />
           ))}
           {docs.length === 0 && <p className="muted">{t("capture.empty")}</p>}
         </div>

@@ -31,6 +31,10 @@ const check = (name, ok, extra = "") => {
 const OWNER_EMAIL = "demo@summitair.example";
 const OWNER_PASSWORD = "hvac-demo-2026";
 
+/** Server-reference id matcher, tolerant of both dev-compile formats:
+ *  top-level `"<id>",x.callServer,void 0,y.findSourceMapURL,"<name>"` and
+ *  the eval-wrapped escaped form `"<id>", x.callServer, void 0, y.findSourceMapURL, "<name>"`.
+ *  Group 2 = action id, group 5 = exported action name. */
 async function main() {
   // Health of the target
   const root = await fetch(BASE + "/");
@@ -320,12 +324,28 @@ async function main() {
     const chunkRe = new RegExp('/chunks/([^"?]+)[.]js', 'g');
     const numRe = new RegExp('[.]e[(]([0-9]{2,5})[)]', 'g');
     const hashRe = new RegExp('([0-9]{2,5}):"([0-9a-f]{16,})"', 'g');
-    const idRe = new RegExp('"([0-9a-f]{40,})",[a-zA-Z_$.]+[.]callServer,void 0,[a-zA-Z_$.]+[.]findSourceMapURL,"(csv(?:Parse|Preview|Commit)Action)"', 'g');
+    // Dev builds may keep the raw webpack chunk name (webpackChunkName magic
+    // comment), served directly as /chunks/<name>.js with no numeric id.
+    // Bare-token match: the chunk name may sit inside eval-escaped strings
+    // where the surrounding quotes are unreachable; the identifier charset
+    // can't over-run into the next token.
+    const namedChunkRe = /_app-pages-browser_[a-zA-Z0-9_-]+/g;
+    // Module code compiles into eval() wrappers whose escape depth and arg
+    // spacing vary between builds — normalize the chunk to a canonical
+    // compact form (strip backslash escapes + all whitespace, which also
+    // welds `void 0` → `void0`) BEFORE matching. The 40+ hex hash and the
+    // exact action names stay mandatory — nothing about the assertion is
+    // loosened, only the byte-noise is removed.
+    const idRe = /"([0-9a-f]{40,})",[a-zA-Z0-9_$.]+[.]callServer,void0,[a-zA-Z0-9_$.]+[.]findSourceMapURL,"(csv(?:Parse|Preview|Commit)Action)"/g;
+    // Char-filter construction (no regex escapes) so it can't rot across
+    // edits: drop backslashes and whitespace entirely.
+    const canonical = (s) => s.split("").filter((c) => c !== "\\" && c.trim() !== "").join("");
     let ids = null;
     const seen = new Set();
     const nums = new Set(); // dynamic chunk numbers, e.g. 6599
     const hash = new Map(); // chunk number -> content hash (from r.u map)
-    const queue = [...new Set([...html.matchAll(chunkRe)].map((m) => m[1]))];
+    const queue = [...new Set([...html.matchAll(chunkRe)].map((m) => m[1]),
+      ...[...html.matchAll(namedChunkRe)].map((m) => m[0]))];
     while (queue.length && !ids && seen.size < 60) {
       const ref = queue.shift();
       if (seen.has(ref)) continue;
@@ -333,10 +353,11 @@ async function main() {
       const c = await fetch(`${BASE}/_next/static/chunks/${ref}.js`);
       if (!c.ok) continue;
       const js = await c.text();
-      const found = [...js.matchAll(idRe)].map((m) => [m[2], m[1]]);
+      const found = [...canonical(js).matchAll(idRe)].map((m) => [m[2], m[1]]);
       if (found.length) { ids = Object.fromEntries(found); break; }
       for (const m of js.matchAll(numRe)) nums.add(m[1]);
       for (const m of js.matchAll(hashRe)) hash.set(m[1], m[2]);
+      for (const m of js.matchAll(namedChunkRe)) if (!seen.has(m[0])) queue.push(m[0]);
       for (const n of nums) if (hash.has(n) && !seen.has(`${n}.${hash.get(n)}`)) queue.push(`${n}.${hash.get(n)}`);
     }
     check("csv action ids found in client bundle", !!ids?.csvPreviewAction && !!ids?.csvCommitAction && !!ids?.csvParseAction,

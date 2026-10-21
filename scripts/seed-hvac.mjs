@@ -21,6 +21,13 @@ const daysAgo = (n) => new Date(Date.now() - n * 864e5);
 async function main() {
   await sql`begin`;
   try {
+    // orphaned payments guard: a previous seed's payments can reference this
+    // org's customers while pointing at a different organization_id. Cascade
+    // deletes customers only through this org's id — remove those rows first
+    // so the customer delete can't violate payments_customer_id_fkey.
+    await sql`delete from payments where customer_id in (
+      select id from customers where organization_id in (
+        select id from organizations where name = ${DEMO_ORG}))`;
     await sql`delete from organizations where name = ${DEMO_ORG}`;
 
     const [org] = await sql`
@@ -28,9 +35,10 @@ async function main() {
     const orgId = org.id;
 
     // Demo credentials (documented in PRODUCT-TOUR.md):
-    //   OWNER  demo@summitair.example  / hvac-demo-2026
-    //   ADMIN  rita@summitair.example  / hvac-admin-2026
-    //   MEMBER chris@summitair.example / hvac-member-2026
+    //   OWNER   demo@summitair.example  / hvac-demo-2026
+    //   ADMIN   rita@summitair.example  / hvac-admin-2026
+    //   MANAGER sam@summitair.example   / hvac-manager-2026
+    //   MEMBER  chris@summitair.example / hvac-member-2026
     const demoHash = (p) => {
       const salt = randomBytes(16).toString("hex");
       return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
@@ -53,6 +61,14 @@ async function main() {
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${memberUser.id}, 'MEMBER')`;
+    // MANAGER: install lead edits the roster + assigns re-reads in the demo.
+    const [managerUser] = await sql`
+      insert into users (email, name, password_hash)
+      values ('sam@summitair.example', 'Sam Whitaker (Demo)', ${demoHash("hvac-manager-2026")})
+      on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
+      returning id`;
+    await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${managerUser.id}, 'MANAGER')
+      on conflict (organization_id, user_id) do nothing`;
 
     const [profile] = await sql`
       insert into business_profiles (organization_id, name, industry, size, locations, business_model, offerings, target_customers, mission, values_text, operational_priorities)
@@ -93,27 +109,46 @@ async function main() {
     await sql`update employees set manager_id = ${emp["Dana Calderon"]} where name in ('Rita Vasquez','Marcus Boone','Sam Whitaker')`;
     await sql`update employees set manager_id = ${emp["Chris Boyd"]} where name = 'Luis Ortega'`;
 
+    // Standing weekly roster — proves the scheduler is industry-neutral
+    // (same grid renders for an HVAC shop: techs, install lead, office).
+    const SHIFTS = [
+      ["Dana Calderon", [1,'AM'],[2,'AM'],[3,'AM'],[4,'AM'],[5,'AM']],
+      ["Rita Vasquez",  [1,'AM'],[2,'AM'],[3,'AM'],[4,'AM'],[5,'AM']],
+      ["Marcus Boone",  [2,'PM'],[3,'PM'],[4,'PM'],[5,'PM'],[6,'AM']],
+      ["Chris Boyd",    [1,'DOUBLE'],[2,'DOUBLE'],[3,'DOUBLE'],[4,'DOUBLE'],[5,'DOUBLE']],
+      ["Luis Ortega",   [1,'AM'],[2,'AM'],[3,'PM'],[4,'AM'],[5,'AM']],
+      ["Sam Whitaker",  [2,'DOUBLE'],[3,'DOUBLE'],[4,'DOUBLE'],[5,'DOUBLE'],[6,'AM']],
+    ];
+    for (const [name, ...days] of SHIFTS) {
+      const eid = emp[name];
+      for (const [dow, shift] of days) {
+        await sql`insert into employee_shifts (organization_id, employee_id, day_of_week, shift)
+          values (${orgId}, ${eid}, ${dow}, ${shift})
+          on conflict (employee_id, day_of_week) do update set shift = excluded.shift`;
+      }
+    }
+
     // Customers
     const custNames = [
-      ["The Alvarez Family", "RETAIL", "Repeat maintenance-agreement customer — 2 systems."],
-      ["Sierra Vista Property Group", "FLEET", "Property manager: 14 rental units, priority dispatch."],
-      ["Casa del Sol Restaurant", "WHOLESALE", "Commercial RTU — health-dept sensitive."],
-      ["The Pham Family", "RETAIL", "Vietnamese-speaking household; prefers Vietnamese comms."],
-      ["Mr. Earl Jenkins", "RETAIL", "Senior, fixed income — financing candidate."],
-      ["Dr. Patel Family", "RETAIL", "Referred by Alvarez family."],
-      ["Riverside Family Dental", "FLEET", "Clinic: air quality sensitive, 3 RTUs."],
-      ["Grace & Tom Whitfield", "RETAIL", "Quote pending on 2-system change-out."],
-      ["Ms. Yolanda Reyes", "RETAIL", "Arabic & Spanish speaker — straight answers wanted."],
-      ["Corner Bakery #4", "WHOLESALE", "Walk-in cooler + RTU service."],
-      ["Henderson Duplex", "FLEET", "Owner of 2 rental duplexes, price-sensitive."],
-      ["The Okafor Family", "RETAIL", "New construction quote via builder."],
+      ["The Alvarez Family", "RETAIL", "Repeat maintenance-agreement customer — 2 systems.", "312 Cedar St, Riverside, CA 92501", "Riverside"],
+      ["Sierra Vista Property Group", "FLEET", "Property manager: 14 rental units, priority dispatch.", "88 Sierra Vista Dr, Riverside, CA 92504", "Riverside"],
+      ["Casa del Sol Restaurant", "WHOLESALE", "Commercial RTU — health-dept sensitive.", "1401 Mission Inn Ave, Riverside, CA 92501", "Riverside"],
+      ["The Pham Family", "RETAIL", "Vietnamese-speaking household; prefers Vietnamese comms.", "642 Magnolia Ave, Riverside, CA 92506", "Riverside"],
+      ["Mr. Earl Jenkins", "RETAIL", "Senior, fixed income — financing candidate.", "2750 Alessandro Blvd, Moreno Valley, CA 92553", "Moreno Valley"],
+      ["Dr. Patel Family", "RETAIL", "Referred by Alvarez family.", "9120 Packard Ave, Riverside, CA 92506", "Riverside"],
+      ["Riverside Family Dental", "FLEET", "Clinic: air quality sensitive, 3 RTUs.", "3851 Arlington Ave, Riverside, CA 92506", "Riverside"],
+      ["Grace & Tom Whitfield", "RETAIL", "Quote pending on 2-system change-out.", "14245 Palm Dr, Desert Hot Springs, CA 92240", "Desert Hot Springs"],
+      ["Ms. Yolanda Reyes", "RETAIL", "Arabic & Spanish speaker — straight answers wanted.", "5395 Crenshaw St, Riverside, CA 92505", "Riverside"],
+      ["Corner Bakery #4", "WHOLESALE", "Walk-in cooler + RTU service.", "3525 Iowa Ave, Riverside, CA 92507", "Riverside"],
+      ["Henderson Duplex", "FLEET", "Owner of 2 rental duplexes, price-sensitive.", "21960 Applebee St, San Jacinto, CA 92582", "San Jacinto"],
+      ["The Okafor Family", "RETAIL", "New construction quote via builder.", "45550 Fig St, Temecula, CA 92592", "Temecula"],
     ];
     const custRows = [];
     for (let i = 0; i < custNames.length; i++) {
-      const [name, type, notes] = custNames[i];
+      const [name, type, notes, address, area] = custNames[i];
       const rows = await sql`
-        insert into customers (organization_id, name, type, notes, phone, created_at)
-        values (${orgId}, ${name}, ${type}, ${notes}, ${`951-555-02${String(i).padStart(2, "0")}`}, ${daysAgo(280 - i * 12)})
+        insert into customers (organization_id, name, type, notes, phone, address, area, created_at)
+        values (${orgId}, ${name}, ${type}, ${notes}, ${`951-555-02${String(i).padStart(2, "0")}`}, ${address}, ${area}, ${daysAgo(280 - i * 12)})
         returning id, name`;
       custRows.push(rows[0]);
     }
@@ -206,7 +241,8 @@ async function main() {
     }
     await sql`
       insert into payments (organization_id, customer_id, invoice_id, amount, method, received_at)
-      select ${orgId}, customer_id, id, amount, 'CARD', paid_at from invoices where status = 'PAID'`;
+      select ${orgId}, customer_id, id, amount, 'CARD', paid_at
+      from invoices where status = 'PAID' and organization_id = ${orgId}`;
 
     // Quote requests — stale leads (follow-up leakage)
     const leads = [
@@ -250,6 +286,18 @@ async function main() {
       (${orgId}, 'Load Calculation Procedure', 'load-calc-procedure.pdf', 'application/pdf', 66000, 'PROCEDURE', 'PROCESSED', 'Every replacement quote requires a Manual J load calculation. No rule-of-thumb sizing. Document tonnage, duct condition, and insulation level on the quote.', 'SEED')
       returning id, title`;
     const doc = Object.fromEntries(docRows.map(r => [r.title, r.id]));
+
+    // Example re-read: technician incentive in the tiers doc is brand new.
+    for (const [name, note] of [
+      ["Chris Boyd", "Technician now earns $25 per agreement sold — re-read."],
+      ["Luis Ortega", null],
+      ["Marcus Boone", null],
+    ]) {
+      await sql`insert into reading_assignments (organization_id, document_id, employee_id, note)
+        select ${orgId}, ${doc["Maintenance Agreement Tiers"]}, id, ${note} from employees
+        where organization_id = ${orgId} and name = ${name}
+        on conflict do nothing`;
+    }
 
     await sql`
       insert into knowledge_items (organization_id, document_id, title, content, category, tags, status) values
@@ -362,6 +410,16 @@ async function main() {
       returning id`;
     await sql`update recommendations set status = 'APPROVED', decided_at = ${daysAgo(1)}, workflow_id = ${wf.id} where id = ${rec.id}`;
     await sql`update insights set status = 'ACTION_TAKEN' where id = ${insight.id}`;
+    // Unscheduled maintenance jobs for the dispatch board (town/area grouping):
+    // service-plan tune-ups generated but never scheduled — no appointment row,
+    // exactly the backlog HCP owners complain about. Customers deliberately
+    // from different areas so the board shows a real route decision.
+    await sql`
+      insert into service_orders (organization_id, customer_id, title, status, amount, opened_at) values
+      (${orgId}, ${cust["Sierra Vista Property Group"]}, 'Portfolio PM — units 3+4 (service plan)', 'OPEN', 380, ${daysAgo(21)}),
+      (${orgId}, ${cust["Dr. Patel Family"]}, 'Maintenance agreement tune-up — spring visit', 'OPEN', 189, ${daysAgo(9)}),
+      (${orgId}, ${cust["Henderson Duplex"]}, 'Agreement PM — both duplex units', 'OPEN', 240, ${daysAgo(4)})`;
+
     const soRows = await sql`select id, title, amount from service_orders where status='COMPLETED' and invoiced_at is null and organization_id=${orgId} limit 3`;
     for (const so of soRows) {
       await sql`

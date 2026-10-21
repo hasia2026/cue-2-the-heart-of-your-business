@@ -84,6 +84,68 @@ export async function shareDocument(docId: string, days: number): Promise<{ ok: 
   return { ok: true, url: `${base}/shared/${token}` };
 }
 
+export async function assignReRead(
+  docId: string,
+  scope: string,
+  note: string
+): Promise<{ ok: boolean; assigned?: number; error?: string }> {
+  const session = await requireSessionAction();
+  if (!canManage(session.role)) return { ok: false, error: "Only Owners and Admins can assign re-reads." };
+  const doc = await ownedDoc(session.organizationId, docId);
+
+  // Audience: ACTIVE employees everywhere or one department — resolved
+  // org-side, so a forged employee or dept id can never scope the write.
+  const audience = await sql`
+    select e.id from employees e
+    where e.organization_id = ${session.organizationId}
+      and e.status = 'ACTIVE'
+      ${scope && scope !== "ALL"
+        ? sql`and e.department_id = ${scope}`
+        : sql` and true`}
+    order by e.name`;
+  if (!audience.length) return { ok: false, error: "No active employees in that audience." };
+
+  let assigned = 0;
+  for (const e of audience) {
+    await sql`
+      insert into reading_assignments (organization_id, document_id, employee_id, note, assigned_by)
+      values (${session.organizationId}, ${doc.id}, ${e.id}, ${note.trim().slice(0, 500) || null}, ${session.user.id})
+      on conflict (document_id, employee_id)
+      do update set status = 'ASSIGNED', note = excluded.note, assigned_by = excluded.assigned_by, assigned_at = now(), read_at = null`;
+    assigned += 1;
+  }
+  await logAudit({
+    organizationId: session.organizationId,
+    actorId: session.user.id,
+    action: "RE_READ_ASSIGNED",
+    targetType: "Document",
+    targetId: doc.id,
+    detail: `Re-read of "${doc.title}" assigned to ${assigned} employee(s)`,
+  });
+  revalidatePath("/capture");
+  revalidatePath("/people");
+  return { ok: true, assigned };
+}
+
+export async function markRead(assignmentId: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireSessionAction();
+  if (session.role === "MEMBER") return { ok: false, error: "Only owners, admins and managers can mark re-reads complete." };
+  const [row] = await sql`
+    select id from reading_assignments
+    where id = ${assignmentId} and organization_id = ${session.organizationId}`;
+  if (!row) return { ok: false, error: "Assignment not in your organization." };
+  await sql`update reading_assignments set status = 'READ', read_at = now() where id = ${row.id}`;
+  await logAudit({
+    organizationId: session.organizationId,
+    actorId: session.user.id,
+    action: "RE_READ_MARKED",
+    targetType: "ReadingAssignment",
+    targetId: row.id,
+  });
+  revalidatePath("/people");
+  return { ok: true };
+}
+
 export async function revokeShare(docId: string): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSessionAction();
   const doc = await ownedDoc(session.organizationId, docId);

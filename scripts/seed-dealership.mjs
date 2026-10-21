@@ -38,8 +38,9 @@ async function main() {
 
     // Role demo accounts — hashed with the real scheme so placeholders can
     // never authenticate. Stable demo credentials (documented in PRODUCT-TOUR):
-    //   ADMIN  marcus@northgate.example / demo-admin-2026
-    //   MEMBER tom@northgate.example   / demo-member-2026
+    //   ADMIN   marcus@northgate.example / demo-admin-2026
+    //   MANAGER rachel@northgate.example / demo-manager-2026
+    //   MEMBER  tom@northgate.example   / demo-member-2026
     const demoHash = (p) => {
       const salt = randomBytes(16).toString("hex");
       return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
@@ -58,6 +59,14 @@ async function main() {
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${memberUser.id}, 'MEMBER')`;
+    // MANAGER: the in-store manager role — edits schedules, assigns re-reads.
+    const [managerUser] = await sql`
+      insert into users (email, name, password_hash)
+      values ('rachel@northgate.example', 'Rachel Kim (Demo)', ${demoHash("demo-manager-2026")})
+      on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
+      returning id`;
+    await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${managerUser.id}, 'MANAGER')
+      on conflict (organization_id, user_id) do nothing`;
 
     const [profile] = await sql`
       insert into business_profiles (organization_id, name, industry, size, locations, business_model, offerings, target_customers, mission, values_text, operational_priorities)
@@ -102,6 +111,28 @@ async function main() {
     await sql`update employees set manager_id = ${emp["Dana Whitfield"]} where name in ('Marcus Lee','Rachel Kim','Kevin Osei')`;
     await sql`update employees set manager_id = ${emp["Marcus Lee"]} where name in ('Priya Patel','Tom Alvarez')`;
     await sql`update employees set manager_id = ${emp["Rachel Kim"]} where name in ('Jorge Santos','Amy Chen')`;
+
+    // Standing weekly roster — the shift grid the manager edits. Days: 0=Sun…6=Sat.
+    // Realistic store shape: everyone but sales rests Sunday; internet-lead
+    // grinding puts Tom on doubles; F&I closes the day.
+    const SHIFTS = [
+      ["Dana Whitfield",  [1,'AM'],[2,'AM'],[3,'AM'],[4,'AM'],[5,'AM'],[6,'AM']],
+      ["Marcus Lee",      [2,'PM'],[3,'PM'],[4,'PM'],[5,'PM'],[6,'DOUBLE']],
+      ["Priya Patel",     [1,'AM'],[2,'AM'],[3,'AM'],[4,'DOUBLE'],[5,'AM'],[6,'AM']],
+      ["Tom Alvarez",     [2,'DOUBLE'],[3,'DOUBLE'],[4,'DOUBLE'],[5,'DOUBLE'],[6,'DOUBLE']],
+      ["Rachel Kim",      [1,'AM'],[2,'AM'],[3,'AM'],[4,'AM'],[5,'AM'],[6,'AM']],
+      ["Jorge Santos",    [1,'DOUBLE'],[2,'DOUBLE'],[3,'DOUBLE'],[4,'DOUBLE'],[5,'DOUBLE'],[6,'AM']],
+      ["Amy Chen",        [1,'PM'],[2,'PM'],[3,'PM'],[4,'PM'],[5,'PM'],[6,'AM']],
+      ["Kevin Osei",      [1,'PM'],[2,'PM'],[3,'PM'],[4,'PM'],[5,'PM']],
+    ];
+    for (const [name, ...days] of SHIFTS) {
+      const eid = emp[name];
+      for (const [dow, shift] of days) {
+        await sql`insert into employee_shifts (organization_id, employee_id, day_of_week, shift)
+          values (${orgId}, ${eid}, ${dow}, ${shift})
+          on conflict (employee_id, day_of_week) do update set shift = excluded.shift`;
+      }
+    }
 
     // Customers (~18)
     const custNames = [
@@ -168,22 +199,25 @@ async function main() {
     }
     const veh = Object.fromEntries(vehRows.map(r => [r.stock_number, r.id]));
 
-    // Deals — includes the finance bottleneck + lost deals
+    // Deals — includes the finance bottleneck + lost deals. Each carries the
+    // closer of record, so the sales leaderboard has real attribution:
+    //   Marcus Lee: 3 closed/pending gross deals, Tom Alvarez: internet-lead
+    //   closers, Priya Patel: fresh walk-ins and the one lost used deal.
     const deals = [
-      [cust["The Nguyen Family"], "U-8807", "USED", "WON", 37200, 12],
-      [cust["Hank Murphy"], "U-8811", "USED", "WON", 29100, 15],
-      [cust["Omar Haddad"], "N-2404", "NEW", "PENDING_FINANCE", 35900, 6],
-      [cust["Luis Ramirez"], "U-8808", "USED", "PENDING_FINANCE", 20500, 11],
-      [cust["Emily & Jack Turner"], "N-2401", "NEW", "NEGOTIATING", 31800, 3],
-      [cust["Fatima Al-Rashid"], "U-8809", "USED", "NEGOTIATING", 26700, 8],
-      [cust["Canyon CrossFit"], "U-8806", "USED", "NEGOTIATING", 40200, 19],
-      [cust["Steve Boozer"], "U-8810", "USED", "LOST", 24100, 26],
-      [cust["Kenji Watanabe"], "N-2402", "NEW", "LOST", 34200, 31],
+      [cust["The Nguyen Family"], "U-8807", "USED", "WON", 37200, 12, "Tom Alvarez"],
+      [cust["Hank Murphy"], "U-8811", "USED", "WON", 29100, 15, "Marcus Lee"],
+      [cust["Omar Haddad"], "N-2404", "NEW", "PENDING_FINANCE", 35900, 6, "Tom Alvarez"],
+      [cust["Luis Ramirez"], "U-8808", "USED", "PENDING_FINANCE", 20500, 11, "Marcus Lee"],
+      [cust["Emily & Jack Turner"], "N-2401", "NEW", "NEGOTIATING", 31800, 3, "Priya Patel"],
+      [cust["Fatima Al-Rashid"], "U-8809", "USED", "NEGOTIATING", 26700, 8, "Tom Alvarez"],
+      [cust["Canyon CrossFit"], "U-8806", "USED", "NEGOTIATING", 40200, 19, "Marcus Lee"],
+      [cust["Steve Boozer"], "U-8810", "USED", "LOST", 24100, 26, "Priya Patel"],
+      [cust["Kenji Watanabe"], "N-2402", "NEW", "LOST", 34200, 31, "Marcus Lee"],
     ];
-    for (const [customerId, stock, dealType, status, amount, ago] of deals) {
+    for (const [customerId, stock, dealType, status, amount, ago, closerName] of deals) {
       await sql`
-        insert into deals (organization_id, customer_id, vehicle_id, deal_type, status, amount, finance_sent_at, closed_at, created_at)
-        values (${orgId}, ${customerId}, ${veh[stock]}, ${dealType}, ${status}, ${amount},
+        insert into deals (organization_id, customer_id, vehicle_id, deal_type, status, amount, sold_by_id, finance_sent_at, closed_at, created_at)
+        values (${orgId}, ${customerId}, ${veh[stock]}, ${dealType}, ${status}, ${amount}, ${emp[closerName]},
           ${status === "PENDING_FINANCE" ? daysAgo(ago - 2) : null},
           ${status === "WON" ? daysAgo(ago) : null}, ${daysAgo(ago + 2)})`;
     }
@@ -224,7 +258,8 @@ async function main() {
 
     await sql`
       insert into payments (organization_id, customer_id, invoice_id, amount, method, received_at)
-      select ${orgId}, customer_id, id, amount, 'ACH', paid_at from invoices where status = 'PAID'`;
+      select ${orgId}, customer_id, id, amount, 'ACH', paid_at
+      from invoices where status = 'PAID' and organization_id = ${orgId}`;
 
     // Leads — includes 14 stale leads (follow-up leakage signal)
     const leads = [
@@ -275,6 +310,21 @@ async function main() {
       (${orgId}, 'Fleet PM Checklist — Vans', 'fleet-pm-vans.pdf', 'application/pdf', 88000, 'PROCEDURE', 'PROCESSED', 'Quarterly PM for fleet vans: fluids, brakes, tires, upfit wiring inspection. Document by VIN; flag any upfit electrical issues.', 'SEED')
       returning id, title`;
     const doc = Object.fromEntries(docRows.map(r => [r.title, r.id]));
+
+    // Example re-reads: the loaner policy just changed, service staff owe a read.
+    const [loaner] = await sql`select id from documents where id = ${doc["Service Loaner Policy"]}`;
+    if (loaner && loaner.id) {
+      for (const [name, note] of [
+        ["Jorge Santos", "Loaners must be washed on return — re-read before Friday."],
+        ["Amy Chen", null],
+        ["Rachel Kim", null],
+      ]) {
+        await sql`insert into reading_assignments (organization_id, document_id, employee_id, note)
+          select ${orgId}, ${doc["Service Loaner Policy"]}, id, ${note} from employees
+          where organization_id = ${orgId} and name = ${name}
+          on conflict do nothing`;
+      }
+    }
 
     await sql`
       insert into knowledge_items (organization_id, document_id, title, content, category, tags, status) values

@@ -70,7 +70,9 @@ export async function signInAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const [user] = await sql`select id, password_hash from users where email = ${email}`;
   if (!user || !verifyPassword(password, user.password_hash)) {
-    throw new Error("Invalid email or password");
+    // Bounce back with the localized banner instead of a thrown English error
+    // page — the signin route re-renders and translates it from the cookie.
+    redirect("/signin?error=1");
   }
   await createSessionCookie(user.id);
   redirect("/dashboard");

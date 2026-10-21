@@ -75,6 +75,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           pulse: pulse.execute,
           children: [
             { href: "/pipeline", label: t("nav.pipeline") },
+            { href: "/pipeline/unscheduled", label: "Unscheduled board" },
             { href: "/report", label: t("nav.report") },
             { href: "/people", label: t("nav.people") },
           ],

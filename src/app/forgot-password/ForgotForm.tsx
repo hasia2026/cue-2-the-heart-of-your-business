@@ -5,7 +5,15 @@ import { requestPasswordResetAction, type ResetFormState } from "@/app/signin/re
 
 const initialState: ResetFormState = { error: null };
 
-export default function ForgotPasswordForm() {
+export default function ForgotPasswordForm({
+  emailLabel,
+  submitLabel,
+  sendingLabel,
+}: {
+  emailLabel: string;
+  submitLabel: string;
+  sendingLabel: string;
+}) {
   const [state, formAction, pending] = useActionState(requestPasswordResetAction, initialState);
 
   return (
@@ -16,11 +24,11 @@ export default function ForgotPasswordForm() {
         </div>
       )}
       <div>
-        <label className="label" htmlFor="email">Work email</label>
+        <label className="label" htmlFor="email">{emailLabel}</label>
         <input id="email" name="email" type="email" required className="input" autoComplete="email" />
       </div>
       <button className="btn-primary w-full" disabled={pending}>
-        {pending ? "Sending…" : "Send reset link"}
+        {pending ? sendingLabel : submitLabel}
       </button>
     </form>
   );

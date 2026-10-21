@@ -5,6 +5,10 @@
       "schedule": "30 14 * * *"
     },
     {
+      "path": "/api/reminders",
+      "schedule": "12 7 * * *"
+    },
+    {
       "path": "/api/monitor/ping",
       "schedule": "17 5 * * *"
     }

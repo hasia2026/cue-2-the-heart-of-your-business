@@ -8,6 +8,7 @@ import {
   deleteDocument,
   shareDocument,
   revokeShare,
+  assignReRead,
 } from "./manage-actions";
 
 type Dept = { id: string; name: string };
@@ -19,7 +20,7 @@ export default function DocumentRow({
   currentDept,
   hasShare,
 }: {
-  doc: { id: string; title: string; kind: string; status: string; uploaded_at: string; size_bytes: number; knowledge_count: number; extracted_text: string | null };
+  doc: { id: string; title: string; kind: string; status: string; uploaded_at: string; size_bytes: number; knowledge_count: number; re_read_outstanding: number; extracted_text: string | null };
   canManage: boolean;
   departments: Dept[];
   currentDept: string | null;
@@ -32,8 +33,11 @@ export default function DocumentRow({
   const [title, setTitle] = useState(doc.title);
   const [text, setText] = useState(doc.extracted_text ?? "");
   const [dept, setDept] = useState(currentDept ?? "");
+  const [rrScope, setRrScope] = useState("ALL");
+  const [rrNote, setRrNote] = useState("");
+  const [rrMsg, setRrMsg] = useState<string | null>(null);
 
-  async function run(fn: () => Promise<{ ok: boolean; error?: string; url?: string }>) {
+  async function run(fn: () => Promise<{ ok: boolean; error?: string; url?: string; assigned?: number }>) {
     setBusy(true);
     setError(null);
     try {
@@ -108,6 +112,37 @@ export default function DocumentRow({
                 <textarea id={`x-${doc.id}`} value={text} onChange={(e) => setText(e.target.value)} rows={3} className="input !py-1.5 text-xs" />
                 <button className="btn-ghost mt-1.5 !px-2.5 !py-1 text-xs" disabled={busy}
                   onClick={() => run(() => editDocumentText(doc.id, text))}>Save content</button>
+              </div>
+
+              {/* Re-read assignment — the update acknowledgment loop: pick a
+                  scope, staff show up on People → Reading queue until read. */}
+              <div className="rounded-lg border border-white/[0.06] p-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-navy-300">Policy update — assign re-read</div>
+                {Number(doc.re_read_outstanding) > 0 && (
+                  <span className="badge-orange mt-1 inline-block">{doc.re_read_outstanding} outstanding</span>
+                )}
+                <div className="mt-2 grid gap-2 md:grid-cols-[auto,1fr,auto]">
+                  <select aria-label="Re-read audience" value={rrScope} onChange={(e) => setRrScope(e.target.value)} className="input !py-1.5 text-xs">
+                    <option value="ALL">Everyone (active)</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name} only</option>)}
+                  </select>
+                  <input
+                    aria-label="Re-read note"
+                    value={rrNote}
+                    onChange={(e) => setRrNote(e.target.value)}
+                    placeholder="What changed, in one line (optional)"
+                    className="input !py-1.5 text-xs"
+                    maxLength={500}
+                  />
+                  <button className="btn-primary !px-3 !py-1.5 text-xs" disabled={busy}
+                    onClick={async () => {
+                      const r = await run(() => assignReRead(doc.id, rrScope, rrNote));
+                      if (r.ok) { setRrMsg(`Assigned to ${r.assigned ?? 0} ✓`); setRrNote(""); }
+                    }}>
+                    Assign re-read
+                  </button>
+                </div>
+                {rrMsg && <p className="mt-1.5 text-xs text-emerald-300">{rrMsg}</p>}
               </div>
 
               {/* Delete */}

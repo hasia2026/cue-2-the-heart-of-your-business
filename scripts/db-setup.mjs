@@ -1,8 +1,12 @@
 #!/usr/bin/env node
-// Applies scripts/schema.sql to the Supabase Postgres database.
+// Applies scripts/schema.sql to the Supabase Postgres database, then applies
+// every scripts/migrate-*.sql patch (all idempotent) so a rebuilt database
+// can't drift from the code's expectations. New columns/tables added as
+// migrations are picked up automatically here.
 // Usage: node --env-file=.env scripts/db-setup.mjs [--fresh]
 //   --fresh: drops the public schema first (destructive — demo/dev only).
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 
 const url = process.env.DATABASE_URL;
@@ -20,6 +24,23 @@ try {
   }
   const ddl = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
   await sql.unsafe(ddl);
+
+  const migrations = readdirSync(fileURLToPath(new URL(".", import.meta.url)))
+    .filter((f) => /^migrate-.*\.sql$/.test(f))
+    .sort();
+  for (const m of migrations) {
+    const patch = readFileSync(new URL(`./${m}`, import.meta.url), "utf8");
+    try {
+      await sql.unsafe(patch);
+      console.log(`  ✔ ${m}`);
+    } catch (e) {
+      // A patch that failed on a live table shouldn't abort the rest of setup —
+      // but surface it loudly instead of swallowing.
+      console.error(`  ✗ ${m}: ${e.message}`);
+      process.exitCode = 1;
+    }
+  }
+
   const [row] = await sql`select count(*)::int as tables from information_schema.tables where table_schema = 'public'`;
   console.log(`Schema applied. ${row.tables} tables in public.`);
 } catch (e) {
