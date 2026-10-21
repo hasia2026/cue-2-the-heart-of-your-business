@@ -116,6 +116,22 @@ try {
     const [{ count: customers }] = await sql`select count(*)::int as count from customers where organization_id = ${args[0]}`;
     const [{ count: invoices }] = await sql`select count(*)::int as count from invoices where organization_id = ${args[0]}`;
     console.log(JSON.stringify({ ok: true, customers, invoices }));
+  } else if (mode === "audit-scan") {
+    // Did a detector refresh actually run for Summit Air in the last 5 min?
+    // Proof is the audit trail (INTELLIGENCE_REFRESHED / INSIGHT_CREATED),
+    // not the POST's status code — any server action answers 200.
+    const org = await summitOrg();
+    if (!org) {
+      console.log(JSON.stringify({ refreshed: false, reason: "no Summit Air org" }));
+    } else {
+      const rows = await sql`
+        select action from audit_events
+        where organization_id = ${org.id}
+          and action in ('INTELLIGENCE_REFRESHED', 'INSIGHT_CREATED')
+          and created_at > now() - interval '5 minutes'
+        limit 1`;
+      console.log(JSON.stringify({ refreshed: rows.length > 0 }));
+    }
   } else {
     console.error("unknown mode: " + mode);
     process.exit(1);

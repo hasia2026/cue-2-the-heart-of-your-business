@@ -261,6 +261,10 @@ async function main() {
 
     // Fire the app's own refresh action (progressive-enhancement form POST
     // against the understand page), then re-read the insights table.
+    // Fire EVERY action id on the page — POSTing any server action returns
+    // 200/303, so "first response wins" previously fired a dismiss form and
+    // never actually ran the refresh. Proof of effect = new INSIGHT_CREATED
+    // in the audit trail, not a status code.
     const page = await fetch(BASE + "/understand", { headers: { cookie } });
     const html = await page.text();
     const ids = [...new Set([...html.matchAll(/ACTION_ID_([0-9a-f]{40,60})/g)].map((m) => m[1]))];
@@ -269,9 +273,14 @@ async function main() {
       const rb = "----r" + Date.now();
       const rp = ["--" + rb, 'Content-Disposition: form-data; name="$ACTION_ID_' + id + '"', "", "", "--" + rb + "--", ""].join("\r\n");
       const res = await fetch(BASE + "/understand", { method: "POST", headers: { "Content-Type": "multipart/form-data; boundary=" + rb, cookie }, body: rp, redirect: "manual" });
-      if (res.status === 303 || res.status === 200) { refreshed = true; break; }
+      await res.text().catch(() => "");
+      // refreshIntelligenceAction audit-logs INTELLIGENCE_REFRESHED and/or
+      // INSIGHT_CREATED on success — check the trail after each POST.
+      const { execFileSync } = await import("node:child_process");
+      const audit = JSON.parse(execFileSync(process.execPath, ["--env-file=.env", "scripts/e2e-db-probe.mjs", "audit-scan"], { encoding: "utf8" }).trim().split("\n").pop());
+      if (audit.refreshed) { refreshed = true; break; }
     }
-    check("understand refresh action fired", refreshed, ids.length + " action ids on page");
+    check("understand refresh action fired", refreshed, ids.length + " action id(s) fired");
 
     const flags = JSON.parse(probe("insights"));
     check("renewal detector insight open (agreement ≤30d)", flags.renewal === true, (flags.titles ?? []).join("; ").slice(0, 140));
