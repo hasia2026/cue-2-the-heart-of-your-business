@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { whatsappConnected } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default async function EcosystemPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const integrations = await sql`

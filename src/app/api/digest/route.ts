@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { buildDigestData, renderDigest, renderDigestHtml } from "@/lib/digest";
+import { buildDigestData, renderDigest, renderDigestHtml, digestBrand } from "@/lib/digest";
 import { mailerConnected, sendMail } from "@/lib/mailer";
 import { whatsappConnected, sendWhatsAppText } from "@/lib/whatsapp";
 import { logAudit } from "@/lib/audit";
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       }
       const data = await buildDigestData(org.id);
       const text = renderDigest(data);
-      const html = renderDigestHtml(data);
+      const html = renderDigestHtml(data, await digestBrand(org.id, data.orgName));
       const mail = mailerConnected()
         ? await sendMail({ to: org.owner_email, subject: `CUE weekly digest — ${data.orgName}`, text, html })
         : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };

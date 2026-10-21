@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import { MOCK_SHEET } from "./mock-sheet";
 import MockExercise from "./MockExercise";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 // can fake) plus the mock appraisal exercise that walks a trade-in
 // export into CUE's structured records before a real importer runs.
 export default async function IntakePage() {
+  await guardWorkspaceModule();
   await requireSession();
   const { t } = await getT();
   const s = await requireSession();

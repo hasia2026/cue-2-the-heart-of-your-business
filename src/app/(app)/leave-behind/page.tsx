@@ -1,5 +1,8 @@
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getLeakTotals } from "@/lib/intelligence";
+import { getWorkspaceProfile, validAccent } from "@/lib/workspace-profile";
+import { sql } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -7,8 +10,14 @@ const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export default async function LeaveBehindPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const totals = await getLeakTotals(session.organizationId);
+  // Workspace Studio branding — accent + business name carry onto the printed page.
+  const [orgRow] = await sql`select name from organizations where id = ${session.organizationId}`;
+  const ws = await getWorkspaceProfile(session.organizationId);
+  const accent = validAccent(ws.brandAccent) ?? "#2E8BFF";
+  const brandName = ws.brandNameOverride || ((orgRow?.name as string) ?? "Search conducted by CUE");
 
   const today = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -22,7 +31,7 @@ export default async function LeaveBehindPage() {
         .leave-behind-page {
           --lb-ink: #1E1B3A;
           --lb-muted: #5C548C;
-          --lb-blue: #2E8BFF;
+          --lb-blue: ${accent};
           --lb-orange: #FB923C;
           max-width: 820px;
           margin: 0 auto;
@@ -112,7 +121,7 @@ export default async function LeaveBehindPage() {
         <div className="lb-tag">Built by HASI Technologies<br />hasi.tech</div>
       </div>
 
-      <h1 className="lb-h1">The numbers we saw on your records, {today}</h1>
+      <h1 className="lb-h1">The numbers we saw on your records, {today} — {brandName}</h1>
       <div className="lb-sub">
         Every figure on this page came from <strong>your own exports</strong> during today&apos;s scan — no estimates, no industry averages. Each one traces to a real record; you saw it on screen.
       </div>

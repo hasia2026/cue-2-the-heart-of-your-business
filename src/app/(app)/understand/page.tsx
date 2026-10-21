@@ -1,11 +1,13 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { refreshIntelligenceAction } from "@/app/signin/actions";
 import EvidenceDrawer from "@/components/EvidenceDrawer";
 
 export const dynamic = "force-dynamic";
 
 export default async function UnderstandPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
 

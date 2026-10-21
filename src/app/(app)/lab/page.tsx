@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default async function LabPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const ideas = await sql`

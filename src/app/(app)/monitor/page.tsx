@@ -1,10 +1,12 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { mailerConnected } from "@/lib/mailer";
 
 export const dynamic = "force-dynamic";
 
 export default async function MonitorPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   if (session.role !== "OWNER") {
     return (

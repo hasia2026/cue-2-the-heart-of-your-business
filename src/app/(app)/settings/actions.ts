@@ -7,6 +7,11 @@ import { logAudit } from "@/lib/audit";
 import { encryptSecret } from "@/lib/secretbox";
 import { PROVIDERS } from "@/lib/ambassador";
 import { VOCAB_LABELS, INDUSTRY_PACKS } from "@/lib/vocab";
+import {
+  getWorkspaceProfile, upsertWorkspaceProfile, validAccent,
+  type AmbassadorTone,
+} from "@/lib/workspace-profile";
+import { MODULES, FIXED_MODULES, isModule, type ModuleKey } from "@/lib/modules";
 
 export async function updateProfile(formData: FormData) {
   const session = await requireSessionAction();
@@ -194,4 +199,120 @@ export async function saveAmbassadorSettings(formData: FormData) {
     detail: provider ? `AI Ambassador set to ${provider}` : "AI Ambassador provider cleared",
   });
   revalidatePath("/settings");
+}
+
+// ───────── Workspace Studio ─────────
+// Owner-curated workspace: Ambassador persona, branding, module toggles/labels.
+// Writes go to one lazy-created workspace_profiles row per org.
+
+const TONES: AmbassadorTone[] = ["friendly", "formal", "concise", "enthusiastic"];
+
+async function requireStudioWriter() {
+  const session = await requireSessionAction();
+  if (session.role === "MEMBER") {
+    throw new Error("Only owners, admins and managers can customize the workspace.");
+  }
+  return session;
+}
+
+function cleanText(raw: FormDataEntryValue | null, max: number): string | null {
+  const v = String(raw ?? "").trim();
+  return v ? v.slice(0, max) : null;
+}
+
+function httpsLogo(raw: FormDataEntryValue | null): string | null {
+  const v = String(raw ?? "").trim();
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return v.slice(0, 500);
+  } catch {
+    return null;
+  }
+}
+
+function markSetup(current: Record<string, unknown>, step: string): Record<string, string> {
+  return { ...current, [step]: true } as Record<string, string>;
+}
+
+async function currentSetup(orgId: string): Promise<Record<string, unknown>> {
+  const p = await getWorkspaceProfile(orgId);
+  return { ...p.setupCompleted } as Record<string, unknown>;
+}
+
+/** Ambassador persona step — name, avatar emoji, greeting, tone. */
+export async function savePersona(formData: FormData) {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+  const toneRaw = String(formData.get("tone") ?? "").trim();
+  await upsertWorkspaceProfile(orgId, {
+    ambassador_name: cleanText(formData.get("ambassadorName"), 40),
+    ambassador_avatar: cleanText(formData.get("ambassadorAvatar"), 8),
+    ambassador_tone: TONES.includes(toneRaw as AmbassadorTone) ? toneRaw : null,
+    ambassador_greeting: cleanText(formData.get("ambassadorGreeting"), 200),
+  });
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_PERSONA_UPDATED", detail: "Ambassador persona customized",
+  });
+  await sql`update workspace_profiles set setup_completed = ${sql.json(markSetup(await currentSetup(orgId), "persona"))} where organization_id = ${orgId}`;
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/onboarding");
+}
+
+/** Branding step — display name, logo, accent, contacts, theme default. */
+export async function saveBranding(formData: FormData) {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+  const themeRaw = String(formData.get("themeDefault") ?? "").trim();
+  // Custom hex wins when it validates; else the palette radio; else null (stock violet).
+  const customAccent = validAccent(String(formData.get("brandAccentCustom") ?? ""));
+  await upsertWorkspaceProfile(orgId, {
+    brand_name: cleanText(formData.get("brandName"), 120),
+    brand_logo_url: httpsLogo(formData.get("brandLogoUrl")),
+    brand_accent: customAccent ?? validAccent(String(formData.get("brandAccent") ?? "")),
+    brand_contact_phone: cleanText(formData.get("brandContactPhone"), 40),
+    brand_contact_email: cleanText(formData.get("brandContactEmail"), 120),
+    theme_default: ["system", "light", "dark"].includes(themeRaw) ? themeRaw : null,
+  });
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_BRANDING_UPDATED", detail: "Workspace branding updated",
+  });
+  await sql`update workspace_profiles set setup_completed = ${sql.json(markSetup(await currentSetup(orgId), "branding"))} where organization_id = ${orgId}`;
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/onboarding");
+}
+
+/** Modules step — enabled/label per module key (fixed keys ignored). */
+export async function saveModules(formData: FormData) {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+  const modules: Record<string, { enabled: boolean; label: string | null }> = {};
+  for (const m of MODULES) {
+    if (FIXED_MODULES.includes(m.key)) continue; // dashboard + settings always on
+    const enabled = formData.get(`mod_${m.key}_on`) === "on";
+    const label = cleanText(formData.get(`mod_${m.key}_label`), 40);
+    modules[m.key] = { enabled, label };
+  }
+  await upsertWorkspaceProfile(orgId, { modules });
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_MODULES_UPDATED",
+    detail: `Module layout saved (${Object.values(modules).filter((m) => m.enabled).length} shown)`,
+  });
+  await sql`update workspace_profiles set setup_completed = ${sql.json(markSetup(await currentSetup(orgId), "modules"))} where organization_id = ${orgId}`;
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/onboarding");
+}
+
+/** Guard helper for route handlers/actions. */
+export async function isModuleEnabled(orgId: string, pathModule: string): Promise<boolean> {
+  if (!isModule(pathModule)) return true;
+  const p = await getWorkspaceProfile(orgId);
+  return p.modules[pathModule as ModuleKey]?.enabled !== false;
 }

@@ -5,10 +5,21 @@ import { useLocale } from "@/components/useLocale";
 
 type Msg = { role: "user" | "ambassador"; text: string; mode?: string };
 
+export type AmbassadorPersona = {
+  name: string;
+  avatar: string;
+  greeting: string | null;
+  tone: string | null;
+};
+
 const SPEECH_LANG: Record<string, string> = { en: "en-US", ar: "ar-SA", es: "es-ES", vi: "vi-VN" };
 const AUTO_SPEAK_KEY = "cue-amb-auto-speak";
 
-export default function AmbassadorWidget() {
+export default function AmbassadorWidget({
+  persona = { name: "AI Ambassador", avatar: "🦋", greeting: null, tone: null },
+}: {
+  persona?: AmbassadorPersona;
+} = {}) {
   const { locale, rtl, t } = useLocale();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -211,11 +222,20 @@ export default function AmbassadorWidget() {
     [],
   );
 
-  // Seed the greeting in the current language (re-seeds if language changes)
+  // Seed the greeting in the current language (re-seeds if language changes).
+  // Owner-custom persona takes precedence; the localized stock greeting is the fallback.
   useEffect(() => {
     stopSpeaking.current();
-    setMsgs([{ role: "ambassador", text: t("amb.greeting") }]);
-  }, [locale]);
+    setMsgs([
+      {
+        role: "ambassador",
+        text: persona.greeting?.trim()
+          ? persona.greeting.trim()
+          : t("amb.greeting"),
+      },
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, persona.greeting]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
@@ -266,7 +286,7 @@ export default function AmbassadorWidget() {
           }`}
           aria-label={t("amb.open")}
         >
-          <span aria-hidden>🦋</span>
+          <span aria-hidden>{persona.avatar}</span>
         </button>
       )}
 
@@ -277,9 +297,9 @@ export default function AmbassadorWidget() {
           }`}
         >
           <div className="flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-violet-600/30 to-cyan-500/20 px-4 py-3">
-            <span className="cue-halo inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/20 text-xl">🦋</span>
+            <span className="cue-halo inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/20 text-xl">{persona.avatar}</span>
             <div className="flex-1">
-              <div className="text-sm font-semibold text-white">{t("amb.title")}</div>
+              <div className="text-sm font-semibold text-white">{persona.name}</div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-violet-300/80">
                 {busy ? t("amb.busy") : t("amb.online")}
               </div>
@@ -325,7 +345,7 @@ export default function AmbassadorWidget() {
                 )}
               </div>
             ))}
-            {busy && <div className="animate-pulse text-xs text-violet-300">🦋 {t("amb.thinking")}</div>}
+            {busy && <div className="animate-pulse text-xs text-violet-300">{persona.avatar} {t("amb.thinking")}</div>}
           </div>
 
           {/* Mobile hold-to-talk — big mic under the message list on small screens */}

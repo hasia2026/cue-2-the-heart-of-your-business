@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import { FOLDER_FOR_KIND } from "@/lib/capture-classify";
 import Link from "next/link";
@@ -21,6 +22,7 @@ export default async function CapturePage({
   const { t } = await getT();
   const { folder: folderParam } = await searchParams;
   const selectedFolder = folderParam?.trim() || null;
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const docs = await sql`

@@ -8,6 +8,29 @@ import ThemeToggle from "./ThemeToggle";
 import TextSizePicker from "./TextSizePicker";
 import ReviMark from "./ReviMark";
 import { signOut } from "@/app/signin/actions";
+import { getWorkspaceProfile } from "@/lib/workspace-profile";
+
+// Workspace Studio: sidebar item href ↔ module key. Anything absent stays stock;
+// a disabled module hides its item (and its children), a renamed label replaces it.
+const ITEM_MODULE: Record<string, string> = {
+  "/dashboard": "dashboard",
+  "/intake": "intake",
+  "/capture": "capture",
+  "/signals": "signals",
+  "/understand": "understand",
+  "/compass": "compass",
+  "/knowledge": "knowledge",
+  "/enhance": "enhance",
+  "/execute": "execute",
+  "/pipeline": "pipeline",
+  "/pipeline/unscheduled": "pipeline",
+  "/report": "report",
+  "/people": "people",
+  "/expand": "expand",
+  "/lab": "lab",
+  "/ecosystem": "ecosystem",
+  "/settings": "settings",
+};
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -33,6 +56,26 @@ export default async function AppShell({ children }: { children: React.ReactNode
     };
   }
   const toastLabels = buildLabels(NAV_TOAST_KEYS, t);
+
+  // Workspace Studio profile: hide disabled modules, apply owner-renamed labels.
+  const ws = s ? await getWorkspaceProfile(s.organizationId) : null;
+  const moduleState = (href: string) => {
+    const key = ITEM_MODULE[href];
+    if (!key || !ws) return { enabled: true, label: undefined as string | undefined };
+    const st = ws.modules[key as keyof typeof ws.modules];
+    return { enabled: st?.enabled !== false, label: st?.label ?? undefined };
+  };
+  const applyWs = <T extends { href: string; label: string; children?: { href: string; label: string }[] }>(item: T): T | null => {
+    const self = moduleState(item.href);
+    const kids = (item.children ?? []).filter((c) => moduleState(c.href).enabled)
+      .map((c) => ({ ...c, label: moduleState(c.href).label ?? c.label }));
+    if (!self.enabled) {
+      // Hidden parent keeps still-enabled children pinned under the group root.
+      if (!kids.length) return null;
+      return { ...(item as T), label: self.label ?? item.label, children: kids };
+    }
+    return { ...(item as T), label: self.label ?? item.label, children: kids.length ? kids : item.children };
+  };
 
   const groups = [
     {
@@ -95,7 +138,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
         { href: "/settings", label: t("nav.settings"), icon: "⚙" },
       ],
     },
-  ];
+  ].map((g) => ({ ...g, items: g.items.map(applyWs).filter(Boolean) as typeof g.items }));
 
   return (
     // Mobile: top bar stacks above content (column); desktop: sidebar + content row
@@ -128,7 +171,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           <div className="flex items-center gap-2">
             <LogoMark className="h-4 w-4" /> CUE — Built by HASI Technologies
             <ReviMark className="ms-2 h-5 w-5" />
-            <span className="text-navy-300/60">Revi is always watching for leaks.</span>
+            <span className="text-navy-300/60">{ws?.ambassadorName ? `${ws.ambassadorName} is always watching for leaks.` : "Revi is always watching for leaks."}</span>
           </div>
         </footer>
       </div>

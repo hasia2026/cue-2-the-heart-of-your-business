@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
@@ -18,6 +19,7 @@ const DIM_LABELS: Record<string, DictKey> = {
 export const dynamic = "force-dynamic";
 
 export default async function CompassPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const { t } = await getT();
   const orgId = session.organizationId;

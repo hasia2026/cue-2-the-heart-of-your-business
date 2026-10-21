@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import { ACADEMY_LABEL_KEYS, LIBRARY_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
 import Academy from "./Academy";
@@ -8,6 +9,7 @@ import TrainingLibrary from "./TrainingLibrary";
 export const dynamic = "force-dynamic";
 
 export default async function ExpandPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const { t } = await getT();
   const orgId = session.organizationId;

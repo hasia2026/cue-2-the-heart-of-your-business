@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { getWorkspaceProfile, validAccent } from "./workspace-profile";
 
 type DigestSection = { heading: string; lines: string[] };
 
@@ -119,8 +120,29 @@ export function renderDigest(d: DigestData): string {
   return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.moneyFound].map(section).join("\n\n")}`;
 }
 
+export type DigestBrand = { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null };
+
+/** Workspace Studio branding for the digest (accent/logo/contacts). */
+export async function digestBrand(orgId: string, orgName: string): Promise<DigestBrand> {
+  const p = await getWorkspaceProfile(orgId);
+  return {
+    name: p.brandNameOverride || orgName,
+    accent: validAccent(p.brandAccent),
+    logo: p.brandLogoUrl,
+    contactPhone: p.brandContactPhone,
+    contactEmail: p.brandContactEmail,
+  };
+}
+
 /** HTML rendering — same builder data, four styled cards; plain text is the fallback. */
-export function renderDigestHtml(d: DigestData): string {
+export function renderDigestHtml(d: DigestData, brand?: DigestBrand): string {
+  const accent = brand?.accent ?? "#7c6cff";
+  const brandLine = brand?.name ? esc(brand.name) : "CUE";
+  const logo = brand?.logo
+    ? `<img src="${esc(brand.logo)}" alt="" style="max-height:40px;max-width:160px;object-fit:contain;margin-bottom:10px;display:block;" />`
+    : "";
+  const contactBits = [brand?.contactPhone, brand?.contactEmail].filter((x): x is string => Boolean(x)).map(esc).join(" · ");
+  const contactFooter = contactBits ? `<div style="font-size:11px;color:#6b7396;margin-top:8px;">${contactBits}</div>` : "";
   const card = (s: DigestSection, accent: string) => `
     <div style="background:#141428;border-radius:12px;padding:18px 20px;margin:0 0 14px;border-left:4px solid ${accent};">
       <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b93b8;margin-bottom:8px;">${esc(s.heading)}</div>
@@ -128,7 +150,8 @@ export function renderDigestHtml(d: DigestData): string {
     </div>`;
   return `<!doctype html><html><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
     <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
-      <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7c6cff;margin-bottom:6px;">CUE · weekly digest</div>
+      ${logo}
+      <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:${accent};margin-bottom:6px;">CUE · weekly digest</div>
       <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:18px;">${esc(d.orgName)}</div>
       ${card(d.openLeaks, "#f87171")}
       ${card(d.pendingDecisions, "#c084fc")}
@@ -136,6 +159,7 @@ export function renderDigestHtml(d: DigestData): string {
       ${card(d.approvedThisWeek, "#22d3ee")}
       ${card(d.moneyFound, "#34d399")}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>
+      ${contactFooter}
     </div>
   </body></html>`;
 }

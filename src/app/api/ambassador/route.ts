@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { ambassadorAnswer } from "@/lib/ambassador";
 import { isLocale, translator, type Locale } from "@/lib/i18n";
 import { rateLimitResult, clientKey } from "@/lib/rate-limit";
+import { getWorkspaceProfile } from "@/lib/workspace-profile";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -40,5 +41,12 @@ export async function POST(req: Request) {
       { status: 429, headers: { "retry-after": String(rl.retryAfterSecs) } },
     );
   }
-  return NextResponse.json(await ambassadorAnswer(session.organizationId, question, locale));
+  // Owner-tuned persona steers the LLM voice; the grounded core is unchanged.
+  const ws = await getWorkspaceProfile(session.organizationId);
+  return NextResponse.json(
+    await ambassadorAnswer(session.organizationId, question, locale, {
+      name: ws.ambassadorName,
+      tone: ws.ambassadorTone,
+    }),
+  );
 }

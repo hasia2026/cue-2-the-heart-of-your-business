@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
+import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import EvidenceDrawer from "@/components/EvidenceDrawer";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,15 @@ export default async function DashboardPage() {
   const orgId = session.organizationId;
   const { t } = await getT();
   const vocab = await getVocab(orgId);
+  // Workspace Studio guided setup — checklist ticks derive from live profile state.
+  const ws = await getWorkspaceProfile(orgId);
+  const setupSteps = [
+    { id: "persona" as const, label: "Name your AI Ambassador", href: "/onboarding" },
+    { id: "branding" as const, label: "Brand your quotes & emails", href: "/onboarding" },
+    { id: "modules" as const, label: "Tune your sidebar", href: "/onboarding" },
+  ];
+  const pendingSetup = setupSteps.filter((s) => !ws.setupCompleted[s.id]);
+  const showSetupCard = Boolean(pendingSetup.length) && session.role !== "MEMBER";
   const health = await computeHealth(orgId);
 
   const insights = await sql`
@@ -87,6 +97,23 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4">
+      {/* Workspace Studio setup checklist — dismiss-free (state-derived), links to the wizard */}
+      {showSetupCard && (
+        <section className="card card-hover border-l-2 border-l-violet-400/70 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="eyebrow !text-violet-300">Set up your workspace</span>
+            <span className="muted text-xs">{pendingSetup.length} step{pendingSetup.length === 1 ? "" : "s"} left — optional, skips anytime</span>
+            <a href="/onboarding" className="btn-primary ms-auto !px-3 !py-1.5 text-xs">Continue setup →</a>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {setupSteps.map((s) => (
+              <span key={s.id} className={`badge ${ws.setupCompleted[s.id] ? "badge-green" : "badge-low"}`}>
+                {ws.setupCompleted[s.id] ? "✓" : "○"} {s.label}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
       {/* Top tagline — poster header line */}
       <div className="text-center">
         <span className="text-lg font-semibold text-white md:text-xl">{t("dash.taglineTop")}</span>

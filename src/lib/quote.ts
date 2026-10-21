@@ -8,6 +8,20 @@
 import { sql } from "./db";
 import { mailerConnected, sendMail } from "./mailer";
 import { logAudit } from "./audit";
+import { getWorkspaceProfile, validAccent } from "./workspace-profile";
+
+// Workspace Studio brand fields resolved for an org — null-safe at every level.
+async function orgBrand(orgId: string): Promise<{ name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null }> {
+  const [org] = await sql`select name from organizations where id = ${orgId}`;
+  const p = await getWorkspaceProfile(orgId);
+  return {
+    name: p.brandNameOverride || ((org?.name as string) || null),
+    accent: validAccent(p.brandAccent),
+    logo: p.brandLogoUrl,
+    contactPhone: p.brandContactPhone,
+    contactEmail: p.brandContactEmail,
+  };
+}
 
 export type QuoteItem = { description: string; amount: number };
 export type QuotePayload = {
@@ -80,15 +94,30 @@ export function renderQuoteText(q: QuotePayload, locale: string | null | undefin
   ].filter(Boolean).join("\n");
 }
 
-export function renderQuoteHtml(q: QuotePayload, locale: string | null | undefined): string {
+export function renderQuoteHtml(
+  q: QuotePayload,
+  locale: string | null | undefined,
+  brand?: { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null },
+): string {
   const t = L[quoteLocale(locale)];
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
   const total = q.items.reduce((s, i) => s + i.amount, 0);
   const dir = quoteLocale(locale) === "ar" ? ` dir="rtl"` : "";
+  // Workspace Studio branding: accent falls back to the stock violet.
+  const accent = brand?.accent ?? "#7c6cff";
+  const logo = brand?.logo
+    ? `<img src="${esc(brand.logo)}" alt="" style="max-height:44px;max-width:180px;object-fit:contain;margin-bottom:10px;display:block;" />`
+    : "";
+  const brandLine = brand?.name ? esc(brand.name) : "CUE";
+  const contactBits = [brand?.contactPhone, brand?.contactEmail].filter((x): x is string => Boolean(x)).map(esc).join(" · ");
+  const contactFooter = contactBits
+    ? `<div style="font-size:11px;color:#6b7396;margin-top:10px;">${contactBits}</div>`
+    : "";
   return `<!doctype html><html><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;"><div${dir} style="max-width:600px;margin:0 auto;padding:24px 16px;">
-  <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7c6cff;margin-bottom:6px;">CUE · ${esc(t.heading)}</div>
+  ${logo}
+  <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:${accent};margin-bottom:6px;">${brandLine} · ${esc(t.heading)}</div>
   <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:4px;">${esc(q.title)}</div>
   <div style="font-size:13px;color:#8b93b8;margin-bottom:18px;">${esc(q.customerName)}</div>
   <div style="background:#141428;border-radius:12px;padding:18px 20px;margin:0 0 14px;border-left:4px solid #7c6cff;">
@@ -99,6 +128,7 @@ export function renderQuoteHtml(q: QuotePayload, locale: string | null | undefin
     ${q.notes ? `<div style="font-size:12px;color:#8b93b8;margin-top:4px;">${esc(t.notes)}: ${esc(q.notes)}</div>` : ""}
   </div>
   <div style="font-size:13px;color:#c9cdea;line-height:1.5;">${esc(t.accept)}<br/>${esc(t.closing)}</div>
+  ${contactFooter}
 </div></body></html>`;
 }
 
@@ -133,12 +163,13 @@ export async function sendQuoteEmail(opts: {
 }): Promise<{ connected: boolean; sent: boolean; error?: string; langUsed: string }> {
   const { quote: q, locale } = opts;
   const subject = `${L[quoteLocale(locale)].heading} — ${q.title}`;
+  const brand = await orgBrand(opts.orgId);
   const mail = mailerConnected()
     ? await sendMail({
         to: q.customerEmail!,
         subject,
         text: renderQuoteText(q, locale),
-        html: renderQuoteHtml(q, locale),
+        html: renderQuoteHtml(q, locale, brand),
       })
     : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };
 

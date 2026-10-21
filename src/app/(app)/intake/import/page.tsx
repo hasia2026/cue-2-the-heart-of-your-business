@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import Importer from "./Importer";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 // CUE records. Hangs off the intake checklist's third step; the mock
 // exercise teaches the shape, this page does the real thing.
 export default async function ImportPage() {
+  await guardWorkspaceModule();
   await requireSession();
   const { t } = await getT();
   const s = await requireSession();

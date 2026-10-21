@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getVocab } from "@/lib/vocab";
 import QuoteSender from "./QuoteSender";
 import ArReminders from "./ArReminders";
@@ -15,6 +16,7 @@ const money = (n: unknown) => `$${Number(n ?? 0).toLocaleString(undefined, { max
 const ago = (d: Date | string | null) => d ? `${Math.floor((Date.now() - new Date(d).getTime()) / 864e5)}d ago` : "—";
 
 export default async function PipelinePage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const vocab = await getVocab(orgId);

@@ -1,7 +1,11 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { PROVIDERS } from "@/lib/ambassador";
-import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateReminderCadence, updateReminderTemplate, updateVocab } from "./actions";
+import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateReminderCadence, updateReminderTemplate, updateVocab, savePersona, saveBranding, saveModules } from "./actions";
+import { getWorkspaceProfile } from "@/lib/workspace-profile";
+import { MODULES, FIXED_MODULES } from "@/lib/modules";
+import WorkspaceStudioForm from "./WorkspaceStudioForm";
 import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
@@ -20,6 +24,7 @@ export default async function SettingsPage({
 }) {
   const { billing } = await searchParams;
   const { t } = await getT();
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const [profile] = await sql`select * from business_profiles where organization_id = ${orgId}`;
@@ -43,6 +48,7 @@ export default async function SettingsPage({
 
   const vocab = await getVocab(orgId);
   const overrides = Object.fromEntries(VOCAB_LABELS.map(([key]) => [key, vocab[key] ?? ""]));
+  const ws = await getWorkspaceProfile(orgId);
 
   return (
     <div className="space-y-6">
@@ -198,6 +204,25 @@ export default async function SettingsPage({
         <h2 className="section-title mb-1">Terminology</h2>
         <p className="muted mb-4 text-xs">Industry pack switches the labels across dashboard, pipeline, and inventory in one move. Custom keeps whatever you set label-by-label below.</p>
         <IndustryPackForm orgId={orgId} />
+      </section>
+
+      {/* Workspace Studio — persona, branding, module layout in one place. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Workspace Studio</h2>
+        <p className="muted mb-4 text-xs">
+          Make the workspace yours: name your AI Ambassador, brand everything customers see, and show only the modules you actually use.
+          Everything carries into quotes, digest emails, the leave-behind pages, and the sidebar.
+        </p>
+        <WorkspaceStudioForm
+          profile={ws}
+          modules={MODULES.filter((m) => !FIXED_MODULES.includes(m.key))}
+          savePersona={savePersona}
+          saveBranding={saveBranding}
+          saveModules={saveModules}
+        />
+        <div className="mt-4">
+          <a href="/onboarding" className="text-xs text-cyan-300 hover:underline">Re-run the guided setup →</a>
+        </div>
       </section>
 
       <section className="card p-6">

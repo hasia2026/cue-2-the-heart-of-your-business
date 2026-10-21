@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import SopRecorder from "./SopRecorder";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ const CATEGORY_BADGE: Record<string, string> = {
 };
 
 export default async function KnowledgePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const { q } = await searchParams;

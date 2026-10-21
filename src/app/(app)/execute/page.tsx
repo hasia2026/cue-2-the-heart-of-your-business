@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import { EXECUTE_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
 import ExecuteClient, { type Task as TaskRow, type WF as WFRow, type Rec as RecRow, type PendingRec } from "./ExecuteClient";
@@ -7,6 +8,7 @@ import ExecuteClient, { type Task as TaskRow, type WF as WFRow, type Rec as RecR
 export const dynamic = "force-dynamic";
 
 export default async function ExecutePage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const { t } = await getT();
   const orgId = session.organizationId;

@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import UnscheduledBoard, { type Job } from "../UnscheduledBoard";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
  * unscheduled queue with no map, no monthly report, and no area grouping.
  */
 export default async function UnscheduledPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
 

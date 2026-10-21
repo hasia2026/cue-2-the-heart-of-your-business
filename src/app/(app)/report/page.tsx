@@ -1,11 +1,13 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 
 export const dynamic = "force-dynamic";
 
 const money = (n: unknown) => `$${Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 export default async function PilotReportPage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
 

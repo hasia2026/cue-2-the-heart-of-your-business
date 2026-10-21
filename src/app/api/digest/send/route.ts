@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { buildDigestData, renderDigest, renderDigestHtml } from "@/lib/digest";
+import { buildDigestData, renderDigest, renderDigestHtml, digestBrand } from "@/lib/digest";
 import { mailerConnected, sendMail } from "@/lib/mailer";
 import { whatsappConnected, sendWhatsAppText } from "@/lib/whatsapp";
 import { rateLimitResult } from "@/lib/rate-limit";
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);
-  const html = renderDigestHtml(data);
+  const html = renderDigestHtml(data, await digestBrand(session.organizationId, data.orgName));
   const subject = `CUE weekly digest — ${data.orgName}`;
 
   const url = new URL(req.url);
@@ -60,8 +60,9 @@ export async function POST() {
   }
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);
+  const html = renderDigestHtml(data, await digestBrand(session.organizationId, data.orgName));
   const mail = mailerConnected()
-    ? await sendMail({ to: session.user.email, subject: `CUE weekly digest — ${data.orgName}`, text, html: renderDigestHtml(data) })
+    ? await sendMail({ to: session.user.email, subject: `CUE weekly digest — ${data.orgName}`, text, html })
     : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };
   return NextResponse.json({ sent: mail.sent, error: mail.error ?? null, preview: text });
 }

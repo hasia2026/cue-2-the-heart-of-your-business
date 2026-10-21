@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import { PRICING_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
 import PricingStudio from "./PricingStudio";
@@ -8,6 +9,7 @@ import PriceBookClient from "./PriceBookClient";
 export const dynamic = "force-dynamic";
 
 export default async function EnhancePage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const { t } = await getT();
   const orgId = session.organizationId;

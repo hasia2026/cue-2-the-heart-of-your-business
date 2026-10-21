@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
 import AmbassadorWidget from "@/components/AmbassadorWidget";
+import { getAmbassadorPersona } from "@/components/AmbassadorPersona";
 import { getT } from "@/lib/locale";
 import { TEXT_SCALE_COOKIE, getTextScalePercent } from "@/lib/text-scale";
 import { activeA11yClasses } from "@/lib/accessibility";
@@ -17,6 +18,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const jar = await cookies();
   const scale = getTextScalePercent(jar.get(TEXT_SCALE_COOKIE)?.value);
   const a11y = activeA11yClasses((name) => jar.get(name)?.value);
+  // Workspace Studio: owner-tuned Ambassador persona (null session → stock identity).
+  const persona = await getAmbassadorPersona();
   return (
     <html lang={locale} dir={rtl ? "rtl" : "ltr"} suppressHydrationWarning
       className={a11y.join(" ")}
@@ -34,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         {children}
-        <AmbassadorWidget />
+        <AmbassadorWidget persona={persona} />
       </body>
     </html>
   );

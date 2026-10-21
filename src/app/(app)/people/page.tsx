@@ -1,5 +1,6 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 import ShiftGrid, { type Cell } from "./ShiftGrid";
 import ReadingQueue, { type ReadingItem } from "./ReadingQueue";
 
@@ -9,6 +10,7 @@ const money = (n: unknown) =>
   `$${Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 export default async function PeoplePage() {
+  await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
 

@@ -1,8 +1,10 @@
 import { requireSession } from "@/lib/auth";
+import { guardWorkspaceModule } from "@/lib/guard";
 
 export const dynamic = "force-dynamic";
 
 export default async function SignalsPage() {
+  await guardWorkspaceModule();
   await requireSession();
   return (
     <div className="space-y-6">
