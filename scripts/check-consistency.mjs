@@ -15,7 +15,7 @@ const SECRET = process.env.CUE_SESSION_SECRET;
 if (!SECRET) { console.error("CUE_SESSION_SECRET missing"); process.exit(1); }
 
 const EMAIL = "demo@northgate.example";
-const PASSWORD = "cue-demo-2026";
+const PASSWORD = "northgate-demo-2026";
 
 function hashPassword(p) {
   const salt = randomBytes(16).toString("hex");

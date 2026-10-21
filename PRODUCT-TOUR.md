@@ -187,15 +187,15 @@ Two demo organizations ship side by side — pick the vertical that matches the 
 
 **Northgate Auto Group (auto dealership)**
 - OWNER: `demo@northgate.example` — placeholder, **cannot log in** by design (see demo-owner caveat below)
-- ADMIN: `marcus@northgate.example` / `demo-admin-2026`
-- MANAGER: `rachel@northgate.example` / `demo-manager-2026`
-- MEMBER: `tom@northgate.example` / `demo-member-2026`
+- ADMIN: `marcus@northgate.example` / `northgate-demo-2026`
+- MANAGER: `rachel@northgate.example` / `northgate-mgr-2026`
+- MEMBER: `tom@northgate.example` / `northgate-staff-2026`
 
 **Summit Air Heating & Cooling (HVAC)**
-- OWNER: `demo@summitair.example` / `hvac-demo-2026`
-- ADMIN: `rita@summitair.example` / `hvac-admin-2026`
-- MANAGER: `sam@summitair.example` / `hvac-manager-2026`
-- MEMBER: `chris@summitair.example` / `hvac-member-2026`
+- OWNER: `demo@summitair.example` / `summit-demo-2026`
+- ADMIN: `rita@summitair.example` / `summit-admin-2026`
+- MANAGER: `sam@summitair.example` / `summit-mgr-2026`
+- MEMBER: `chris@summitair.example` / `summit-staff-2026`
 
 What each role can do (worst for best):
 - **MEMBER** — staff: view Capture, Pipeline, Execute tasks, and the weekly schedule; read-only everywhere it counts (no approvals, no AR sends, no imports, no document edits, no schedule edits).
@@ -208,7 +208,7 @@ Walk-in-ready demo features (both industries):
 - **People → Weekly schedule** — clickable AM/PM/DBL/off grid; managers edit, everyone sees.
 - **Capture → Assign re-read** — after a policy edit, assign Everyone or a department; outstanding reads track on **People → Reading queue**.
 
-Demo-owner caveat: freshly seeded, the dealership OWNER account's hash is a placeholder and does not log in. `scripts/smoke-auth.mjs` provisions it with the `cue-demo-2026` password as part of a smoke run, so that login works immediately after running the smoke script (or re-run the script when needed — it re-upserts).
+Demo-owner caveat: freshly seeded, the dealership OWNER account's hash is a placeholder and does not log in. `scripts/smoke-auth.mjs` provisions it with the `northgate-demo-2026` password as part of a smoke run, so that login works immediately after running the smoke script (or re-run the script when needed — it re-upserts).
 
 60-second path (either org): Dashboard → **Enhance → Pricing Studio** (send a price for approval) → **Execute → Approvals** (approve it) → **Create workflow** → task assigned → **Expand → Academy** (mark a lesson done, assign a track).
 

@@ -33,7 +33,7 @@ npm run dev                 # http://localhost:3210
 
 **Pilot demo login** (after seeding):
 - Email: `demo@northgate.example`
-- Password: `cue-demo-2026`
+- Password: `northgate-demo-2026`
 
 The demo org ships with real business problems CUE detects: 7 unbilled completed service
 orders, 14 stale leads, 5 vehicles past the 60-day aging threshold, deals stuck in finance,

@@ -38,9 +38,9 @@ async function main() {
 
     // Role demo accounts — hashed with the real scheme so placeholders can
     // never authenticate. Stable demo credentials (documented in PRODUCT-TOUR):
-    //   ADMIN   marcus@northgate.example / demo-admin-2026
-    //   MANAGER rachel@northgate.example / demo-manager-2026
-    //   MEMBER  tom@northgate.example   / demo-member-2026
+    //   ADMIN   marcus@northgate.example / northgate-demo-2026
+    //   MANAGER rachel@northgate.example / northgate-mgr-2026
+    //   MEMBER  tom@northgate.example   / northgate-staff-2026
     const demoHash = (p) => {
       const salt = randomBytes(16).toString("hex");
       return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
@@ -49,20 +49,20 @@ async function main() {
     // the users_email_key constraint on prior demo accounts.
     const [adminUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('marcus@northgate.example', 'Marcus Lee (Demo)', ${demoHash("demo-admin-2026")})
+      values ('marcus@northgate.example', 'Marcus Lee (Demo)', ${demoHash("northgate-demo-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${adminUser.id}, 'ADMIN')`;
     const [memberUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('tom@northgate.example', 'Tom Alvarez (Demo)', ${demoHash("demo-member-2026")})
+      values ('tom@northgate.example', 'Tom Alvarez (Demo)', ${demoHash("northgate-staff-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${memberUser.id}, 'MEMBER')`;
     // MANAGER: the in-store manager role — edits schedules, assigns re-reads.
     const [managerUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('rachel@northgate.example', 'Rachel Kim (Demo)', ${demoHash("demo-manager-2026")})
+      values ('rachel@northgate.example', 'Rachel Kim (Demo)', ${demoHash("northgate-mgr-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${managerUser.id}, 'MANAGER')

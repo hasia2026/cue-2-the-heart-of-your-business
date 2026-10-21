@@ -29,7 +29,7 @@ const check = (name, ok, extra = "") => {
 };
 
 const OWNER_EMAIL = "demo@summitair.example";
-const OWNER_PASSWORD = "hvac-demo-2026";
+const OWNER_PASSWORD = "summit-demo-2026";
 
 /** Server-reference id matcher, tolerant of both dev-compile formats:
  *  top-level `"<id>",x.callServer,void 0,y.findSourceMapURL,"<name>"` and

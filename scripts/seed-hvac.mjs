@@ -35,36 +35,36 @@ async function main() {
     const orgId = org.id;
 
     // Demo credentials (documented in PRODUCT-TOUR.md):
-    //   OWNER   demo@summitair.example  / hvac-demo-2026
-    //   ADMIN   rita@summitair.example  / hvac-admin-2026
-    //   MANAGER sam@summitair.example   / hvac-manager-2026
-    //   MEMBER  chris@summitair.example / hvac-member-2026
+    //   OWNER   demo@summitair.example  / summit-demo-2026
+    //   ADMIN   rita@summitair.example  / summit-admin-2026
+    //   MANAGER sam@summitair.example   / summit-mgr-2026
+    //   MEMBER  chris@summitair.example / summit-staff-2026
     const demoHash = (p) => {
       const salt = randomBytes(16).toString("hex");
       return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
     };
     const [ownerUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('demo@summitair.example', 'Dana Calderon (Demo)', ${demoHash("hvac-demo-2026")})
+      values ('demo@summitair.example', 'Dana Calderon (Demo)', ${demoHash("summit-demo-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${ownerUser.id}, 'OWNER')`;
     const [adminUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('rita@summitair.example', 'Rita Vasquez (Demo)', ${demoHash("hvac-admin-2026")})
+      values ('rita@summitair.example', 'Rita Vasquez (Demo)', ${demoHash("summit-admin-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${adminUser.id}, 'ADMIN')`;
     const [memberUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('chris@summitair.example', 'Chris Boyd (Demo)', ${demoHash("hvac-member-2026")})
+      values ('chris@summitair.example', 'Chris Boyd (Demo)', ${demoHash("summit-staff-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${memberUser.id}, 'MEMBER')`;
     // MANAGER: install lead edits the roster + assigns re-reads in the demo.
     const [managerUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('sam@summitair.example', 'Sam Whitaker (Demo)', ${demoHash("hvac-manager-2026")})
+      values ('sam@summitair.example', 'Sam Whitaker (Demo)', ${demoHash("summit-mgr-2026")})
       on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${managerUser.id}, 'MANAGER')
