@@ -19,6 +19,8 @@ export const runtime = "nodejs";
  * the UI needs. Query params:
  *   customerId — required, org-scoped
  *   quoteId    — optional: an invoice id (kind SERVICE/DEAL) to quote verbatim
+ *   assemblyId — optional: a price-book assembly; its lines become the quote's
+ *                line items, each priced at its standalone or add-on rate
  *   locale     — optional override (en|es|ar|vi); else customer preference
  *   preview=1  — return rendered HTML/text without sending
  */
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const customerId = typeof body?.customerId === "string" ? body.customerId : null;
   const quoteId = typeof body?.quoteId === "string" ? body.quoteId : null;
+  const assemblyId = typeof body?.assemblyId === "string" ? body.assemblyId : null;
   const override = isLocale(body?.locale) ? (body.locale as string) : null;
   const preview = Boolean(body?.preview);
 
@@ -48,10 +51,42 @@ export async function POST(req: NextRequest) {
   const delivery = await resolveQuoteDelivery(orgId, customerId, override);
   if (!delivery) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
-  // Build the payload from an existing invoice (its line items verbatim) or
-  // from the request body for ad-hoc quotes constructed by the UI.
+  // Build the payload from an existing invoice (its line items verbatim),
+  // from a price-book assembly (lines priced per-line at standalone/add-on
+  // rates), or from the request body for ad-hoc quotes constructed by the UI.
   let quote: QuotePayload | null = null;
-  if (quoteId) {
+  if (assemblyId) {
+    const [asm] = await sql`
+      select a.name, a.description from service_assemblies a
+      where a.id = ${assemblyId} and a.organization_id = ${orgId}`;
+    if (!asm) return NextResponse.json({ error: "Assembly not found" }, { status: 404 });
+    const lines = await sql`
+      select o.name, o.description, o.parts_cost, o.labor_hours,
+        o.labor_rate_standalone, o.labor_rate_addon, i.pricing_mode
+      from service_assembly_items i
+      join service_offerings o on o.id = i.offering_id
+      where i.assembly_id = ${assemblyId}
+      order by i.position asc`;
+    if (!lines.length) return NextResponse.json({ error: "Assembly has no lines" }, { status: 422 });
+    const items = lines.map((r) => {
+      const hours = Number(r.labor_hours) || 1;
+      const rate = r.pricing_mode === "ADDON" ? Number(r.labor_rate_addon) : Number(r.labor_rate_standalone);
+      const labor = rate * hours;
+      const parts = Number(r.parts_cost) || 0;
+      const modeTag = r.pricing_mode === "ADDON" ? " (add-on rate)" : "";
+      return { description: `${r.name}${modeTag} — ${hours}h${parts ? ` + ${r.name} parts` : ""}`.slice(0, 200), amount: Math.round((labor + parts) * 100) / 100 };
+    });
+    quote = {
+      customerName: delivery.name,
+      customerEmail: delivery.email,
+      title: typeof body?.title === "string" && body.title.trim()
+        ? body.title.slice(0, 120)
+        : `Bundle — ${asm.name}`,
+      items,
+      notes: typeof body?.notes === "string" ? body.notes.slice(0, 500) : (asm.description ?? null),
+      validUntil: null,
+    };
+  } else if (quoteId) {
     const [inv] = await sql`
       select i.number, i.due_at, c.name as customer_name, c.email as customer_email
       from invoices i join customers c on c.id = i.customer_id

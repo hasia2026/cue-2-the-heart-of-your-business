@@ -49,3 +49,20 @@ create unique index if not exists service_assembly_items_unique
   on service_assembly_items(assembly_id, offering_id);
 create index if not exists service_assembly_items_org_idx
   on service_assembly_items(assembly_id);
+
+-- Feature requests / issue reports from any signed-in user straight to the
+-- builder. Subject is optional free text; every submission is also mirrored
+-- into audit_events so nothing is lost behind the feedback table alone.
+create table if not exists builder_feedback (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  user_id uuid references users(id) on delete set null,
+  kind text not null default 'FEATURE' check (kind in ('FEATURE','ISSUE')),
+  message text not null,
+  page text,
+  created_at timestamptz not null default now(),
+  -- pull-tab ack (builder marks them done; null = still open)
+  resolved_at timestamptz
+);
+create index if not exists builder_feedback_org_idx on builder_feedback(organization_id);
+create index if not exists builder_feedback_open_idx on builder_feedback(resolved_at)

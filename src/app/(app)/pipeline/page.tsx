@@ -7,6 +7,7 @@ import VisitActions from "./VisitActions";
 import LeadFollowUp from "./LeadFollowUp";
 import { parseAuthorityBands } from "@/lib/desking";
 import { LeadServiceType, DealServiceType } from "./ServiceTypeInputs";
+import BackGrossInput from "./BackGrossInput";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,24 @@ export default async function PipelinePage() {
     select id, name, email, preferred_locale from customers
     where organization_id = ${orgId} and status = 'ACTIVE'
     order by name asc limit 100`;
+  // Assemblies for the one-click bundle quote — bundle total computed with
+  // each line's saved pricing mode, matching the price-book math.
+  const assemblyRows = await sql`
+    select a.id, a.name,
+      coalesce(sum(
+        case i.pricing_mode when 'ADDON'
+          then coalesce(o.labor_rate_addon, 0) * coalesce(o.labor_hours, 1) + coalesce(o.parts_cost, 0)
+          else coalesce(o.labor_rate_standalone, 0) * coalesce(o.labor_hours, 1) + coalesce(o.parts_cost, 0)
+        end
+      ), 0)::float as bundle_total
+    from service_assemblies a
+    left join service_assembly_items i on i.assembly_id = a.id
+    left join service_offerings o on o.id = i.offering_id
+    where a.organization_id = ${orgId}
+    group by a.id, a.name order by a.name`;
+  const bundleAssemblies = assemblyRows.map((a) => ({
+    id: String(a.id), name: String(a.name), bundleTotal: Number(a.bundle_total) || 0,
+  }));
 
   // Lead-source ROI: group by the lead's origin channel and its terminal
   // (or open) status so an owner can see "referral beats GMB" with dollars,
@@ -163,7 +182,7 @@ export default async function PipelinePage() {
       <section className="card p-5">
         <h2 className="section-title mb-1">Send a localized quote</h2>
         <p className="muted mb-3 text-xs">Goes out in the household's language — their stored preference wins unless you override it here. Email via Resend when connected; audit-logged either way.</p>
-        <QuoteSender customers={quoteCustomers as never} />
+        <QuoteSender customers={quoteCustomers as never} assemblies={bundleAssemblies} />
       </section>
 
       {/* AR automation: draft-first payment reminders in the customer's language. */}
@@ -298,7 +317,7 @@ export default async function PipelinePage() {
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                     <span className="badge-blue">front {money(d.front)}</span>
-                    <span className="badge-purple">back {money(d.back)}</span>
+                    <BackGrossInput dealId={d.id} value={d.back} canEdit={session.role !== "MEMBER"} />
                     <span className="badge-green">total {money(d.total)}</span>
                     <span className="text-navy-300">discount {money(d.discount)} · {d.closer}</span>
                   </div>

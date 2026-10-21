@@ -7,8 +7,10 @@ import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 
 // Every captured document can be viewed, edited, moved, shared, or deleted.
-// All actions are org-scoped and audited; delete/move are OWNER/ADMIN only
-// (MEMBER keeps view + share, matching the app's role-gate pattern).
+// All actions are org-scoped and audited. Managers and above manage
+// documents (including assigning re-reads — service managers push SOP
+// updates to their techs); delete/move stay OWNER/ADMIN; MEMBER keeps
+// view + share, matching the app's role-gate pattern.
 
 async function ownedDoc(orgId: string, docId: string) {
   const [doc] = await sql`select id, title from documents where id = ${docId} and organization_id = ${orgId}`;
@@ -17,12 +19,12 @@ async function ownedDoc(orgId: string, docId: string) {
 }
 
 function canManage(role: string): boolean {
-  return role === "OWNER" || role === "ADMIN";
+  return role === "OWNER" || role === "ADMIN" || role === "MANAGER";
 }
 
 export async function renameDocument(docId: string, title: string): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSessionAction();
-  if (!canManage(session.role)) return { ok: false, error: "Only Owners and Admins can rename documents." };
+  if (!canManage(session.role)) return { ok: false, error: "Only owners, admins and managers can rename documents." };
   const clean = title.trim();
   if (!clean) return { ok: false, error: "Title cannot be empty." };
   const doc = await ownedDoc(session.organizationId, docId);
@@ -35,7 +37,7 @@ export async function renameDocument(docId: string, title: string): Promise<{ ok
 
 export async function moveDocument(docId: string, departmentId: string | null): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSessionAction();
-  if (!canManage(session.role)) return { ok: false, error: "Only Owners and Admins can move documents." };
+  if (!canManage(session.role)) return { ok: false, error: "Only owners, admins and managers can move documents." };
   const doc = await ownedDoc(session.organizationId, docId);
   let dept: string | null = null;
   if (departmentId) {
@@ -51,7 +53,7 @@ export async function moveDocument(docId: string, departmentId: string | null): 
 
 export async function editDocumentText(docId: string, extractedText: string): Promise<{ ok: boolean; error?: string }> {
   const session = await requireSessionAction();
-  if (!canManage(session.role)) return { ok: false, error: "Only Owners and Admins can edit document content." };
+  if (!canManage(session.role)) return { ok: false, error: "Only owners, admins and managers can edit document content." };
   const doc = await ownedDoc(session.organizationId, docId);
   await sql`update documents set extracted_text = ${extractedText.slice(0, 20000)} where id = ${doc.id}`;
   await sql`update knowledge_items set content = ${extractedText.slice(0, 20000)} where document_id = ${doc.id}`;
@@ -90,7 +92,7 @@ export async function assignReRead(
   note: string
 ): Promise<{ ok: boolean; assigned?: number; error?: string }> {
   const session = await requireSessionAction();
-  if (!canManage(session.role)) return { ok: false, error: "Only Owners and Admins can assign re-reads." };
+  if (!canManage(session.role)) return { ok: false, error: "Only owners, admins and managers can assign re-reads." };
   const doc = await ownedDoc(session.organizationId, docId);
 
   // Audience: ACTIVE employees everywhere or one department — resolved

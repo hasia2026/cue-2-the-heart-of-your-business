@@ -6,6 +6,7 @@ import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
 import TextSizePicker from "@/components/TextSizePicker";
+import BuilderFeedbackForm from "./BuilderFeedbackForm";
 import AccessibilityToggles from "@/components/AccessibilityToggles";
 import { getT } from "@/lib/locale";
 import type { DictKey } from "@/lib/i18n";
@@ -282,6 +283,14 @@ export default async function SettingsPage({
               </li>
             ))}
           </ul>
+        </section>
+
+        {/* Message the builder — every role, no ceremony. The owner asked for
+            a direct line from any CUE user to feature requests/issues. */}
+        <section className="card p-6">
+          <h2 className="section-title mb-1">Message the builder</h2>
+          <p className="muted mb-3 text-xs">Feature requests and broken things, straight to the person building CUE — no queue, no ticket bot. Every role sees this box.</p>
+          <BuilderFeedbackForm userName={session.user.email ?? "you"} />
         </section>
 
         <section className="card p-6">
