@@ -34,9 +34,9 @@ LANDING PAGE     →  free "Revenue Leak Scan" (the hook)
    ↓
 SCAN CALL        →  20-min screen-share on THEIR numbers (the proof)
    ↓
-PILOT            →  30 days, one store, success metric agreed upfront
+PILOT            →  14 days, one store, success metric agreed upfront
    ↓
-CONVERT          →  annual contract at $299–799/mo after the scan proves value
+CONVERT          →  founding-member rate $99/mo locked for life during the pilot window; regular pricing after
 ```
 
 ### Stage 1 — Awareness (pick two, don't spread thin)
@@ -63,7 +63,7 @@ CONVERT          →  annual contract at $299–799/mo after the scan proves val
 
 This works because the software *is* the sales demo. No slideware.
 
-### Stage 4 — Pilot (30 days, one store, $0 or $199 setup)
+### Stage 4 — Pilot (14 days, one store, $0 or $99 founding-member rate)
 - Scope: one location, service dept + leads board only. Don't onboard everything.
 - **Agree one success metric before starting** — e.g. "100% of completed ROs invoiced
   within 48h" or "every lead contacted within 24h for 2 weeks straight."
@@ -84,9 +84,9 @@ Anchor to recovered revenue, not seats. Recommended structure:
 
 | Tier | Price | Who | What's included |
 |---|---|---|---|
-| **Pilot** | $0–199 one-time | One store, 30 days | Full CUE, one location, service + leads |
-| **Operator** | **$299/mo** | Single store | All modules, 10 seats, email support |
-| **Group** | **$799/mo** | 2–5 stores | Multi-location rollup, consolidated health scores, priority support |
+| **Pilot** | 14 days free | One store | Full CUE, one location, service + leads |
+| **Founding member** | **$99/mo locked for life** | Single store | All modules, 10 seats, email support — rate never rises once joined |
+| **Group** | **custom** | 2–5 stores | Multi-location rollup, consolidated health scores, priority support |
 | **Franchise/OEM** | $2,500+/mo | 10+ rooftops or a brand | White-label, API, dedicated success |
 
 Rules of thumb:
@@ -107,9 +107,9 @@ credible pilot platform, not a mockup.
 
 Build next for the raise:
 1. **One-page deck** — Problem (leaked revenue) → Solution (CUE scans records, not vibes) →
-   Demo screenshots → Pilot pricing → Market (25k dealers × $299–799/mo → $60–240M TAM) →
+   Demo screenshots → Founding-member $99/mo pricing → Market (25k dealers × $99/mo+ → $30M+ TAM, growing with group tiers) →
    Roadmap (Home Services, Hospitality packs) → Ask.
-2. **The pilot report as exhibit A** — nothing sells like "we found $31k in 30 days."
+2. **The pilot report as exhibit A** — nothing sells like "we found $31k in 14 days."
 3. **Metrics to instrument now** (so the raise has numbers): pilots started, leaks detected
    per store, dollars recovered, conversion pilot→paid, churn.
 
@@ -139,7 +139,7 @@ Build next for the raise:
 Week 1: 2 landing pages live (leak score + scan booking), 100 DMs to GMs, 3 dealer-group posts.
 Week 2: 5 scan calls, 2 pilots started. Instrument everything (even a spreadsheet).
 Week 3: 2 more pilots; publish one screenshot-as-case-study per pilot with permission.
-Week 4: Convert 1–2 to annual; raise the founding-customer price to $299.
+Week 2: Convert 1–2 to founding members at $99/mo locked for life — the pilot window is the only entry to that rate.
 Success at day 30 = 5 pilots, 2 conversions, 1 documented case study. That's the seed of everything else.
 
 ---
