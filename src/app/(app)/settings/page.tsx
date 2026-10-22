@@ -220,6 +220,7 @@ export default async function SettingsPage({
           saveBranding={saveBranding}
           saveModules={saveModules}
           logoUrl={(ws.brandLogoUrl ?? "").includes("/api/workspace/logo/") ? ws.brandLogoUrl : null}
+          orgId={session.organizationId}
         />
         <div className="mt-4">
           <a href="/onboarding" className="text-xs text-cyan-300 hover:underline">Re-run the guided setup →</a>

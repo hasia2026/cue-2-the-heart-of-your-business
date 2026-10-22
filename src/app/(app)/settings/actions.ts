@@ -250,7 +250,7 @@ export async function savePersona(formData: FormData) {
   const toneRaw = String(formData.get("tone") ?? "").trim();
   await upsertWorkspaceProfile(orgId, {
     ambassador_name: cleanText(formData.get("ambassadorName"), 40),
-    ambassador_avatar: cleanText(formData.get("ambassadorAvatar"), 8),
+    ambassador_avatar: cleanText(formData.get("ambassadorAvatar"), 32),
     ambassador_tone: TONES.includes(toneRaw as AmbassadorTone) ? toneRaw : null,
     ambassador_greeting: cleanText(formData.get("ambassadorGreeting"), 200),
   });
@@ -447,5 +447,57 @@ export async function removeLogo() {
   });
   revalidatePath("/settings");
   revalidatePath("/onboarding");
+  return { ok: true as const, error: null };
+}
+
+// ── Ambassador avatar photo ────────────────────────────────────────────
+// Same shape as the workspace logo: bytes stored per org in a table,
+// served by a small route, URL stored on the profile (photo beats emoji).
+const AVATAR_MAX_BYTES = 200 * 1024;
+const AVATAR_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export async function uploadAvatar(formData: FormData) {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+
+  const file = formData.get("avatar") as File | null;
+  if (!file || file.size === 0) return { ok: false as const, error: "Choose an image file first." };
+  if (!AVATAR_MIMES.has(file.type)) {
+    return { ok: false as const, error: "Avatar must be a PNG, JPEG, or WebP photo (no PDFs or GIFs)." };
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return { ok: false as const, error: `Avatar is too large (${Math.round(file.size / 1024)} KB) — 200 KB max.` };
+  }
+
+  const data = Buffer.from(await file.arrayBuffer());
+  await sql`
+    insert into workspace_avatars (organization_id, mime, data, updated_at)
+    values (${orgId}, ${file.type}, ${data}, now())
+    on conflict (organization_id) do update set
+      mime = excluded.mime, data = excluded.data, updated_at = now()`;
+  const avatarUrl = `/api/workspace/avatar/${orgId}`;
+  await upsertWorkspaceProfile(orgId, { ambassador_avatar_url: avatarUrl });
+
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_AVATAR_UPLOADED",
+    detail: `Ambassador photo uploaded (${file.type}, ${Math.round(file.size / 1024)} KB)`,
+  });
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  return { ok: true as const, error: null };
+}
+
+export async function removeAvatar() {
+  const session = await requireStudioWriter();
+  const orgId = session.organizationId;
+  await sql`delete from workspace_avatars where organization_id = ${orgId}`;
+  await sql`update workspace_profiles set ambassador_avatar_url = null where organization_id = ${orgId}`;
+  await logAudit({
+    organizationId: orgId, actorId: session.user.id,
+    action: "WORKSPACE_AVATAR_REMOVED", detail: "Ambassador photo removed",
+  });
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
   return { ok: true as const, error: null };
 }

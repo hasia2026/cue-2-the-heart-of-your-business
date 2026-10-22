@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { WorkspaceProfile } from "@/lib/workspace-profile";
 import type { ModuleDef } from "@/lib/modules";
+import EmojiPicker from "@/components/EmojiPicker";
 
 type SaveAction = (formData: FormData) => Promise<void>;
 
@@ -68,7 +69,9 @@ export default function OnboardingWizard({
           </div>
           <div>
             <label className="label" htmlFor="obAvatar">Pick its avatar (any emoji)</label>
-            <input id="obAvatar" name="ambassadorAvatar" defaultValue={profile.ambassadorAvatar ?? ""} className="input" placeholder="🦋" maxLength={8} />
+            <div id="obAvatar">
+              <EmojiPicker name="ambassadorAvatar" defaultValue={profile.ambassadorAvatar ?? ""} label="Pick its avatar (any emoji)" />
+            </div>
           </div>
           <div className="md:col-span-2">
             <label className="label" htmlFor="obGreeting">What it says when opened</label>

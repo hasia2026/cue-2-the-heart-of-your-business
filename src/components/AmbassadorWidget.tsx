@@ -8,6 +8,8 @@ type Msg = { role: "user" | "ambassador"; text: string; mode?: string };
 export type AmbassadorPersona = {
   name: string;
   avatar: string;
+  /** Uploaded photo (Workspace Studio) — shown instead of the emoji when set. */
+  avatarUrl?: string | null;
   greeting: string | null;
   tone: string | null;
 };
@@ -16,7 +18,7 @@ const SPEECH_LANG: Record<string, string> = { en: "en-US", ar: "ar-SA", es: "es-
 const AUTO_SPEAK_KEY = "cue-amb-auto-speak";
 
 export default function AmbassadorWidget({
-  persona = { name: "AI Ambassador", avatar: "🦋", greeting: null, tone: null },
+  persona = { name: "AI Ambassador", avatar: "🦋", avatarUrl: null, greeting: null, tone: null },
 }: {
   persona?: AmbassadorPersona;
 } = {}) {
@@ -286,7 +288,12 @@ export default function AmbassadorWidget({
           }`}
           aria-label={t("amb.open")}
         >
-          <span aria-hidden>{persona.avatar}</span>
+          {persona.avatarUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={persona.avatarUrl} alt="" aria-hidden className="h-14 w-14 rounded-full object-cover" />
+          ) : (
+            <span aria-hidden>{persona.avatar}</span>
+          )}
         </button>
       )}
 
@@ -297,7 +304,14 @@ export default function AmbassadorWidget({
           }`}
         >
           <div className="flex items-center gap-3 border-b border-white/10 bg-gradient-to-r from-violet-600/30 to-cyan-500/20 px-4 py-3">
-            <span className="cue-halo inline-flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/20 text-xl">{persona.avatar}</span>
+            <span className="cue-halo inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-violet-500/20 text-xl">
+              {persona.avatarUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={persona.avatarUrl} alt="" className="h-10 w-10 object-cover" />
+              ) : (
+                persona.avatar
+              )}
+            </span>
             <div className="flex-1">
               <div className="text-sm font-semibold text-white">{persona.name}</div>
               <div className="text-[10px] uppercase tracking-[0.25em] text-violet-300/80">

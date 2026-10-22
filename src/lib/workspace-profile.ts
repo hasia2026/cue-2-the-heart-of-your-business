@@ -11,6 +11,8 @@ export type ModuleState = { enabled: boolean; label: string | null };
 export type WorkspaceProfile = {
   ambassadorName: string | null;
   ambassadorAvatar: string | null;
+  /** Uploaded avatar photo — beats the emoji whenever it is set. */
+  ambassadorAvatarUrl: string | null;
   ambassadorTone: AmbassadorTone | null;
   ambassadorGreeting: string | null;
   brandNameOverride: string | null;
@@ -26,6 +28,7 @@ export type WorkspaceProfile = {
 export const DEFAULT_WORKSPACE_PROFILE: WorkspaceProfile = {
   ambassadorName: null,
   ambassadorAvatar: null,
+  ambassadorAvatarUrl: null,
   ambassadorTone: null,
   ambassadorGreeting: null,
   brandNameOverride: null,
@@ -72,6 +75,7 @@ function normalizeSetup(raw: unknown): Partial<Record<"persona" | "branding" | "
 type Row = {
   ambassador_name: string | null;
   ambassador_avatar: string | null;
+  ambassador_avatar_url: string | null;
   ambassador_tone: string | null;
   ambassador_greeting: string | null;
   brand_name: string | null;
@@ -87,7 +91,7 @@ type Row = {
 /** Workspace profile for an org — always resolves (defaults when the row is absent). */
 export async function getWorkspaceProfile(orgId: string): Promise<WorkspaceProfile> {
   const rows = await sql`
-    select ambassador_name, ambassador_avatar, ambassador_tone, ambassador_greeting,
+    select ambassador_name, ambassador_avatar, ambassador_avatar_url, ambassador_tone, ambassador_greeting,
            brand_name, brand_logo_url, brand_accent, brand_contact_phone, brand_contact_email,
            theme_default, modules, setup_completed
     from workspace_profiles where organization_id = ${orgId}`;
@@ -95,7 +99,12 @@ export async function getWorkspaceProfile(orgId: string): Promise<WorkspaceProfi
   const r = rows[0] as Row;
   return {
     ambassadorName: r.ambassador_name?.slice(0, 40) ?? null,
-    ambassadorAvatar: r.ambassador_avatar?.slice(0, 8) ?? null,
+    // 32 = ample room for multi-code-unit glyphs (skin tones, ZWJ sequence
+    // family emojis run ~25 UTF-16 units) — trimmed in one place on read.
+    // 32 = ample room for multi-code-unit glyphs (skin tones, ZWJ sequence
+    // family emojis run ~25 UTF-16 units) — trimmed in one place on read.
+    ambassadorAvatar: r.ambassador_avatar?.slice(0, 32) ?? null,
+    ambassadorAvatarUrl: r.ambassador_avatar_url?.slice(0, 300) ?? null,
     ambassadorTone: TONES.includes(r.ambassador_tone as AmbassadorTone) ? (r.ambassador_tone as AmbassadorTone) : null,
     ambassadorGreeting: r.ambassador_greeting?.slice(0, 200) ?? null,
     brandNameOverride: r.brand_name?.slice(0, 120) ?? null,
@@ -124,6 +133,7 @@ export function validAccent(input: string | null | undefined): string | null {
 export type UpsertInput = {
   ambassador_name?: string | null;
   ambassador_avatar?: string | null;
+  ambassador_avatar_url?: string | null;
   ambassador_tone?: string | null;
   ambassador_greeting?: string | null;
   brand_name?: string | null;
@@ -139,10 +149,11 @@ export type UpsertInput = {
 /** Lazy upsert — creates the row on first save; existing orgs never get one until they save. */
 export async function upsertWorkspaceProfile(orgId: string, patch: UpsertInput): Promise<void> {
   await sql`
-    insert into workspace_profiles (organization_id, ambassador_name, ambassador_avatar, ambassador_tone,
+    insert into workspace_profiles (organization_id, ambassador_name, ambassador_avatar, ambassador_avatar_url, ambassador_tone,
       ambassador_greeting, brand_name, brand_logo_url, brand_accent, brand_contact_phone, brand_contact_email,
       theme_default, modules, setup_completed)
     values (${orgId}, ${patch.ambassador_name ?? null}, ${patch.ambassador_avatar ?? null},
+      ${patch.ambassador_avatar_url ?? null},
       ${patch.ambassador_tone ?? null}, ${patch.ambassador_greeting ?? null}, ${patch.brand_name ?? null},
       ${patch.brand_logo_url ?? null}, ${patch.brand_accent ?? null}, ${patch.brand_contact_phone ?? null},
       ${patch.brand_contact_email ?? null}, ${patch.theme_default ?? null},
@@ -150,6 +161,7 @@ export async function upsertWorkspaceProfile(orgId: string, patch: UpsertInput):
     on conflict (organization_id) do update set
       ambassador_name = coalesce(excluded.ambassador_name, workspace_profiles.ambassador_name),
       ambassador_avatar = coalesce(excluded.ambassador_avatar, workspace_profiles.ambassador_avatar),
+      ambassador_avatar_url = coalesce(excluded.ambassador_avatar_url, workspace_profiles.ambassador_avatar_url),
       ambassador_tone = coalesce(excluded.ambassador_tone, workspace_profiles.ambassador_tone),
       ambassador_greeting = coalesce(excluded.ambassador_greeting, workspace_profiles.ambassador_greeting),
       brand_name = coalesce(excluded.brand_name, workspace_profiles.brand_name),

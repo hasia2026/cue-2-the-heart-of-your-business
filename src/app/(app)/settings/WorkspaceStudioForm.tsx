@@ -3,7 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import type { WorkspaceProfile } from "@/lib/workspace-profile";
 import type { ModuleDef } from "@/lib/modules";
-import { uploadLogo, removeLogo, previewBranding } from "./actions";
+import EmojiPicker from "@/components/EmojiPicker";
+import { uploadLogo, removeLogo, uploadAvatar, removeAvatar, previewBranding } from "./actions";
 
 type SaveAction = (formData: FormData) => Promise<void>;
 
@@ -27,6 +28,7 @@ export default function WorkspaceStudioForm({
   saveBranding,
   saveModules,
   logoUrl,
+  orgId,
 }: {
   profile: WorkspaceProfile;
   modules: ModuleDef[];
@@ -34,6 +36,7 @@ export default function WorkspaceStudioForm({
   saveBranding: SaveAction;
   saveModules: SaveAction;
   logoUrl: string | null;
+  orgId: string;
 }) {
   const [tab, setTab] = useState<"persona" | "branding" | "modules">("persona");
   const brandingRef = useRef<HTMLFormElement>(null);
@@ -43,6 +46,49 @@ export default function WorkspaceStudioForm({
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoMsg, setLogoMsg] = useState<string | null>(null);
   const [currentLogo, setCurrentLogo] = useState<string | null>(logoUrl);
+
+  // ── Avatar photo state (photo beats the emoji whenever it is set) ──
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile.ambassadorAvatarUrl);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+
+  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarBusy(true);
+    setAvatarMsg(null);
+    const fd = new FormData();
+    fd.append("avatar", file);
+    try {
+      const res = await uploadAvatar(fd);
+      if (res.ok) {
+        setAvatarUrl(`/api/workspace/avatar/${orgId}`);
+        setAvatarMsg("Photo uploaded ✓ — the bubble now shows it everywhere.");
+      } else {
+        setAvatarMsg(res.error ?? "Upload failed.");
+      }
+    } catch {
+      setAvatarMsg("Upload failed — try again.");
+    } finally {
+      setAvatarBusy(false);
+      if (avatarFileRef.current) avatarFileRef.current.value = "";
+    }
+  }
+
+  async function onRemoveAvatar() {
+    setAvatarBusy(true);
+    setAvatarMsg(null);
+    try {
+      await removeAvatar();
+      setAvatarUrl(null);
+      setAvatarMsg("Photo removed — back to the emoji.");
+    } catch {
+      setAvatarMsg("Removal failed — try again.");
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
 
   async function onLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -140,9 +186,36 @@ export default function WorkspaceStudioForm({
             <label className="label" htmlFor="wsAmbName">Ambassador name</label>
             <input id="wsAmbName" name="ambassadorName" defaultValue={profile.ambassadorName ?? ""} className="input" placeholder="Revi" maxLength={40} />
           </div>
-          <div>
-            <label className="label" htmlFor="wsAvatar">Avatar emoji</label>
-            <input id="wsAvatar" name="ambassadorAvatar" defaultValue={profile.ambassadorAvatar ?? ""} className="input" placeholder="🦋" maxLength={8} />
+          <div className="md:col-span-2">
+            <span className="label">Avatar — pick any emoji, or upload a photo</span>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="min-w-[220px] flex-1">
+                <EmojiPicker name="ambassadorAvatar" defaultValue={profile.ambassadorAvatar ?? ""} label="Avatar emoji" />
+              </div>
+              <div className="min-w-[240px] flex-1">
+                <div className="flex items-center gap-2">
+                  {avatarUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={avatarUrl} alt="Current ambassador photo" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/20" />
+                      <button type="button" onClick={onRemoveAvatar} disabled={avatarBusy} className="btn-ghost !px-2 !py-1 text-xs">Remove photo</button>
+                    </>
+                  ) : (
+                    <span className="muted text-xs">No photo yet — the emoji above is shown.</span>
+                  )}
+                </div>
+                <input
+                  ref={avatarFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={onAvatarChange}
+                  disabled={avatarBusy}
+                  className="input mt-2 !py-1.5 text-xs"
+                  aria-label="Upload an avatar photo (PNG, JPEG or WebP, up to 200 KB)"
+                />
+                {avatarMsg && <p className="muted mt-1 text-xs" role="status">{avatarMsg}</p>}
+              </div>
+            </div>
           </div>
           <div className="md:col-span-2">
             <label className="label" htmlFor="wsGreeting">Greeting (first thing it says when opened)</label>
