@@ -11,6 +11,7 @@ import {
   quoteLocale,
 } from "@/lib/quote";
 import { rateLimitResult } from "@/lib/rate-limit";
+import { signupUrlIfPlans } from "@/lib/plan-links";
 
 export const runtime = "nodejs";
 
@@ -119,18 +120,24 @@ export async function POST(req: NextRequest) {
   if (!quote) return NextResponse.json({ error: "quoteId or items required" }, { status: 400 });
 
   const effectiveLocale = quoteLocale(delivery.locale);
+  // Tracked plan sign-up CTA — only when the org actually publishes plans.
+  const plansUrl = await signupUrlIfPlans(orgId, {
+    source: "QUOTE",
+    ref: quoteId,
+    locale: effectiveLocale,
+  });
   if (!preview) {
     if (!quote.customerEmail) {
       return NextResponse.json({ error: "Customer has no email on file" }, { status: 422 });
     }
     // send path below
-    const sent = await sendQuoteEmail({ orgId, quote, locale: effectiveLocale });
+    const sent = await sendQuoteEmail({ orgId, quote, locale: effectiveLocale, plansUrl });
     return NextResponse.json({ ...quote, ...sent, localeSource: delivery.source });
   }
 
   return NextResponse.json({
-    previewText: renderQuoteText(quote, effectiveLocale),
-    previewHtml: renderQuoteHtml(quote, effectiveLocale),
+    previewText: renderQuoteText(quote, effectiveLocale, plansUrl),
+    previewHtml: renderQuoteHtml(quote, effectiveLocale, undefined, plansUrl),
     locale: effectiveLocale,
     localeSource: delivery.source,
   });

@@ -4,6 +4,7 @@ import { buildDigestData, renderDigest, renderDigestHtml, digestBrand } from "@/
 import { mailerConnected, sendMail } from "@/lib/mailer";
 import { whatsappConnected, sendWhatsAppText } from "@/lib/whatsapp";
 import { logAudit } from "@/lib/audit";
+import { signupUrlIfPlans } from "@/lib/plan-links";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -44,7 +45,11 @@ export async function GET(req: NextRequest) {
       }
       const data = await buildDigestData(org.id);
       const text = renderDigest(data);
-      const html = renderDigestHtml(data, await digestBrand(org.id, data.orgName));
+      const plansUrl = await signupUrlIfPlans(org.id, {
+        source: "DIGEST",
+        ref: new Date().toISOString().slice(0, 10),
+      });
+      const html = renderDigestHtml(data, await digestBrand(org.id, data.orgName), plansUrl);
       const mail = mailerConnected()
         ? await sendMail({ to: org.owner_email, subject: `CUE weekly digest — ${data.orgName}`, text, html })
         : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };

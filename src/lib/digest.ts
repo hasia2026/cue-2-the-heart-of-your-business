@@ -134,8 +134,10 @@ export async function digestBrand(orgId: string, orgName: string): Promise<Diges
   };
 }
 
-/** HTML rendering — same builder data, four styled cards; plain text is the fallback. */
-export function renderDigestHtml(d: DigestData, brand?: DigestBrand): string {
+/** HTML rendering — same builder data, four styled cards; plain text is the fallback.
+ *  plansUrl, when the org has signup links enabled, appends the tracked
+ *  "sign up for a maintenance plan" CTA (spec §3). */
+export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: string | null): string {
   const accent = brand?.accent ?? "#7c6cff";
   const brandLine = brand?.name ? esc(brand.name) : "CUE";
   const logo = brand?.logo
@@ -158,6 +160,7 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand): string {
       ${card(d.actionItems, "#7c6cff")}
       ${card(d.approvedThisWeek, "#22d3ee")}
       ${card(d.moneyFound, "#34d399")}
+      ${plansUrl ? `<div style="text-align:center;margin-top:18px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">Sign up for a maintenance plan →</a></div>` : ""}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>
       ${contactFooter}
     </div>

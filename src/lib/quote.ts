@@ -42,6 +42,7 @@ const L: Record<string, Record<string, string>> = {
     notes: "Notes",
     accept: "Reply to this email to accept or ask any question — we answer same day.",
     closing: "Thank you for the opportunity to earn your business.",
+    planCta: "Sign up for a maintenance plan →",
   },
   es: {
     heading: "Su cotización de",
@@ -51,6 +52,7 @@ const L: Record<string, Record<string, string>> = {
     notes: "Notas",
     accept: "Responda a este correo para aceptar o hacer cualquier pregunta — contestamos el mismo día.",
     closing: "Gracias por la oportunidad de servirle.",
+    planCta: "Regístrese en un plan de mantenimiento →",
   },
   ar: {
     heading: "عرض السعر من",
@@ -60,6 +62,7 @@ const L: Record<string, Record<string, string>> = {
     notes: "ملاحظات",
     accept: "قم بالرد على هذا البريد للقبول أو لأي سؤال — نجيب في نفس اليوم.",
     closing: "شكرًا لمنحنا فرصة خدمتك.",
+    planCta: "سجّل في خطة صيانة →",
   },
   vi: {
     heading: "Báo giá từ",
@@ -69,6 +72,7 @@ const L: Record<string, Record<string, string>> = {
     notes: "Ghi chú",
     accept: "Vui lòng trả lời email này để chấp nhận hoặc hỏi bất cứ điều gì — chúng tôi trả lời trong ngày.",
     closing: "Cảm ơn quý khách đã cho chúng tôi cơ hội phục vụ.",
+    planCta: "Đăng ký gói bảo trì →",
   },
 };
 
@@ -76,7 +80,7 @@ export function quoteLocale(locale: string | null | undefined): string {
   return locale && locale in L ? locale : "en";
 }
 
-export function renderQuoteText(q: QuotePayload, locale: string | null | undefined): string {
+export function renderQuoteText(q: QuotePayload, locale: string | null | undefined, plansUrl?: string | null): string {
   const t = L[quoteLocale(locale)];
   const total = q.items.reduce((s, i) => s + i.amount, 0);
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
@@ -90,6 +94,9 @@ export function renderQuoteText(q: QuotePayload, locale: string | null | undefin
     q.notes ? `${t.notes}: ${q.notes}` : "",
     "",
     t.accept,
+    // Sign-up CTA (spec §3): plain URL line so the text fallback carries the
+    // plan offer too.
+    ...(plansUrl ? [t.planCta ?? "", plansUrl] : []),
     t.closing,
   ].filter(Boolean).join("\n");
 }
@@ -98,6 +105,7 @@ export function renderQuoteHtml(
   q: QuotePayload,
   locale: string | null | undefined,
   brand?: { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null },
+  plansUrl?: string | null,
 ): string {
   const t = L[quoteLocale(locale)];
   const esc = (s: string) =>
@@ -128,6 +136,7 @@ export function renderQuoteHtml(
     ${q.notes ? `<div style="font-size:12px;color:#8b93b8;margin-top:4px;">${esc(t.notes)}: ${esc(q.notes)}</div>` : ""}
   </div>
   <div style="font-size:13px;color:#c9cdea;line-height:1.5;">${esc(t.accept)}<br/>${esc(t.closing)}</div>
+  ${plansUrl ? `<div style="text-align:center;margin-top:16px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">${esc(t.planCta ?? "Sign up for a maintenance plan →")}</a></div>` : ""}
   ${contactFooter}
 </div></body></html>`;
 }
@@ -160,6 +169,8 @@ export async function sendQuoteEmail(opts: {
   quote: QuotePayload;
   locale: string;
   subjectNote?: string;
+  /** Resolved by the caller via lib/plan-links.signupUrl — builders stay pure. */
+  plansUrl?: string | null;
 }): Promise<{ connected: boolean; sent: boolean; error?: string; langUsed: string }> {
   const { quote: q, locale } = opts;
   const subject = `${L[quoteLocale(locale)].heading} — ${q.title}`;
@@ -168,8 +179,8 @@ export async function sendQuoteEmail(opts: {
     ? await sendMail({
         to: q.customerEmail!,
         subject,
-        text: renderQuoteText(q, locale),
-        html: renderQuoteHtml(q, locale, brand),
+        text: renderQuoteText(q, locale, opts.plansUrl),
+        html: renderQuoteHtml(q, locale, brand, opts.plansUrl),
       })
     : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };
 

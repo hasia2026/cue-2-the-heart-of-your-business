@@ -5,6 +5,7 @@ import { buildDigestData, renderDigest, renderDigestHtml, digestBrand } from "@/
 import { mailerConnected, sendMail } from "@/lib/mailer";
 import { whatsappConnected, sendWhatsAppText } from "@/lib/whatsapp";
 import { rateLimitResult } from "@/lib/rate-limit";
+import { signupUrlIfPlans } from "@/lib/plan-links";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,12 @@ export async function GET(req: Request) {
 
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);
-  const html = renderDigestHtml(data, await digestBrand(session.organizationId, data.orgName));
+  // Tracked plan CTA attributed to this digest send (ISO date as the week ref).
+  const plansUrl = await signupUrlIfPlans(session.organizationId, {
+    source: "DIGEST",
+    ref: new Date().toISOString().slice(0, 10),
+  });
+  const html = renderDigestHtml(data, await digestBrand(session.organizationId, data.orgName), plansUrl);
   const subject = `CUE weekly digest — ${data.orgName}`;
 
   const url = new URL(req.url);
@@ -60,7 +66,11 @@ export async function POST() {
   }
   const data = await buildDigestData(session.organizationId);
   const text = renderDigest(data);
-  const html = renderDigestHtml(data, await digestBrand(session.organizationId, data.orgName));
+  const plansUrl = await signupUrlIfPlans(session.organizationId, {
+    source: "DIGEST",
+    ref: new Date().toISOString().slice(0, 10),
+  });
+  const html = renderDigestHtml(data, await digestBrand(session.organizationId, data.orgName), plansUrl);
   const mail = mailerConnected()
     ? await sendMail({ to: session.user.email, subject: `CUE weekly digest — ${data.orgName}`, text, html })
     : { connected: false, sent: false, error: "Email not connected (RESEND_API_KEY missing)" };
