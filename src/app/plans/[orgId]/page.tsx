@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import { planSignup } from "./actions";
+import SubmitButton from "./SubmitButton";
 
 type Plan = { id: string; name: string; blurb: string | null; annual_value: number; visits_per_year: number | null; featured: boolean };
 
@@ -127,8 +128,10 @@ export default async function PlansPage({
     order by featured desc, position asc, name asc`;
   const plans = rows as unknown as Plan[];
 
-  const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+  const money = (n: number) => usd.format(n);
+  // JSX auto-escapes text nodes — no HTML-escaping helper needed (an esc()
+  // here once rendered "&AMP;" literally since JSX shows entities verbatim).
   const ERR_KEYS: Record<string, string> = { contact: "errContact", name: "errName", plan: "errPlan", rate: "errRate" };
   const stringsAll = t as Record<string, string>;
   const err = sp.err ? stringsAll[ERR_KEYS[sp.err] ?? "errContact"] : null;
@@ -136,10 +139,10 @@ export default async function PlansPage({
   const ThankYou = (
     <div className="mx-auto mt-16 max-w-md text-center" dir={lang === "ar" ? "rtl" : undefined}>
       <div className="card p-8">
-        <div className="text-4xl">✅</div>
+        <div className="text-4xl" aria-hidden="true">✅</div>
         <h1 className="page-title mt-3">{t.doneHead}</h1>
         <p className="page-sub">{t.doneBody}</p>
-        {contactBits && <p className="muted mt-2 text-sm">{esc(contactBits)}</p>}
+        {contactBits && <p className="muted mt-2 text-sm">{contactBits}</p>}
       </div>
     </div>
   );
@@ -149,21 +152,21 @@ export default async function PlansPage({
     <header className="mb-8 text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {logo && <img src={logo} alt="" className="mx-auto mb-4 block max-h-16 max-w-[220px] object-contain" />}
-      <div className="eyebrow" style={{ color: accent }}>{esc(brand)} · {t.eyebrow}</div>
+      <div className="eyebrow" style={{ color: accent }}>{brand} · {t.eyebrow}</div>
       <h1 className="page-title">{t.heading}</h1>
       <p className="page-sub">{t.sub}</p>
     </header>
   );
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10" dir={lang === "ar" ? "rtl" : undefined}>
+    <div className="mx-auto max-w-3xl px-4 py-10" lang={lang} dir={lang === "ar" ? "rtl" : undefined}>
       {banner}
 
-      {err && <p className="badge badge-orange mb-4 block text-center">{err}</p>}
+      {err && <p className="badge badge-orange mb-4 block text-center" role="alert">{err}</p>}
 
       {plans.length === 0 ? (
         <div className="card p-8 text-center">
-          <p className="muted">{esc(brand)} hasn&apos;t published plans yet — check back soon or call {contactBits ? contactBits.split(" · ")[0] : "us"}.</p>
+          <p className="muted">{brand} hasn&apos;t published plans yet — check back soon or call {contactBits ? contactBits.split(" · ")[0] : "us"}.</p>
         </div>
       ) : (
         <form action={planSignup} className="space-y-6">
@@ -173,17 +176,16 @@ export default async function PlansPage({
 
           <div className="grid gap-3 md:grid-cols-2" role="radiogroup" aria-label={t.pick}>
             {plans.map((p, i) => (
-              <label key={p.id} className="card cursor-pointer p-5 has-[:checked]:ring-2 has-[:checked]:ring-violet-400/60">
+              <label key={p.id} className="card cursor-pointer p-5 has-[:checked]:ring-2 has-[:checked]:ring-violet-400/60 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-cue-blue/70 transition">
                 <input type="radio" name="planId" value={p.id} defaultChecked={i === 0} className="peer sr-only" />
                 <div className="flex items-center gap-2">
-                  {p.featured && <span className="badge badge-blue ms-auto">★</span>}
+                  {p.featured && <span className="badge badge-blue ms-auto" aria-hidden="true">★</span>}
                 </div>
-                <div className="mt-1 text-lg font-bold text-white">{esc(p.name)}</div>
-                {p.blurb && <p className="muted mt-1 text-sm">{esc(p.blurb)}</p>}
+                <div className="mt-1 text-lg font-bold text-white">{p.name}</div>
+                {p.blurb && <p className="muted mt-1 text-sm">{p.blurb}</p>}
                 <div className="mt-3">
-                  <span className="text-2xl font-bold" style={{ color: accent }}>{money(Number(p.annual_value))}</span>
-                  <span className="muted text-sm">{t.perYear}</span>
-                  {p.visits_per_year != null && <span className="muted text-sm"> · {p.visits_per_year} {lang === "en" ? "visits/yr" : lang === "es" ? "visitas/año" : lang === "ar" ? "زيارة/سنة" : "lần/năm"}</span>}
+                  <span className="text-2xl font-bold [font-variant-numeric:tabular-nums]" style={{ color: accent }}>{money(Number(p.annual_value))}</span>                  <span className="muted text-sm"> {t.perYear}</span>
+                  {p.visits_per_year != null && <span className="muted text-sm [font-variant-numeric:tabular-nums]"> · {p.visits_per_year} {lang === "en" ? "visits/yr" : lang === "es" ? "visitas/año" : lang === "ar" ? "زيارة/سنة" : "lần/năm"}</span>}
                 </div>
               </label>
             ))}
@@ -198,7 +200,7 @@ export default async function PlansPage({
               </label>
               <label>
                 <span className="label">{t.email}</span>
-                <input name="email" type="email" maxLength={200} className="input" autoComplete="email" />
+                <input name="email" type="email" maxLength={200} className="input" autoComplete="email" spellCheck={false} />
               </label>
               <label>
                 <span className="label">{t.phone}</span>
@@ -213,9 +215,9 @@ export default async function PlansPage({
                 <textarea name="message" rows={2} maxLength={1000} className="input" />
               </label>
             </div>
-            <button className="btn-primary mt-4 w-full md:w-auto">{t.submit} →</button>
+            <SubmitButton label={t.submit} />
             <p className="muted mt-2 text-xs">
-              {esc(brand)} reviews every request by hand — nothing is charged today.
+              {brand} reviews every request by hand — nothing is charged today.
             </p>
           </div>
         </form>
