@@ -332,7 +332,10 @@ async function main() {
     // id-to-hash map inside the webpack runtime — the scan resolves both.
     const chunkRe = new RegExp('/chunks/([^"?]+)[.]js', 'g');
     const numRe = new RegExp('[.]e[(]([0-9]{2,5})[)]', 'g');
-    const hashRe = new RegExp('([0-9]{2,5}):"([0-9a-f]{16,})"', 'g');
+    // Dev builds emit shorter module hashes (e.g. 8 hex chars) in the runtime
+    // map; 16+ was a prod-only assumption that made the dynamic chunk
+    // unresolvable and crashed the importer smoke.
+    const hashRe = new RegExp('([0-9]{2,5}):"([0-9a-f]{8,})"', 'g');
     // Dev builds may keep the raw webpack chunk name (webpackChunkName magic
     // comment), served directly as /chunks/<name>.js with no numeric id.
     // Bare-token match: the chunk name may sit inside eval-escaped strings
