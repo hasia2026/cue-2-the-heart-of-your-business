@@ -395,6 +395,10 @@ function buildSampleDigest(orgName: string) {
     pendingDecisions: { heading: "Decisions awaiting your approval (1)", lines: ["• Sample decision — $1,200 (preview)"] },
     actionItems: { heading: "Action items with owners (1 open)", lines: ["• [MEDIUM] Sample task — owner: (you)"] },
     approvedThisWeek: { heading: "Approvals this week (0)", lines: ["• No new approvals in the last 7 days."] },
+    planSignups: {
+      heading: "Plan sign-ups this week (0 new)",
+      lines: ["• No plan sign-ups this week.", "• Nothing pending — every request has been decided."],
+    },
     moneyFound: { heading: "Money found / recovered", lines: ["• Total recovered / protected: $0 (preview)"] },
   };
 }
