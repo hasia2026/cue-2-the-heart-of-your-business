@@ -234,6 +234,7 @@ async function main() {
       ["open revenue leaks", "Open revenue leaks"],
       ["decisions awaiting approval", "Decisions awaiting your approval"],
       ["approvals this week", "Approvals this week"],
+      ["plan sign-ups", "Plan sign-ups this week"],
       ["money found / recovered", "Money found / recovered"],
     ]) {
       check(`digest section: ${name}`, text.includes(marker), marker);

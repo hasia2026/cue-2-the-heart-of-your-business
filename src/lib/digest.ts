@@ -10,6 +10,7 @@ export type DigestData = {
   actionItems: DigestSection;
   approvedThisWeek: DigestSection;
   moneyFound: DigestSection;
+  planSignups: DigestSection;
 };
 
 /** All digest figures come from the same live tables the dashboard reads. */
@@ -109,7 +110,34 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
     ],
   };
 
-  return { orgName: org.name, openLeaks, pendingDecisions, actionItems, approvedThisWeek, moneyFound };
+  // Plan-signup funnel (spec §3): new submissions this week, who is still
+  // waiting for a decision, and what the owner hasn't acted on yet.
+  const weekSignups = await sql`
+    select contact_name, plan_name, status, source
+    from plan_signups
+    where organization_id = ${orgId} and submitted_at > now() - interval '7 days'
+    order by submitted_at desc
+    limit 5`;
+  const [signupStats] = await sql`
+    select count(*) filter (where submitted_at > now() - interval '7 days')::int as week,
+           count(*) filter (where status = 'PENDING')::int as pending,
+           count(*) filter (where status = 'CONVERTED' and decided_at > now() - interval '7 days')::int as converted
+    from plan_signups where organization_id = ${orgId}`;
+  const planSignups: DigestSection = {
+    heading: `Plan sign-ups this week (${signupStats?.week ?? 0} new)`,
+    lines: weekSignups.map(
+      (r) =>
+        `• ${r.contact_name} → ${r.plan_name} (via ${(r.source as string).toLowerCase()})${r.status === "PENDING" ? " — awaiting approval" : ""}`,
+    ),
+  };
+  if (!planSignups.lines.length) planSignups.lines.push("• No plan sign-ups this week.");
+  planSignups.lines.push(
+    Number(signupStats?.pending ?? 0) > 0
+      ? `• ${signupStats?.pending} open request(s) still awaiting approval — convert in Enhance → Service plans.`
+      : "• Nothing pending — every request has been decided.",
+  );
+
+  return { orgName: org.name, openLeaks, pendingDecisions, actionItems, approvedThisWeek, moneyFound, planSignups };
 }
 
 /** Plain-text rendering — the same body goes to WhatsApp and the email fallback.
@@ -117,7 +145,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
  *  structure — leaks → decisions → who owns what → what was approved → money. */
 export function renderDigest(d: DigestData): string {
   const section = (s: DigestSection) => `${s.heading}\n${s.lines.join("\n")}`;
-  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.moneyFound].map(section).join("\n\n")}`;
+  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.planSignups, d.moneyFound].map(section).join("\n\n")}`;
 }
 
 export type DigestBrand = { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null };
@@ -159,6 +187,7 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
       ${card(d.pendingDecisions, "#c084fc")}
       ${card(d.actionItems, "#7c6cff")}
       ${card(d.approvedThisWeek, "#22d3ee")}
+      ${card(d.planSignups, "#fbbf24")}
       ${card(d.moneyFound, "#34d399")}
       ${plansUrl ? `<div style="text-align:center;margin-top:18px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">Sign up for a maintenance plan →</a></div>` : ""}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>
