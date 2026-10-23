@@ -12,6 +12,17 @@ const LOOP: { n: string; titleKey: DictKey; descKey: DictKey; accent: string; gl
   { n: "05", titleKey: "pillar.expand", descKey: "home.expandDesc", accent: "text-emerald-300", glow: "from-emerald-500/20" },
 ];
 
+// The /compare capability checklist, mirrored on the landing page. Columns are
+// intentionally generic ("your CRM / FSM tools") — no competitor is named here;
+// specifics live only on /compare.
+const CHECKLIST: { cap: DictKey; crm: string; cue: string }[] = [
+  { cap: "cmp.stores", crm: "✓", cue: "✓" },
+  { cap: "cmp.finds", crm: "✗", cue: "✓" },
+  { cap: "cmp.evidence", crm: "✗", cue: "✓" },
+  { cap: "cmp.approve", crm: "—", cue: "✓" },
+  { cap: "cmp.replaces", crm: "✗", cue: "✗" },
+];
+
 export default async function Home() {
   const session = await getSession();
   const { t } = await getT();
@@ -43,12 +54,9 @@ export default async function Home() {
         <div className="pointer-events-none absolute right-0 top-0 hidden md:block">
           <ReviMark className="h-14 w-14 drop-shadow-glow" />
         </div>
+        {/* Visible headline removed — the logo art above already carries the brand line. Keep an sr-only h1 for structure/SEO. */}
+        <h1 className="sr-only">CUE — The Heart of Your Business</h1>
         <p className="eyebrow -mt-2 mb-4">{t("home.eyebrow")}</p>
-        <div className="mx-auto max-w-3xl">
-          <h1 className="text-3xl font-bold uppercase tracking-[0.35em] text-white md:text-5xl">
-            CUE THE HEART OF YOUR BUSINESS
-          </h1>
-        </div>
         <p className="mx-auto mt-5 max-w-2xl text-navy-300 md:text-lg">
           {t("home.sub")}
         </p>
@@ -85,17 +93,26 @@ export default async function Home() {
         </p>
       </div>
 
-      {/* Competitive strip — keep their tools, CUE sits above (details on /compare) */}
-      <div className="mt-6 grid gap-3 md:grid-cols-3">
-        {([
-          ["cmp.crmNote", "text-navy-300"],
-          ["cmp.fsmNote", "text-navy-300"],
-          ["cmp.cueNote", "text-white"],
-        ] as const).map(([k, cls]) => (
-          <div key={k} className={`card p-5 text-xs leading-relaxed ${cls}`}>
-            {t(k)}
-          </div>
-        ))}
+      {/* Capability checklist — no competitor names; specifics live on /compare */}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-white/[0.04] text-left">
+              <th className="px-5 py-3 font-medium text-navy-300">{t("cmp.capCol")}</th>
+              <th className="px-5 py-3 font-medium text-navy-300">{t("cmp.crmCol")}</th>
+              <th className="px-5 py-3 font-semibold text-cue-blue">{t("cmp.cueCol")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {CHECKLIST.map((r) => (
+              <tr key={r.cap} className="border-t border-white/[0.06]">
+                <td className="px-5 py-3 text-navy-100">{t(r.cap)}</td>
+                <td className="px-5 py-3 text-navy-300">{r.crm}</td>
+                <td className="px-5 py-3 font-medium text-white">{r.cue}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <div className="mt-3 text-center">
         <a href="/compare" className="text-xs text-cue-blue hover:underline">{t("cmp.title")} →</a>

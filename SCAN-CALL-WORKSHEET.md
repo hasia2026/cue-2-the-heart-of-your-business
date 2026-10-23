@@ -50,7 +50,7 @@ Key demo beats (pick what maps to their leaks):
 
 ### 16:00–20:00 — One ask, then sign
 
-> "Here's my offer: 30 days, this one location, read-only export. If CUE doesn't identify at least $10k in documented leakage, you pay nothing and keep every finding. If it does, you decide whether [$299–799]/month is worth it. I'll set you up tonight, you look Thursday. Do we have a deal?"
+> "Here's my offer: 30 days, this one location, read-only export. If CUE doesn't identify at least $1,000 in documented leakage, you pay nothing and keep every finding. If it does, you decide whether [$299–799]/month is worth it. I'll set you up tonight, you look Thursday. Do we have a deal?"
 
 - [ ] **Signed** → open [PILOT-AGREEMENT.md](PILOT-AGREEMENT.md), fill the brackets, agree the success metric (Section 3) out loud. Send it before you hang up.
 - [ ] **"Send me something"** → they're not a no, they're a not-now. Book a 15-min follow-up *on the call* + queue the 3-touch follow-up (day 2: artifact screenshot; day 5: case-study post; day 9: honest breakup email).

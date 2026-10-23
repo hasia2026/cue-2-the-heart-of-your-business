@@ -94,7 +94,7 @@ if (lbRes.status !== 200 || dashRes.status !== 200) {
         `MISMATCH: lb $${lbTotal.toLocaleString()} vs dash $${dashStake.toLocaleString()} (delta $${Math.abs(lbTotal - dashStake).toLocaleString()})`);
     }
     // Traceability: every dollar figure printed in the leak ROWS (org data)
-    // must appear on the dashboard. Static copy on the page (the $10,000
+    // must appear on the dashboard. Static copy on the page (the $1,000
     // guarantee, sample fine-print figures from other stores) is excluded —
     // those are not claims about this org's data.
     const rowFigures = lbNums.map((n) => n.toLocaleString("en-US"));

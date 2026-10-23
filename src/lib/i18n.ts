@@ -430,7 +430,7 @@ const en = {
   "home.executeDesc": "Customers and staff ask questions in plain language and get answers from your actual records — never invented ones. 24/7, in four languages.",
   "home.expandDesc": "Every finding shows its source; every action waits for your approval. A money-finder your accountant can trust.",
   "home.packs":
-    "The pitch in one line: “Your CRM stores. CUE audits. We found $31k in a store's first month — if the scan finds nothing in yours, you've lost a coffee break.” Industry packs for dealerships, HVAC, salons, and retail — each white-labelable to your own vocabulary.",
+    "Built for dealerships, HVAC, salons, and retail — each industry pack white-labelable to your own vocabulary.",
   "home.pledgeLead": "Our pledge:",
   "home.pledgeBody": "$3 from every subscription goes to Revi Rescue, HASI Foundation, HASI Academy, and Open Resource.",
   "home.pledgeTail": "Your business grows. Your community grows with it.",
@@ -900,7 +900,7 @@ const vi: Partial<Record<DictKey, string>> = {
   "home.executeDesc": "Khách và nhân viên hỏi bằng ngôn ngữ thường ngày và nhận câu trả lời từ đúng dữ liệu của bạn — không bao giờ bịa số. 24/7, bốn ngôn ngữ.",
   "home.expandDesc": "Mỗi phát hiện đều ghi rõ nguồn; mỗi hành động đều chờ bạn duyệt. Một công cụ tìm tiền mà kế toán của bạn tin được.",
   "home.packs":
-    "Pitch trong một câu: “CRM của bạn lưu trữ. CUE kiểm tra. Chúng tôi tìm ra 31.000 USD trong tháng đầu — nếu bản quét không tìm thấy gì ở bạn, bạn chỉ mất một buổi cà phê.” Gói ngành cho đại lý ô tô, HVAC, spa và bán lẻ — có thể đổi từ ngữ theo thương hiệu của bạn.",
+    "Xây dựng cho đại lý ô tô, HVAC, spa và bán lẻ — mỗi gói ngành có thể đổi từ ngữ theo thương hiệu của bạn.",
   "home.pledgeLead": "Cam kết của chúng tôi:",
   "home.pledgeBody": "3 USD từ mỗi gói đăng ký dành cho Revi Rescue, HASI Foundation, HASI Academy và Open Resource.",
   "home.pledgeTail": "Doanh nghiệp bạn phát triển. Cộng đồng của bạn cùng phát triển.",
@@ -1323,7 +1323,7 @@ const ar: Partial<Record<DictKey, string>> = {
   "home.executeDesc": "يسأل العملاء والموظفون بلغة عادية ويحصلون على إجابات من سجلاتك الفعلية — أرقام مخترعة أبدًا. على مدار الساعة، بأربع لغات.",
   "home.expandDesc": "كل نتيجة تُظهر مصدرها؛ كل إجراء ينتظر موافقتك. باحث عن المال يثق به محاسبك.",
   "home.packs":
-    "العرض في سطر واحد: «CRM يخزّن. CUE يدقق. وجدنا 31 ألف دولار في الشهر الأول — إن لم يجد الفحص شيئًا عندك، فالخسارة فنجان قهوة فقط.» حزم قطاعات للمعارض وأنظمة التكييف والصالونات والتجزئة — وكلها قابلة لتغليف بمصطلحاتك الخاصة.",
+    "مصمم للمعارض وأنظمة التكييف والصالونات والتجزئة — وكل حزمة قطاع قابلة لتغليف بمصطلحاتك الخاصة.",
   "home.pledgeLead": "تعهدنا:",
   "home.pledgeBody": "3 دولارات من كل اشتراك تذهب إلى Revi Rescue وHASI Foundation وHASI Academy وOpen Resource.",
   "home.pledgeTail": "عملك ينمو. مجتمعك ينمو معه.",
@@ -1749,7 +1749,7 @@ const es: Partial<Record<DictKey, string>> = {
   "home.executeDesc": "Clientes y empleados preguntan en lenguaje natural y reciben respuestas de tus registros reales — nunca inventadas. 24/7, en cuatro idiomas.",
   "home.expandDesc": "Cada hallazgo muestra su fuente; cada acción espera tu aprobación. Un buscador de dinero en el que tu contador puede confiar.",
   "home.packs":
-    "El pitch en una línea: “Tu CRM almacena. CUE audita. Encontramos $31k en el primer mes de una tienda — si el escaneo no encuentra nada en la tuya, solo perdiste un café.” Packs de industria para concesionarios, HVAC, salones y retail — cada uno con vocabulario personalizable a tu marca.",
+    "Diseñado para concesionarios, HVAC, salones y retail — cada pack de industria personalizable con el vocabulario de tu marca.",
   "home.pledgeLead": "Nuestro compromiso:",
   "home.pledgeBody": "3 USD de cada suscripción van a Revi Rescue, HASI Foundation, HASI Academy y Open Resource.",
   "home.pledgeTail": "Tu negocio crece. Tu comunidad crece contigo.",

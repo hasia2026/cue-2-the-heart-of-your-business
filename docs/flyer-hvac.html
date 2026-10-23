@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CUE for HVAC Companies — Leave-Behind Flyer</title>
+<style>
+  @page { size: letter; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1E1B3A; width: 8.5in; height: 11in; display: flex; flex-direction: column; }
+  .band { background: linear-gradient(120deg, #050113, #1C1244); color: #fff; padding: 22px 34px; display: flex; align-items: center; gap: 14px; border-radius: 0 0 18px 0; }
+  .band .logo { font-size: 26pt; font-weight: 800; letter-spacing: 1px; }
+  .band .logo span { color: #38BDF8; }
+  .band .tag { margin-left: auto; text-align: right; font-size: 9.5pt; color: #A79FD4; }
+  .prepared { background: #EDE9FB; color: #4C1D95; font-size: 9pt; padding: 5px 12px; margin: 12px 34px 0; width: fit-content; border-radius: 999px; font-weight: 600; border: 1.5px dashed #A78BFA; }
+  .prepared span { color: #7C3AED; font-weight: 800; letter-spacing: .5px; }
+  .content { flex: 1; padding: 12px 34px 10px; display: flex; flex-direction: column; }
+  .guarantee { display: flex; align-items: center; gap: 12px; background: #7C3AED; color: #fff; border-radius: 12px; padding: 9px 14px; margin-bottom: 10px; }
+  .guarantee .g { font-size: 12.5pt; font-weight: 800; line-height: 1.3; }
+  .guarantee .g em { color: #FDE68A; font-style: normal; }
+  .guarantee .s { font-size: 8.5pt; color: #EDE9FB; margin-left: auto; text-align: right; }
+  h1 { font-size: 20pt; line-height: 1.25; margin-bottom: 6px; }
+  h1 em { color: #7C3AED; font-style: normal; }
+  .sub { color: #5C548C; font-size: 10.5pt; margin-bottom: 12px; }
+  .stats { display: flex; gap: 10px; margin-bottom: 12px; }
+  .stat { flex: 1; border: 1.5px solid #E4E1F4; border-radius: 12px; padding: 10px 12px; background: #F6F5FC; }
+  .stat .n { font-size: 17pt; font-weight: 800; color: #7C3AED; }
+  .stat .l { font-size: 8.5pt; color: #5C548C; text-transform: uppercase; letter-spacing: .5px; line-height: 1.3; }
+  .how { display: flex; gap: 10px; margin-bottom: 12px; }
+  .step { flex: 1; border: 1.5px solid #E4E1F4; border-radius: 12px; padding: 10px 12px; }
+  .step .k { display: inline-block; background: #7C3AED; color: #fff; border-radius: 999px; width: 20px; height: 20px; text-align: center; line-height: 20px; font-size: 9pt; font-weight: 700; margin-bottom: 4px; }
+  .step .t { font-weight: 700; font-size: 10pt; margin-bottom: 2px; }
+  .step .d { font-size: 9pt; color: #5C548C; line-height: 1.35; }
+  .feat { margin-top: 10px; }
+  .feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; font-size: 9.5pt; }
+  .feat-grid div { color: #5C548C; }
+  .feat-grid b { color: #2A2255; }
+  .feat-grid .ck { color: #7C3AED; font-weight: 800; margin-right: 5px; }
+  .pillsrow { margin-bottom: 6px; }
+  h2 { font-size: 12.5pt; color: #2A2255; border-left: 4px solid #A855F7; padding-left: 9px; margin-bottom: 6px; }
+  ul { padding-left: 18px; font-size: 10.5pt; }
+  li { margin-bottom: 3px; }
+  .lower { display: flex; gap: 16px; margin-top: auto; align-items: stretch; }
+  .offer { flex: 1; background: #F6F5FC; border: 1.5px solid #E4E1F4; border-radius: 12px; padding: 10px 14px; font-size: 10pt; display: flex; flex-direction: column; justify-content: center; }
+  .offer b { color: #7C3AED; }
+  .offer .urgency { margin-top: 5px; font-size: 9pt; color: #B91C1C; font-weight: 700; background: #FEE2E2; border-radius: 8px; padding: 5px 10px; }
+  .pill { display: inline-block; background: #EDE9FB; color: #6D28D9; border-radius: 999px; padding: 2px 10px; font-size: 8.5pt; font-weight: 600; margin: 0 4px 6px 0; }
+  .qr { width: 2.4in; text-align: center; background: #050113; border-radius: 14px; padding: 14px 10px 12px; color: #fff; }
+  .qr img { width: 100%; background: #fff; border-radius: 10px; padding: 6px; }
+  .qr .scan { font-size: 11pt; font-weight: 700; margin: 8px 0 2px; }
+  .qr .url { font-size: 7.3pt; color: #A79FD4; word-break: break-all; line-height: 1.3; }
+  .qr .cta { font-size: 9.5pt; color: #38BDF8; margin-top: 4px; font-weight: 700; }
+  .qr .sms { font-size: 8.5pt; color: #fff; margin-top: 6px; border-top: 1px solid #1C1244; padding-top: 6px; }
+  .qr .sms code { color: #FB923C; font-weight: 800; }
+  footer { padding: 0 34px 12px; font-size: 8.5pt; color: #5C548C; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+  <div class="band">
+    <div class="logo">CU<span>E</span></div>
+    <div style="font-size:10.5pt; color:#E7E4F8;">AI Business Operating System<br><strong style="color:#FB923C;">The Heart of Your Business</strong></div>
+    <div class="tag">Built by HASI Technologies<br>English · Español · Tiếng Việt · العربية</div>
+  </div>
+
+  <div class="prepared"><span>PREPARED FOR:</span> ______________________________</div>
+
+  <div class="content">
+    <div class="guarantee">
+      <div class="g">Don't find <em>$1,000 in documented leaks</em>?<br>The pilot is free — and you keep every finding.</div>
+      <div class="s">We scan YOUR records.<br>Every dollar traces to a real job.</div>
+    </div>
+
+    <h1>Your trucks did the work. Somewhere between the job and the invoice, <em>money is leaking.</em></h1>
+    <div class="sub">CUE reads your own field-service records and shows exactly where the revenue drains: unbilled calls, quote requests nobody followed up, agreements never offered. <strong>CUE prepares. You decide.</strong></div>
+
+    <div class="stats">
+      <div class="stat"><div class="n">$6,431</div><div class="l">Unbilled service calls (oldest 14 days)</div></div>
+      <div class="stat"><div class="n">$99,360</div><div class="l">Quote requests with zero follow-up</div></div>
+      <div class="stat"><div class="n">$75,400</div><div class="l">Equipment quotes past the 30-day window</div></div>
+    </div>
+
+    <h2>What CUE catches in your shop</h2>
+    <ul>
+      <li><strong>Completed calls, never invoiced</strong> — flagged against your own same-day rule, record attached.</li>
+      <li><strong>Quote requests gone cold</strong> — no-cool and replacement shoppers call the next company within 48h; CUE shows who's waiting and what they're worth.</li>
+      <li><strong>Agreement revenue left on the table</strong> — every repair visit that deserved a maintenance-agreement offer, tracked to the tech.</li>
+    </ul>
+
+    <div class="how">
+      <div class="step"><span class="k">1</span><div class="t">Connect</div><div class="d">Point CUE at your field-service records and accounting exports — read-only, no rip-and-replace.</div></div>
+      <div class="step"><span class="k">2</span><div class="t">Detect</div><div class="d">CUE finds unbilled calls, cold quotes, and missed agreement offers — every number traces to a record.</div></div>
+      <div class="step"><span class="k">3</span><div class="t">Approve</div><div class="d">CUE prepares the action; you push the button. Full audit trail, your rules.</div></div>
+    </div>
+
+    <div class="feat">
+      <h2>What's working in CUE today</h2>
+      <div class="feat-grid">
+        <div><span class="ck">✓</span><b>Snap it</b> — photo any job sheet or quote; OCR fills the record</div>
+        <div><span class="ck">✓</span><b>Say it</b> — talk your notes; auto-transcribed and filed</div>
+        <div><span class="ck">✓</span><b>Leak dashboard</b> — every leak in dollars, record attached</div>
+        <div><span class="ck">✓</span><b>Approve-only</b> — nothing executes without you, audit trail</div>
+        <div><span class="ck">✓</span><b>Draft invoices</b> — completed jobs billed the moment they close (you send)</div>
+        <div><span class="ck">✓</span><b>Pricing studio</b> — service plans and flat-rate pricebook</div>
+      </div>
+    </div>
+
+    <div class="lower">
+      <div class="offer">
+        <div class="pillsrow"><span class="pill">14-DAY PILOT</span><span class="pill">ONE LOCATION</span><span class="pill">READ-ONLY EXPORT</span></div>
+        <div style="margin-top:4px;"><b>Founding member rate: $99/mo locked for life</b> — one 20-minute call to verify your numbers first.</div>
+        <div class="urgency">Founding cohort: next 5 shops per city. When a city's list is full, the rate closes.</div>
+      </div>
+      <div class="qr">
+        <img src="data:image/png;base64,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" alt="QR code — book the free 20-minute CUE scan call">
+        <div class="scan">Scan · book your free scan call</div>
+        <div class="cta">20-min call — we run CUE live on YOUR numbers, no pitch</div>
+        <div class="sms">No QR? Text <code>SCAN</code> to 555-0123</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div>Your records are read-only and yours: exports deleted after the pilot, nothing shared or sold. Centrally? Reminders, drafts and exports wait for YOUR approval.</div>
+    <div>hasi.tech · CUE — The Heart of Your Business</div>
+  </footer>
+</body>
+</html>

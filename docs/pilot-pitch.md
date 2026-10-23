@@ -52,7 +52,7 @@ real audit trail, and honest grounding — real numbers or no answer, never conf
 ## The offer (pay for proof)
 
 - **30-day pilot, one store** — we agree on one success metric today.
-- If the scan doesn't find at least **$10,000 in documented leakage** from your records, the pilot costs **nothing** — and you keep every finding.
+- If the scan doesn't find at least **$1,000 in documented leakage** from your records, the pilot costs **nothing** — and you keep every finding.
 - If it does: **$299–799/month** afterwards. One recovered repair order a month pays for it.
 - Your data stays yours: org-isolated database, encrypted, deleted on request. NDA available.
 

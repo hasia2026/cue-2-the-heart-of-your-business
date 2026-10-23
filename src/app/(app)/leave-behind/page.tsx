@@ -173,7 +173,7 @@ export default async function LeaveBehindPage() {
 
       <div className="lb-guarantee">
         <p style={{ margin: 0 }}>
-          <b>Pay for proof:</b> if the pilot doesn&apos;t identify at least <b>$10,000</b> in documented leakage from your records,
+          <b>Pay for proof:</b> if the pilot doesn&apos;t identify at least <b>$1,000</b> in documented leakage from your records,
           it costs <span className="lb-fill" /> — and you keep every finding, on the record, yours to hand to anyone.
           That was the deal before we ran the scan today; it&apos;s still the deal.
         </p>

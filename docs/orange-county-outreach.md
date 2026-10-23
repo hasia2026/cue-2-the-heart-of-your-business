@@ -56,7 +56,7 @@ call first, ask for the owner, and bring the printed leave-behind + the pitch on
 
 **Warm walk-in follow-up (same-day, after the visit)**
 
-> {name} — good meeting you at {Dealership} today. As promised: the scan takes 20 minutes on your last-30-days RO + lead export — nothing moves without your approval. The one-page pilot sheet I brought is attached; $0–199 one-time, and if the pilot doesn't surface ≥$10k of documented leakage, it costs nothing. Want to start Monday?
+> {name} — good meeting you at {Dealership} today. As promised: the scan takes 20 minutes on your last-30-days RO + lead export — nothing moves without your approval. The one-page pilot sheet I brought is attached; $0–199 one-time, and if the pilot doesn't surface ≥$1,000 of documented leakage, it costs nothing. Want to start Monday?
 
 ### HVAC
 

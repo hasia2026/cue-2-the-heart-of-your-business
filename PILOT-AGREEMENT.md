@@ -15,7 +15,7 @@ CUE connects to a **read-only export** of Customer's records [DMS / field-servic
 
 Pilot fee: **$0**. CUE earns the paid engagement only by finding real money:
 
-> **Success threshold: CUE identifies at least $10,000 in documented revenue leakage** (completed-but-unbilled work, uncollected receivables, or lapsed follow-up), each item backed by a Customer-verifiable record.
+> **Success threshold: CUE identifies at least $1,000 in documented revenue leakage** (completed-but-unbilled work, uncollected receivables, or lapsed follow-up), each item backed by a Customer-verifiable record.
 
 - If the threshold is met, Customer may continue to a paid subscription at **[$299–799]/month** (by location, by modules used).
 - If the threshold is **not** met, CUE says so in writing, hands over all findings free of charge, and the pilot ends. No invoice. No obligation.
