@@ -63,9 +63,7 @@ Anchor: **a fraction of recovered revenue**, priced flat.
 | Franchise / OEM | $2,500+/mo | Brands, white-label |
 
 Unit economics: one recovered repair order (~$800) pays a year of Operator. Payback is
-measured in days when the pilot report lands. **$3 per subscription** funds Revi Rescue,
-HASI Foundation, HASI Academy, and Open Resource — built-in goodwill that also drives
-referral loops in tight-knit dealer communities.
+measured in days when the pilot report lands.
 
 ## Market
 

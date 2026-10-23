@@ -118,15 +118,6 @@ export default async function Home() {
         <a href="/compare" className="text-xs text-cue-blue hover:underline">{t("cmp.title")} →</a>
       </div>
 
-      {/* The pledge */}
-      <div className="card mt-6 p-6 text-center">
-        <p className="text-sm text-navy-100">
-          <span className="font-semibold text-white">{t("home.pledgeLead")}</span>{" "}
-          {t("home.pledgeBody")}
-        </p>
-        <p className="muted mt-1 text-xs">{t("home.pledgeTail")}</p>
-      </div>
-
       {/* Public leak-score hook */}
       <div className="mt-10 text-center">
         <a href="/score" className="btn-primary">{t("home.scoreCta")}</a>

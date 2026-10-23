@@ -431,9 +431,6 @@ const en = {
   "home.expandDesc": "Every finding shows its source; every action waits for your approval. A money-finder your accountant can trust.",
   "home.packs":
     "Built for dealerships, HVAC, salons, and retail — each industry pack white-labelable to your own vocabulary.",
-  "home.pledgeLead": "Our pledge:",
-  "home.pledgeBody": "$3 from every subscription goes to Revi Rescue, HASI Foundation, HASI Academy, and Open Resource.",
-  "home.pledgeTail": "Your business grows. Your community grows with it.",
   "home.scoreCta": "Find your Revenue Leak Score — free, 60 seconds →",
 
   // /compare — CUE above the incumbent tools
@@ -901,9 +898,6 @@ const vi: Partial<Record<DictKey, string>> = {
   "home.expandDesc": "Mỗi phát hiện đều ghi rõ nguồn; mỗi hành động đều chờ bạn duyệt. Một công cụ tìm tiền mà kế toán của bạn tin được.",
   "home.packs":
     "Xây dựng cho đại lý ô tô, HVAC, spa và bán lẻ — mỗi gói ngành có thể đổi từ ngữ theo thương hiệu của bạn.",
-  "home.pledgeLead": "Cam kết của chúng tôi:",
-  "home.pledgeBody": "3 USD từ mỗi gói đăng ký dành cho Revi Rescue, HASI Foundation, HASI Academy và Open Resource.",
-  "home.pledgeTail": "Doanh nghiệp bạn phát triển. Cộng đồng của bạn cùng phát triển.",
   "home.scoreCta": "Tìm điểm rò rỉ doanh thu của bạn — miễn phí, 60 giây →",
   "cmp.title": "Giữ CRM của bạn. Giữ FSM của bạn. CUE nằm phía trên.",
   "cmp.sub": "CRM và công cụ hiện trường là nơi công việc diễn ra — nghe điện thoại, lưu lead, điều phối xe. CUE là lớp kiểm tra những gì xảy ra sau đó: đã kiếm được gì, đã xuất hóa đơn gì, đã theo follow-up gì — có bằng chứng cho từng con số.",
@@ -1324,9 +1318,6 @@ const ar: Partial<Record<DictKey, string>> = {
   "home.expandDesc": "كل نتيجة تُظهر مصدرها؛ كل إجراء ينتظر موافقتك. باحث عن المال يثق به محاسبك.",
   "home.packs":
     "مصمم للمعارض وأنظمة التكييف والصالونات والتجزئة — وكل حزمة قطاع قابلة لتغليف بمصطلحاتك الخاصة.",
-  "home.pledgeLead": "تعهدنا:",
-  "home.pledgeBody": "3 دولارات من كل اشتراك تذهب إلى Revi Rescue وHASI Foundation وHASI Academy وOpen Resource.",
-  "home.pledgeTail": "عملك ينمو. مجتمعك ينمو معه.",
   "home.scoreCta": "اكتشف درجة تسرب الإيرادات — مجاناً، في 60 ثانية →",
   "cmp.title": "احتفظ بـ CRM. احتفظ بـ FSM. CUE يعمل فوقها.",
   "cmp.sub": "أنظمة إدارة العملاء والخدمة الميدانية هي حيث تحدث العمل — الرد على الهاتف، حفظ العملاء، إرسال الفرق. CUE هي الطبقة التي تراجع ما حدث بعدها: ما كُسب، ما فوتر، ما تابع — بدليل لكل رقم.",
@@ -1750,9 +1741,6 @@ const es: Partial<Record<DictKey, string>> = {
   "home.expandDesc": "Cada hallazgo muestra su fuente; cada acción espera tu aprobación. Un buscador de dinero en el que tu contador puede confiar.",
   "home.packs":
     "Diseñado para concesionarios, HVAC, salones y retail — cada pack de industria personalizable con el vocabulario de tu marca.",
-  "home.pledgeLead": "Nuestro compromiso:",
-  "home.pledgeBody": "3 USD de cada suscripción van a Revi Rescue, HASI Foundation, HASI Academy y Open Resource.",
-  "home.pledgeTail": "Tu negocio crece. Tu comunidad crece contigo.",
   "home.scoreCta": "Descubre tu puntaje de fuga de ingresos — gratis, 60 segundos →",
   "cmp.title": "Conserva tu CRM. Conserva tu FSM. CUE va por encima.",
   "cmp.sub": "Tu CRM y tus herramientas de campo son donde ocurre el trabajo — contestar teléfonos, guardar leads, despachar camiones. CUE es la capa que audita lo que pasó después: qué se ganó, qué se facturó, qué se siguió — con evidencia para cada número.",
