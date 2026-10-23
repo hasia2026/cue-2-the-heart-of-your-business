@@ -229,6 +229,39 @@ create table if not exists leads (
 );
 create index if not exists leads_org_idx on leads(organization_id);
 
+-- ───────── MARKET SIGNALS (inbound mentions: social webhooks + GBP) ─────────
+-- signal_hash, unique per org — replays and provider retries are no-ops.
+
+create table if not exists market_signals (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  kind text not null default 'SOCIAL',   -- SOCIAL | GBP
+  source text not null default 'WEBHOOK',
+  external_id text,
+  author text,
+  channel text,
+  title text not null,
+  body text,
+  url text,
+  intent text,                            -- BUY | SELL | SERVICE (classified on ingest)
+  status text not null default 'NEW',     -- NEW | LEAD | INSIGHT | DISMISSED
+  lead_id uuid references leads(id) on delete set null,
+  insight_id uuid,
+  signal_hash text not null,
+  demo boolean not null default false,
+  occurred_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint market_signals_kind_chk check (kind in ('SOCIAL', 'GBP')),
+  constraint market_signals_intent_chk check (intent in ('BUY', 'SELL', 'SERVICE')),
+  constraint market_signals_status_chk check (status in ('NEW', 'LEAD', 'INSIGHT', 'DISMISSED'))
+);
+
+create index if not exists market_signals_org_idx on market_signals(organization_id);
+create index if not exists market_signals_org_created_idx on market_signals(organization_id, created_at desc);
+create index if not exists market_signals_lead_idx on market_signals(lead_id);
+create unique index if not exists market_signals_org_dedupe_idx on market_signals(organization_id, signal_hash);
+
+
 -- ───────── TRANSACTIONS ─────────
 create table if not exists invoices (
   id uuid primary key default gen_random_uuid(),
