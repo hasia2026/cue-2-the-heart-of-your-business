@@ -9,6 +9,7 @@ export type DigestData = {
   pendingDecisions: DigestSection;
   actionItems: DigestSection;
   approvedThisWeek: DigestSection;
+  unbilled: DigestSection;
   moneyFound: DigestSection;
   planSignups: DigestSection;
 };
@@ -100,6 +101,28 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   };
   if (!actionItems.lines.length) actionItems.lines.push("• No open tasks — run the approved workflows from Execute.");
 
+  // Unbilled-revenue alert: completed service orders with no live
+  // (non-VOID) invoice. These are jobs the crew finished that the owner
+  // may not realize were never billed — same definition the Pipeline
+  // "UNBILLED" badge uses, so the digest and the board never disagree.
+  const [unbilledRow] = await sql`
+    select count(*)::int as n, coalesce(sum(amount), 0)::float as total
+    from service_orders so
+    where organization_id = ${orgId} and status = 'COMPLETED' and invoiced_at is null
+      and not exists (
+        select 1 from invoices i
+        where i.service_order_id = so.id and i.status <> 'VOID')`;
+  const unbilledN = Number(unbilledRow?.n ?? 0);
+  const unbilledTotal = Number(unbilledRow?.total ?? 0);
+  const unbilled: DigestSection = {
+    heading: unbilledN
+      ? `⚠ Unbilled completed work (${unbilledN} jobs) — ${money(unbilledTotal)} never invoiced`
+      : "Unbilled completed work (0 jobs)",
+    lines: unbilledN
+      ? [`• ${unbilledN} completed job(s) totaling ${money(unbilledTotal)} still have no invoice — draft and release them in Pipeline → Work orders.`]
+      : ["• Every completed job is invoiced or carries a live draft."],
+  };
+
   const moneyFound: DigestSection = {
     heading: "Money found / recovered",
     lines: [
@@ -137,7 +160,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
       : "• Nothing pending — every request has been decided.",
   );
 
-  return { orgName: org.name, openLeaks, pendingDecisions, actionItems, approvedThisWeek, moneyFound, planSignups };
+  return { orgName: org.name, openLeaks, pendingDecisions, actionItems, approvedThisWeek, unbilled, moneyFound, planSignups };
 }
 
 /** Plain-text rendering — the same body goes to WhatsApp and the email fallback.
@@ -145,7 +168,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
  *  structure — leaks → decisions → who owns what → what was approved → money. */
 export function renderDigest(d: DigestData): string {
   const section = (s: DigestSection) => `${s.heading}\n${s.lines.join("\n")}`;
-  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.planSignups, d.moneyFound].map(section).join("\n\n")}`;
+  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.planSignups, d.unbilled, d.moneyFound].map(section).join("\n\n")}`;
 }
 
 export type DigestBrand = { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null };
@@ -188,6 +211,7 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
       ${card(d.actionItems, "#7c6cff")}
       ${card(d.approvedThisWeek, "#22d3ee")}
       ${card(d.planSignups, "#fbbf24")}
+      ${card(d.unbilled, d.unbilled.lines[0]?.startsWith("•") === false ? "#f87171" : "#fbbf24")}
       ${card(d.moneyFound, "#34d399")}
       ${plansUrl ? `<div style="text-align:center;margin-top:18px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">Sign up for a maintenance plan →</a></div>` : ""}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>

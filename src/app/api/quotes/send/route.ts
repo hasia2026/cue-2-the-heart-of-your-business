@@ -16,6 +16,19 @@ import { signupUrlIfPlans } from "@/lib/plan-links";
 export const runtime = "nodejs";
 
 /**
+ * Explicit method-mismatch response so dev and production agree. The framework
+ * default (405 on a POST-only route) differs in shape across dev/prod and was
+ * once served unreliably by a stale dev server; this pins 405 + JSON + Allow
+ * everywhere and is asserted in e2e.
+ */
+export async function GET() {
+  return NextResponse.json(
+    { error: "Method not allowed — use POST" },
+    { status: 405, headers: { allow: "POST" } },
+  );
+}
+
+/**
  * Manual localized-quote send/preview for verification — the only write path
  * the UI needs. Query params:
  *   customerId — required, org-scoped

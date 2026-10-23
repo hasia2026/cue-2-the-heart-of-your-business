@@ -4,6 +4,8 @@ import { guardWorkspaceModule } from "@/lib/guard";
 import { getVocab } from "@/lib/vocab";
 import QuoteSender from "./QuoteSender";
 import ArReminders from "./ArReminders";
+import OrderActions from "./OrderActions";
+import DraftRelease from "./DraftRelease";
 import VisitActions from "./VisitActions";
 import LeadFollowUp from "./LeadFollowUp";
 import { parseAuthorityBands } from "@/lib/desking";
@@ -46,6 +48,25 @@ export default async function PipelinePage() {
       left join employees e on e.id = s.sold_by
     where s.organization_id = ${orgId}
     order by case s.status when 'COMPLETED' then 0 when 'IN_PROGRESS' then 1 else 2 end, s.opened_at desc limit 10`;
+
+  // Live invoices per listed order, so the row shows "draft QD-… ready" and
+  // never offers a second draft when one exists.
+  const draftInvoices = service.length
+    ? await sql`
+        select id, service_order_id, number, amount from invoices
+        where organization_id = ${orgId} and service_order_id in ${sql(service.map((s) => s.id))}
+          and status = 'DRAFT'`
+    : [];
+  // draftIdByOrder supports the review-and-release control: pass the DRAFT
+  // invoice's id + amount through to OrderActions for 
+  const draftByOrder = new Map<string, string>();
+  const draftMeta = new Map<string, { id: string; amount: number }>();
+  for (const d of draftInvoices as { id: string; service_order_id: string; number: string; amount: unknown }[]) {
+    if (!draftByOrder.has(String(d.service_order_id))) {
+      draftByOrder.set(String(d.service_order_id), String(d.number));
+      draftMeta.set(String(d.service_order_id), { id: String(d.id), amount: Number(d.amount ?? 0) });
+    }
+  }
   const appts = await sql`
     select a.id, a.title, a.kind, a.scheduled_for, a.status, c.name as customer
     from appointments a join customers c on c.id = a.customer_id
@@ -399,6 +420,18 @@ export default async function PipelinePage() {
                 <div className="mt-1 text-xs text-navy-300">
                   {s.customer} · {money(s.amount)}{s.seller ? " · sold by " + s.seller : ""}
                 </div>
+                <OrderActions
+                  orderId={String(s.id)}
+                  status={String(s.status)}
+                  draftNumber={draftByOrder.get(String(s.id)) ?? null}
+                  canEdit={session.role !== "MEMBER"}
+                  draftSlot={(() => {
+                    const m = draftMeta.get(String(s.id));
+                    if (!m) return null;
+                    const num = draftByOrder.get(String(s.id)) ?? "";
+                    return <DraftRelease invoiceId={m.id} draftNumber={num} amount={m.amount} />;
+                  })()}
+                />
               </div>
             ))}
             {service.length === 0 && <p className="muted">{vocab.serviceEmpty}</p>}

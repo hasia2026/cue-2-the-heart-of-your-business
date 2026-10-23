@@ -4,6 +4,7 @@
 import { sql } from "./db";
 import { logAudit } from "./audit";
 import { parseEvidence } from "./intelligence";
+import { draftInvoiceForOrder } from "./billing";
 
 export async function createWorkflowFromRecommendation(
   organizationId: string,
@@ -64,8 +65,9 @@ async function buildTasks(organizationId: string, workflowId: string, recId: str
     // Unbilled service orders → one task per order (max 10), plus a draft
     // quote per order so the follow-up artifacts exist the moment the
     // approval lands: the owner reviews and SENDS the draft — nobody has to
-    // build a quote from scratch. Already-priced orders are skipped so
-    // re-approving or duplicate workflows can't double-draft.
+    // build a quote from scratch. Drafting goes through the shared billing
+    // helper so manual/automation paths dedupe identically; already-priced
+    // orders skip the draft but still get the task.
     if (queryRef?.ref === "service_orders") {
       const rows = await sql`
         select so.id, so.title, so.amount
@@ -76,18 +78,15 @@ async function buildTasks(organizationId: string, workflowId: string, recId: str
           )
         order by so.completed_at asc limit 10`;
       for (const r of rows) {
-        const [draft] = await sql`
-          insert into invoices (organization_id, customer_id, service_order_id, number, kind, amount, status, issued_at, due_at)
-          select so.organization_id, so.customer_id, so.id,
-                 'QD-' || upper(left(replace(gen_random_uuid()::text, '-', ''), 10)),
-                 'SERVICE', so.amount, 'DRAFT', now(), now() + interval '14 days'
-          from service_orders so
-          where so.id = ${r.id}
-          returning number`;
+        const result = await draftInvoiceForOrder(organizationId, {
+          serviceOrderId: String(r.id),
+          source: "WORKFLOW",
+          actorType: "AI",
+        });
         made.push({
           title: `Invoice: ${r.title}`,
-          detail: draft?.number
-            ? `Confirm pricing ($${Number(r.amount).toFixed(2)}) and send draft quote ${draft.number} (already prepared in Pipeline). Reference the 24h RO SOP.`
+          detail: result.ok && result.number
+            ? `Confirm pricing ($${Number(r.amount).toFixed(2)}) and send draft quote ${result.number} (already prepared in Pipeline). Reference the 24h RO SOP.`
             : `Confirm pricing ($${Number(r.amount).toFixed(2)}) and issue the invoice. Reference the 24h RO SOP.`,
         });
       }
