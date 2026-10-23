@@ -2,6 +2,7 @@ import Link from "next/link";
 import PublicHeader from "@/components/PublicHeader";
 import { LogoMark } from "@/components/NavClient";
 import { QUESTIONS, REVENUE_BRACKETS } from "@/lib/leak-score";
+import { pilotInboxEmail } from "@/lib/leads";
 import ScoreClient from "./ScoreClient";
 
 export const metadata = {
@@ -31,6 +32,7 @@ export default function ScorePage() {
         <ScoreClient
           questions={QUESTIONS.map((q) => ({ id: q.id, text: q.text, options: [...q.options] }))}
           brackets={REVENUE_BRACKETS.map((b) => ({ key: b.key, label: b.label }))}
+          scanMailto={`mailto:${pilotInboxEmail()}?subject=Revenue%20Leak%20Scan`}
         />
       </main>
 

@@ -1,5 +1,6 @@
 import PublicHeader from "@/components/PublicHeader";
 import { LogoMark } from "@/components/NavClient";
+import { pilotInboxEmail } from "@/lib/leads";
 
 export const metadata = {
   title: "Book a CUE walkthrough",
@@ -42,8 +43,8 @@ export default function BookPage() {
             <p className="muted mx-auto mt-2 max-w-md text-sm">
               The live calendar is being connected. In the meantime, email
               {" "}
-              <a className="text-violet-300 underline" href="mailto:pilots@hasi.tech?subject=CUE%20scan%20call">
-                pilots@hasi.tech
+              <a className="text-violet-300 underline" href={`mailto:${pilotInboxEmail()}?subject=CUE%20scan%20call`}>
+                {pilotInboxEmail()}
               </a>{" "}
               with two times that work and you'll get a slot within the hour.
             </p>

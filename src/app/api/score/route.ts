@@ -3,6 +3,7 @@ import { z } from "zod";
 import { sql } from "@/lib/db";
 import { computeLeakScore, QUESTIONS, REVENUE_BRACKETS, type AnswerIndex } from "@/lib/leak-score";
 import { rateLimitResult, clientKey } from "@/lib/rate-limit";
+import { notifyPilotRequest } from "@/lib/leads";
 
 const answerSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 const bodySchema = z.object({
@@ -46,6 +47,14 @@ export async function POST(req: Request) {
       values (${email.toLowerCase()}, ${businessName ?? null}, ${industry ?? null},
         ${sql.json({ ...clean, revenueBracket })}, ${result.score}, ${result.leakHours.name},
         ${result.leakHours.monthlyEstimate})`;
+    // Score-lead = strongest top-of-funnel pilot intent — ping the inbox.
+    void notifyPilotRequest({
+      name: businessName ?? email.toLowerCase(),
+      shop: businessName ?? "(not given)",
+      phone: "(none — contact via email)",
+      email: email.toLowerCase(),
+      source: "SCORE",
+    });
   } catch (e) {
     // Never block the result on a lead-capture write failure.
     console.error("score_leads insert failed", e);

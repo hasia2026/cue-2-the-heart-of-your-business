@@ -535,6 +535,34 @@ async function main() {
   check("/api/digest/send unauthenticated → 401", digestUnauth.status === 401, String(digestUnauth.status));
   const quoteUnauth = await fetch(BASE + "/api/quotes/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   check("/api/quotes/send unauthenticated → 401", quoteUnauth.status === 401, String(quoteUnauth.status));
+  const quoteWrongMethod = await fetch(BASE + "/api/quotes/send");
+  check("/api/quotes/send wrong method → 405 JSON (dev/prod aligned)", quoteWrongMethod.status === 405 && (quoteWrongMethod.headers.get("allow") ?? "").includes("POST"), String(quoteWrongMethod.status));
+
+  // Market Signals ingest — no token → session-only auth: unauthenticated
+  // (and wrong-token, which falls back to session) GET-less POSTs → 401; a
+  // signed-in session ingests one deduped social signal + one GBP review.
+  const sigUnauth = await fetch(BASE + "/api/ingest/signals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "e2e probe" }) });
+  check("/api/ingest/signals unauthenticated → 401", sigUnauth.status === 401, String(sigUnauth.status));
+  const sigBadToken = await fetch(BASE + "/api/ingest/signals", { method: "POST", headers: { "Content-Type": "application/json", "x-cue-signals": "definitely-not-the-token" }, body: JSON.stringify({ title: "e2e probe" }) });
+  check("/api/ingest/signals wrong token, no session → 401", sigBadToken.status === 401, String(sigBadToken.status));
+  const sigIn = await fetch(BASE + "/api/ingest/signals", {
+    method: "POST", headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ title: "E2E market signal — who repairs furnaces around here?", text: "anyone do seasonal maintenance calls before winter?", source: "E2E", timestamp: Date.now() }),
+  });
+  const sig = await sigIn.json().catch(() => ({}));
+  check("signals ingest (session auth) → ok", sigIn.status === 200 && sig?.ok === true && sig?.accepted === 1, `status=${sigIn.status} ${JSON.stringify(sig).slice(0, 120)}`);
+  const sigReplay = await fetch(BASE + "/api/ingest/signals", {
+    method: "POST", headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ title: "E2E market signal — who repairs furnaces around here?", text: "anyone do seasonal maintenance calls before winter?", source: "E2E" }),
+  });
+  const sigRe = await sigReplay.json().catch(() => ({}));
+  check("signals ingest dedupes replays", sigReplay.status === 200 && sigRe?.created === 0, `created=${sigRe?.created}`);
+  const gbpIn = await fetch(BASE + "/api/ingest/google", {
+    method: "POST", headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ reviews: [{ reviewId: "e2e-gbp-1", comment: "Fast AC repair scheduling, highly recommend for service before summer.", reviewer: { displayName: "E2E Reviewer" }, starRating: "FIVE", createTime: new Date().toISOString() }] }),
+  });
+  const gbp = await gbpIn.json().catch(() => ({}));
+  check("GBP ingest (session auth) → ok", gbpIn.status === 200 && gbp?.ok === true && gbp?.accepted === 1, `status=${gbpIn.status} ${JSON.stringify(gbp).slice(0, 120)}`);
 
   console.log(fails === 0 ? "\nE2E PASSED" : `\n${fails} E2E FAILURE(S)`);
   process.exitCode = fails === 0 ? 0 : 1;

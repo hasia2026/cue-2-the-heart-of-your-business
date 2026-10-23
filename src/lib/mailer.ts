@@ -11,7 +11,7 @@ export function mailFrom(): string {
   return process.env.MAIL_FROM ?? "CUE <onboarding@resend.dev>";
 }
 
-export async function sendMail(opts: { to: string; subject: string; text: string; html?: string }): Promise<SendResult> {
+export async function sendMail(opts: { to: string | string[]; subject: string; text: string; html?: string }): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   if (!key) return { connected: false, sent: false, error: "RESEND_API_KEY not set" };
   try {

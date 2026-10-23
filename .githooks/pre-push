@@ -1,8 +1,20 @@
 #!/bin/sh
-# Git pre-push hook — runs the E2E smoke. Target: $E2E_BASE_URL
-# (default http://localhost:3210 — start `npm run dev` first), falling back
-# to the last successful Vercel deployment when localhost is not up.
+# Git pre-push hook — gates pushes on: (1) typecheck, (2) E2E smoke.
+# Target: $E2E_BASE_URL (default http://localhost:3210 — start `npm run dev`
+# first), falling back to the last successful Vercel deployment when localhost
+# is not up.
 # One-time install per clone:  git config core.hooksPath .githooks
+
+# 1. Typecheck — must pass before the E2E smoke even starts. (Caught a prod
+#    build failure once that local checks missed: a digest-preview type error
+#    Vercel's build caught and tsc would have caught here, 6 pushes earlier.)
+echo "pre-push: typecheck"
+if ! npx tsc --noEmit; then
+  echo "pre-push: TYPECHECK FAILED — push aborted."
+  exit 1
+fi
+
+# 2. E2E smoke.
 URL="${E2E_BASE_URL:-http://localhost:3210}"
 echo "pre-push: E2E smoke against $URL"
 if ! node scripts/e2e.mjs "$URL"; then

@@ -3,6 +3,9 @@ node_modules/
 out/
 .env
 .env*.local
+.resend-domain-id.txt
+.resend-domain-dns.json
+.resend-domain-request.cjs
 *.tsbuildinfo
 server.log
 .vercel
@@ -16,3 +19,7 @@ tools/
 .vercel
 .run-server.log
 .tmp-logs/
+.env*
+
+.tmp-devserver.log
+.tmp-devserver.pid

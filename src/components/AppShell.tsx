@@ -24,6 +24,7 @@ const ITEM_MODULE: Record<string, string> = {
   "/execute": "execute",
   "/pipeline": "pipeline",
   "/pipeline/unscheduled": "pipeline",
+  "/pipeline/scan-leads": "pipeline",
   "/report": "report",
   "/people": "people",
   "/expand": "expand",
@@ -119,6 +120,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           children: [
             { href: "/pipeline", label: t("nav.pipeline") },
             { href: "/pipeline/unscheduled", label: "Unscheduled board" },
+            { href: "/pipeline/scan-leads", label: "Scan-call leads" },
             { href: "/report", label: t("nav.report") },
             { href: "/people", label: t("nav.people") },
           ],

@@ -14,9 +14,12 @@ const money = (n: number) => `$${n.toLocaleString()}`;
 export default function ScoreClient({
   questions,
   brackets,
+  scanMailto,
 }: {
   questions: { id: string; text: string; options: string[] }[];
   brackets: { key: string; label: string }[];
+  /** Publisher-set pilot inbox (mailto address) — server passes it down; client env is unavailable. */
+  scanMailto: string;
 }) {
   const [step, setStep] = useState(0); // 0..4 questions, 5 = email gate, 6 = results
   const [bracket, setBracket] = useState(brackets[1]?.key ?? brackets[0].key);
@@ -174,7 +177,7 @@ export default function ScoreClient({
           leads and invoices, live on a screen share.
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <a href="mailto:pilots@hasi.tech?subject=Revenue%20Leak%20Scan" className="btn-primary">Book the free scan</a>
+          <a href={scanMailto} className="btn-primary">Book the free scan</a>
           <a href="/" className="btn-ghost">Learn about CUE</a>
         </div>
       </div>

@@ -16,7 +16,7 @@
 - [x] Text-size accessibility with **Large (112.5%) as the default** for new sessions (Standard / XL / Huge options; Settings + header `Aa` control, cookie-applied before first paint)
 - [x] Display accessibility toggles beside text size: Reduce motion, High contrast, Strong focus outlines (cookie-driven, server-applied classes)
 - [x] Capture duplicate detector: exact content hash, legacy name+size fallback, and fuzzy near-duplicate pass (title & note-text similarity over the last 90 days, with a "Save anyway" escape hatch)
-- [x] Typecheck clean · production build passes · 17/17 smoke checks green
+- [x] Typecheck clean · production build passes · 62-check E2E smoke green
 
 ## 🔒 Before first real customer
 - [x] Rate-limit `/api/assistant` + auth actions for public exposure
@@ -29,7 +29,9 @@
       → **remaining owner step:** set `RESEND_API_KEY` + verified `MAIL_FROM`
       in Vercel env; the code path is live either way
 - [x] E2E gates green on every push (pre-push hook) — false-positive refresh
-      probe fixed to verify via audit trail (ffe91db)
+      probe fixed to verify via audit trail (ffe91db). The hook now also runs
+      `tsc --noEmit` **before** the E2E smoke, so a prod-build type error like
+      the one Vercel caught on f4lnhgay9 is caught at the hook, not in prod
 - [ ] Rotate Supabase DB password + least-privilege app role — **owner console step**:
       ① Supabase → Settings → Database → Reset database password; ② copy the
       new password into the `DATABASE_URL` pooler connection string in
@@ -51,11 +53,59 @@
 - [ ] Replace seeded demo evidence refs with live DMS export (CSV ingest in Capture)
 - [ ] Add employee invite flow (Settings → Team)
 - [ ] Document real DMS integration: field mapping from CDK/Dealertrack exports
-- [ ] Weekly digest email (open insights + pending decisions)
-- [ ] Uptime monitoring on `/api/health` (Better Stack / Vercel checks)
+- [x] Weekly digest email — shipped: `/api/digest` cron daily 14:30 UTC
+      (vercel.json), per-org on/off + send day + destination in Settings →
+      "Weekly digest"; content spans open insights, pending decisions, and
+      the new "Plan sign-ups this week" section
+- [x] Uptime monitoring (internal): `/api/health` heartbeat, `/api/monitor/ping`
+      cron daily 05:17 UTC, error ingest at `/api/monitor/log` guarded by
+      `MONITOR_INGEST_TOKEN`, alerts to `ALERT_EMAIL`
+- [x] Lead-alert hardening: pilot requests (scan form + score) notify
+      `PILOT_REQUEST_EMAIL` (list-capable), failed alert emails retry with
+      backoff from `lead_alert_queue` (cron `/api/alerts/cron` daily 06:10 UTC),
+      and devices get real-time Web Push pings (VAPID keys; subscribe toggle on
+      Pipeline → Scan-call leads)
+- [ ] External uptime monitor on `/api/health` (Better Stack / Vercel checks) —
+      **owner step**: point a hosted monitor at `/api/health` so outages are
+      caught independently of Vercel's own crons
 
 ## 🏭 Scale phase
 - [ ] Move detectors to a scheduled job (Vercel Cron) with per-org fan-out
 - [ ] Vector search for Knowledge (Supabase pgvector) to upgrade assistant retrieval
 - [ ] Usage metering for pricing tiers (per-seat + per-connection)
 - [ ] SOC 2 track: audit log retention policy, access reviews, incident runbook
+
+## 🔎 Live status audit — 2026-10-22
+
+What was checked against the running production deployment
+(`https://cue-2-the-heart-of-your-business-1p66-scal33.vercel.app`):
+
+- [x] `/api/health` → `{"ok":true,"db":"up"}`
+- [x] `/signup` public page → 200 (rate-limited 5/h/IP); public service-plan
+      signup at `/plans/<orgId>` live with tracked email CTAs
+- [x] `/api/monitor/ping` → 401 unauthenticated (expected; cron passes the
+      ingest token), `/api/monitor/log` guarded by `MONITOR_INGEST_TOKEN`
+- [x] API guards verified in the E2E smoke (now 62 checks, including the
+      pinned dev/prod-aligned `GET /api/quotes/send → 405 JSON + Allow: POST`
+      and the new Market Signals ingest guards + dedupe)
+- [x] Crons registered in `vercel.json`: digest 14:30 UTC, reminders 07:12 UTC,
+      monitor ping 05:17 UTC
+
+**Remaining go-live gaps (all owner console / Vercel dashboard steps, in
+priority order):**
+
+1. Rotate Supabase DB password + least-privilege app role (① in the section
+   above) — DB password is still the original, in the pooled
+   `DATABASE_URL` env var on Vercel
+2. Fresh production `CUE_SESSION_SECRET` (distinct from dev) — signs out
+   existing sessions, do it before the pilot invite
+3. Set `RESEND_API_KEY` + verified `MAIL_FROM` in Vercel — until then password
+   resets fail honestly with "email not configured"
+4. Supabase PITR / scheduled backups, with one restore-into-scratch-DB drill
+5. External `/api/health` monitor (Better Stack or equivalent)
+6. Confirm `MONITOR_INGEST_TOKEN` is set non-empty in Production (per
+   `.env.example`: signed-in owners are also accepted by `/api/monitor/log`,
+   so an empty token means intake relies on sessions alone and the 05:17 UTC
+   ping cron cannot authenticate)
+7. WhatsApp Cloud creds (`WHATSAPP_*`) remain optional/undone — the channel
+   honestly shows AVAILABLE but the webhook refuses unverified calls

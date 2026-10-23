@@ -5,6 +5,10 @@
       "schedule": "30 14 * * *"
     },
     {
+      "path": "/api/alerts/cron",
+      "schedule": "10 6 * * *"
+    },
+    {
       "path": "/api/reminders",
       "schedule": "12 7 * * *"
     },

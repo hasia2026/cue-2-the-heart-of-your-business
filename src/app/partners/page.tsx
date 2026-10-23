@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import PublicHeader from "@/components/PublicHeader";
 import { LogoMark } from "@/components/NavClient";
 import { createPartnerAction } from "./actions";
+import { pilotInboxEmail } from "@/lib/leads";
 
 export const metadata = {
   title: "CUE Partner Program — earn 50% recurring revenue",
@@ -111,7 +112,7 @@ export default async function PartnersPage({
       )}
 
       <p className="muted mt-8 text-center text-xs">
-        Questions? <a className="text-violet-300 underline" href="mailto:pilots@hasi.tech?subject=CUE%20partner%20program">pilots@hasi.tech</a>
+        Questions? <a className="text-violet-300 underline" href={`mailto:${pilotInboxEmail()}?subject=CUE%20partner%20program`}>{pilotInboxEmail()}</a>
       </p>
     </div>
     </>
