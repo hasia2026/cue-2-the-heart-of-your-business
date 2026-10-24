@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
+import { PLANS, operatorPriceLabel, groupPriceLabel, foundingPriceLabel } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,7 @@ export default async function PilotReportPage() {
   // Conversion copy math: earned per-day framing from the audit trail, and
   // how many times the still-open recovery covers the plan price.
   const perDay = Math.round(Number(leaks.impact_total ?? 0) / daysLive);
-  const planCover = Math.floor(projected / 299);
+  const planCover = Math.floor(projected / PLANS.operatorMonthly);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -184,20 +185,20 @@ export default async function PilotReportPage() {
           {projected > 0 ? (
             <>
               The leak engine still sees <strong>{money(projected)}/month</strong> on the table — that&apos;s
-              {planCover >= 2 ? ` ${planCover}× the Operator plan` : " roughly the Operator plan"} at <strong>$299/month</strong>,
+              {planCover >= 2 ? ` ${planCover}× the Operator plan` : " roughly the Operator plan"} at <strong>{operatorPriceLabel}</strong>,
               before your team touches it. Clear the open list and the plan is covered by recovered work alone.
             </>
           ) : (
             <>
-              Every detected leak has been decided. The Operator plan is <strong>$299/month</strong> — the next
+              Every detected leak has been decided. The Operator plan is <strong>{operatorPriceLabel}</strong> — the next
               leak CUE catches is the one that pays for it.
             </>
           )}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <span className="badge-blue">Annual: 2 months free</span>
-          <span className="badge-purple">Group (2–5 stores): $799/mo</span>
-          <span className="badge-green">Founding rate: $199/mo locked</span>
+          <span className="badge-purple">Group (2–5 stores): {groupPriceLabel}</span>
+          <span className="badge-green">Founding rate: {foundingPriceLabel} locked</span>
         </div>
         <p className="mt-4 text-xs text-navy-300/70">
           Full audit trail: {exec.audit_events} events recorded · exportable on request
