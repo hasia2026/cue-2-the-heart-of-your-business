@@ -46,13 +46,18 @@ export async function aiClassifyIntent(
       "BUY = the person wants to buy or is asking for recommendations on what/where to buy. " +
       "SELL = the person wants to sell or trade in something they own. " +
       "SERVICE = the person needs repair, maintenance, inspection, or an appointment. " +
-      "UNKNOWN = none of those.";
+      "UNKNOWN = none of those. " +
+      "Bias: when a post is actionable — someone wants something done on their property or vehicle, urgently or soon, " +
+      "and no provider is named yet — answer BUY. Urgent breakdowns ('my AC is not cooling, who can help?'), " +
+      "'who can check/look at/sort out my X', and requests for company recommendations all count. " +
+      "Only plain routine maintenance scheduling, routine star-rating reviews with no request, and chatter with no " +
+      "intent to act stay SERVICE or UNKNOWN. A missed sale costs far more than one extra alert.";
     let out = "";
     if (cfg.provider === "anthropic") {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": cfg.apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model: cfg.model || "claude-haiku-4-5", max_tokens: 8, system, messages: [{ role: "user", content: text }] }),
+        body: JSON.stringify({ model: cfg.model || "claude-haiku-4-5", max_tokens: 300, system, messages: [{ role: "user", content: text }] }),
       });
       if (!res.ok) return null;
       const j = await res.json() as { content?: { text?: string }[] };
@@ -65,7 +70,7 @@ export async function aiClassifyIntent(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text }] }],
-          generationConfig: { maxOutputTokens: 8 },
+          generationConfig: { maxOutputTokens: 300 },
         }),
       });
       if (!res.ok) return null;
@@ -82,13 +87,16 @@ export async function aiClassifyIntent(
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { Authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json" },
-        body: JSON.stringify({ model, max_tokens: 8, messages: [{ role: "system", content: system }, { role: "user", content: text }] }),
+        body: JSON.stringify({ model, max_tokens: 300, messages: [{ role: "system", content: system }, { role: "user", content: text }] }),
       });
       if (!res.ok) return null;
       const j = await res.json() as { choices?: { message?: { content?: string } }[] };
       out = (j.choices?.[0]?.message?.content ?? "").trim();
     }
-    const verdict = out.toUpperCase().replace(/[^A-Z]/g, "");
+    // Reasoning models (gpt-oss etc.) may emit thinking around the answer;
+    // match the verdict word anywhere and take the LAST occurrence.
+    const matches = [...out.toUpperCase().matchAll(/\b(BUY|SELL|SERVICE|UNKNOWN)\b/g)];
+    const verdict = matches.at(-1)?.[1];
     return verdict === "BUY" || verdict === "SELL" || verdict === "SERVICE" ? (verdict as SignalIntent) : null;
   } catch {
     return null; // graceful: an unreachable LLM never blocks the ingest
