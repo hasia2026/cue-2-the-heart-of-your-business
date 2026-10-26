@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { clientKey, rateLimitResult } from "@/lib/rate-limit";
-import { ingestSignal, parseGooglePayload, resolveIngestAuth } from "@/lib/market-signals";
+import { ingestSignal, notifyBuySignal, parseGooglePayload, resolveIngestAuth } from "@/lib/market-signals";
 
 export const runtime = "nodejs";
 
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
   if (!items.length) return NextResponse.json({ error: "No usable review — reviewer/comment required" }, { status: 400 });
 
   let created = 0;
+  const buyAlerts: Parameters<typeof notifyBuySignal>[0][] = [];
   for (const it of items.slice(0, 50)) {
     const r = await ingestSignal({
       organizationId: auth.organizationId,
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
       occurredAt: it.occurredAt,
     });
     if (r.created) created += 1;
+    // Fresh BUY-intent signals (keyword or AI) alert the owner inbox, like scan leads.
+    if (r.created && r.intent === "BUY") buyAlerts.push({ ...it, kind: "GBP" as const });
   }
-  return NextResponse.json({ ok: true, accepted: items.slice(0, 50).length, created });
+  for (const s of buyAlerts) await notifyBuySignal(s);
+  return NextResponse.json({ ok: true, accepted: items.slice(0, 50).length, created, buyAlerts: buyAlerts.length });
 }

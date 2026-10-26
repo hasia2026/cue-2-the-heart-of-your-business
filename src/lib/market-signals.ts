@@ -21,6 +21,80 @@ export function classifyIntent(text: string): SignalIntent | null {
   return null;
 }
 
+/**
+ * AI fallback for signals the keyword rules miss. Same bring-your-own-key
+ * chain as the AI Ambassador: the org's configured provider first, then the
+ * server-level env keys (GROQ → ANTHROPIC → XAI → GEMINI). Returns null when
+ * no LLM is configured or the answer is unusable — the signal is simply
+ * stored unclassified, exactly like the keyword-only behavior.
+ */
+export async function aiClassifyIntent(
+  organizationId: string,
+  title: string,
+  body: string | null,
+): Promise<SignalIntent | null> {
+  try {
+    const { getAmbassadorConfig } = await import("./ambassador");
+    const cfg = await getAmbassadorConfig(organizationId);
+    if (!cfg.provider || !cfg.apiKey) return null;
+    const text = `${title}\n${body ?? ""}`.replace(/\s+/g, " ").trim().slice(0, 2000);
+    if (!text) return null;
+
+    const system =
+      "You classify social posts and reviews for an automotive/HVAC service business. " +
+      "Answer with exactly ONE word and nothing else: BUY, SELL, SERVICE, or UNKNOWN. " +
+      "BUY = the person wants to buy or is asking for recommendations on what/where to buy. " +
+      "SELL = the person wants to sell or trade in something they own. " +
+      "SERVICE = the person needs repair, maintenance, inspection, or an appointment. " +
+      "UNKNOWN = none of those.";
+    let out = "";
+    if (cfg.provider === "anthropic") {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": cfg.apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: cfg.model || "claude-haiku-4-5", max_tokens: 8, system, messages: [{ role: "user", content: text }] }),
+      });
+      if (!res.ok) return null;
+      const j = await res.json() as { content?: { text?: string }[] };
+      out = (j.content?.[0]?.text ?? "").trim();
+    } else if (cfg.provider === "google") {
+      const model = cfg.model || "gemini-2.0-flash";
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text }] }],
+          generationConfig: { maxOutputTokens: 8 },
+        }),
+      });
+      if (!res.ok) return null;
+      const j = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      out = (j.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
+    } else {
+      // OpenAI-compatible: groq, openai, openrouter, xai
+      const endpoint =
+        cfg.provider === "openai" ? "https://api.openai.com/v1/chat/completions"
+        : cfg.provider === "openrouter" ? "https://openrouter.ai/api/v1/chat/completions"
+        : cfg.provider === "xai" ? "https://api.x.ai/v1/chat/completions"
+        : "https://api.groq.com/openai/v1/chat/completions";
+      const model = cfg.model || (cfg.provider === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o-mini");
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json" },
+        body: JSON.stringify({ model, max_tokens: 8, messages: [{ role: "system", content: system }, { role: "user", content: text }] }),
+      });
+      if (!res.ok) return null;
+      const j = await res.json() as { choices?: { message?: { content?: string } }[] };
+      out = (j.choices?.[0]?.message?.content ?? "").trim();
+    }
+    const verdict = out.toUpperCase().replace(/[^A-Z]/g, "");
+    return verdict === "BUY" || verdict === "SELL" || verdict === "SERVICE" ? (verdict as SignalIntent) : null;
+  } catch {
+    return null; // graceful: an unreachable LLM never blocks the ingest
+  }
+}
+
 export type SignalInput = {
   organizationId: string;
   kind: SignalKind;
@@ -48,10 +122,11 @@ export function signalHash(orgId: string, s: Pick<SignalInput, "kind" | "source"
 /**
  * Insert one signal; a replay of the same signal (same per-org hash) is a
  * no-op. Returns whether a new row was created plus its id when so.
- */
-export async function ingestSignal(s: SignalInput): Promise<{ created: boolean; id: string | null }> {
+ */export async function ingestSignal(s: SignalInput): Promise<{ created: boolean; id: string | null; intent: SignalIntent | null }> {
   const hash = signalHash(s.organizationId, s);
-  const intent = classifyIntent(`${s.title} ${s.body ?? ""}`);
+  // Keyword rules first (free, instant); the AI classifies what they miss.
+  let intent = classifyIntent(`${s.title} ${s.body ?? ""}`);
+  if (!intent) intent = await aiClassifyIntent(s.organizationId, s.title, s.body);
   const [row] = await sql`
     insert into market_signals
       (organization_id, kind, source, external_id, author, channel, title, body, url, intent, signal_hash, occurred_at)
@@ -60,7 +135,7 @@ export async function ingestSignal(s: SignalInput): Promise<{ created: boolean; 
        ${s.title}, ${s.body}, ${s.url}, ${intent}, ${hash}, ${s.occurredAt})
     on conflict (organization_id, signal_hash) do nothing
     returning id`;
-  return { created: !!row, id: row?.id ?? null };
+  return { created: !!row, id: row?.id ?? null, intent };
 }
 
 /**
@@ -166,4 +241,66 @@ export function parseGooglePayload(b: Record<string, unknown>): RawSignalPayload
     });
   }
   return out;
+}
+
+// ── BUY-intent pilot alert ────────────────────────────────────────────────────
+// Hot-signal whisper: a newly created BUY-intent signal is someone asking to
+// buy. It routes to the SAME owner inbox as scan-lead alerts — email via
+// Resend (failures retried by the lead_alert_queue cron), Web Push whisper to
+// registered devices. Fire-and-forget: ingest never fails because of an alert.
+export async function notifyBuySignal(s: {
+  title: string;
+  author: string | null;
+  channel: string | null;
+  source: string;
+  body: string | null;
+  url: string | null;
+  kind: SignalKind;
+}): Promise<void> {
+  try {
+    const [{ pilotInboxEmails, enqueueFailedAlert }, { sendMail, mailerConnected }] = await Promise.all([
+      import("./leads"),
+      import("./mailer"),
+    ]);
+    const targets = pilotInboxEmails();
+    const channel = s.channel ?? s.source;
+    const subject = `New BUY-intent signal — ${channel}${s.author ? ` (${s.author})` : ""}`;
+    const text = [
+      `Someone is asking to buy. Arrived via ${s.kind === "GBP" ? "Google Business Profile" : "a social-listening webhook"}.`,
+      ``,
+      `Signal: ${s.title}`,
+      s.body ? `"${s.body.slice(0, 500)}${s.body.length > 500 ? "..." : ""}"` : null,
+      s.author ? `By: ${s.author}` : null,
+      s.url ? `Source: ${s.url}` : null,
+      ``,
+      `Convert it while it's hot: Signals -> Lead. Follow up within one business day.`,
+    ].filter((v) => v !== null).join("\n");
+
+    if (!mailerConnected()) {
+      console.warn("BUY-signal alert skipped — mailer not configured (signal still stored)");
+    } else {
+      try {
+        const result = await sendMail({ to: targets, subject, text });
+        if (!result.sent) {
+          console.error("BUY-signal alert failed:", result.error ?? "unknown mailer error");
+          if (result.connected) await enqueueFailedAlert(targets, subject, text, result.error ?? "unknown mailer error");
+        }
+      } catch (e) {
+        const err = e instanceof Error ? e.message : String(e);
+        console.error("BUY-signal alert failed:", err);
+        await enqueueFailedAlert(targets, subject, text, err);
+      }
+    }
+
+    // Real-time whisper — best effort, logged, never blocks.
+    try {
+      const { pushPilotAlert } = await import("./push");
+      const pushed = await pushPilotAlert(`BUY signal: ${s.title.slice(0, 60)}`, `${channel}${s.author ? ` · ${s.author}` : ""}`, "/signals");
+      if (!pushed.ok) console.warn("BUY-signal push inconclusive:", pushed.detail);
+    } catch (e) {
+      console.warn("BUY-signal push failed:", e instanceof Error ? e.message : String(e));
+    }
+  } catch (e) {
+    console.error("BUY-signal alert crashed (ingest unaffected):", e instanceof Error ? e.message : String(e));
+  }
 }

@@ -74,8 +74,9 @@ export default async function SignalsPage() {
         <p className="muted text-sm">
           The ingest endpoints (<code className="text-cue-blue">/api/ingest/signals</code> and{" "}
           <code className="text-cue-blue">/api/ingest/google</code>) accept authenticated webhooks from social
-          listening providers and GBP sync. Every signal is deduped, classified by intent (BUY / SELL / SERVICE),
-          and convertible into a lead or an insight with one click.
+          listening providers and GBP sync. Every signal is deduped, classified by intent (BUY / SELL / SERVICE —
+          keyword rules first, your AI Ambassador key classifies the rest), and convertible into a lead or an
+          insight with one click. New BUY-intent signals also ping your pilot-request inbox and devices.
         </p>
         <p className="muted mt-2 text-sm">
           Auth uses your org&apos;s ingest token (<code className="text-cue-blue">SIGNALS_INGEST_TOKEN</code>) in
