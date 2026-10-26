@@ -251,13 +251,15 @@ export function parseGooglePayload(b: Record<string, unknown>): RawSignalPayload
   return out;
 }
 
-// ── BUY-intent pilot alert ────────────────────────────────────────────────────
-// Hot-signal whisper: a newly created BUY-intent signal is someone asking to
-// buy. It routes to the SAME owner inbox as scan-lead alerts — email via
+// ── Hot-signal pilot alert ───────────────────────────────────────────────────
+// Hot-signal whisper: a newly created actionable signal — someone asking to
+// buy (BUY) or urgent, actionable service (SERVICE) — routes to the SAME
+// owner inbox as scan-lead alerts — email via
 // Resend (failures retried by the lead_alert_queue cron), Web Push whisper to
 // registered devices. Fire-and-forget: ingest never fails because of an alert.
-export async function notifyBuySignal(s: {
+export async function notifySignalAlert(s: {
   title: string;
+  intent: "BUY" | "SERVICE";
   author: string | null;
   channel: string | null;
   source: string;
@@ -272,9 +274,9 @@ export async function notifyBuySignal(s: {
     ]);
     const targets = pilotInboxEmails();
     const channel = s.channel ?? s.source;
-    const subject = `New BUY-intent signal — ${channel}${s.author ? ` (${s.author})` : ""}`;
+    const subject = `New ${s.intent === "BUY" ? "BUY-intent" : "urgent service"} signal — ${channel}${s.author ? ` (${s.author})` : ""}`;
     const text = [
-      `Someone is asking to buy. Arrived via ${s.kind === "GBP" ? "Google Business Profile" : "a social-listening webhook"}.`,
+      `Someone is ${s.intent === "BUY" ? "asking to buy" : "asking for service now — they can be converted today"}. Arrived via ${s.kind === "GBP" ? "Google Business Profile" : "a social-listening webhook"}.`,
       ``,
       `Signal: ${s.title}`,
       s.body ? `"${s.body.slice(0, 500)}${s.body.length > 500 ? "..." : ""}"` : null,
@@ -285,17 +287,17 @@ export async function notifyBuySignal(s: {
     ].filter((v) => v !== null).join("\n");
 
     if (!mailerConnected()) {
-      console.warn("BUY-signal alert skipped — mailer not configured (signal still stored)");
+      console.warn("hot-signal alert skipped — mailer not configured (signal still stored)");
     } else {
       try {
         const result = await sendMail({ to: targets, subject, text });
         if (!result.sent) {
-          console.error("BUY-signal alert failed:", result.error ?? "unknown mailer error");
+          console.error("hot-signal alert failed:", result.error ?? "unknown mailer error");
           if (result.connected) await enqueueFailedAlert(targets, subject, text, result.error ?? "unknown mailer error");
         }
       } catch (e) {
         const err = e instanceof Error ? e.message : String(e);
-        console.error("BUY-signal alert failed:", err);
+        console.error("hot-signal alert failed:", err);
         await enqueueFailedAlert(targets, subject, text, err);
       }
     }
@@ -303,12 +305,12 @@ export async function notifyBuySignal(s: {
     // Real-time whisper — best effort, logged, never blocks.
     try {
       const { pushPilotAlert } = await import("./push");
-      const pushed = await pushPilotAlert(`BUY signal: ${s.title.slice(0, 60)}`, `${channel}${s.author ? ` · ${s.author}` : ""}`, "/signals");
-      if (!pushed.ok) console.warn("BUY-signal push inconclusive:", pushed.detail);
+      const pushed = await pushPilotAlert(`${s.intent} signal: ${s.title.slice(0, 60)}`, `${channel}${s.author ? ` · ${s.author}` : ""}`, "/signals");
+      if (!pushed.ok) console.warn("hot-signal push inconclusive:", pushed.detail);
     } catch (e) {
-      console.warn("BUY-signal push failed:", e instanceof Error ? e.message : String(e));
+      console.warn("hot-signal push failed:", e instanceof Error ? e.message : String(e));
     }
   } catch (e) {
-    console.error("BUY-signal alert crashed (ingest unaffected):", e instanceof Error ? e.message : String(e));
+    console.error("hot-signal alert crashed (ingest unaffected):", e instanceof Error ? e.message : String(e));
   }
 }

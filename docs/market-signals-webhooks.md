@@ -73,11 +73,11 @@ Content-Type: application/json
 **Response:**
 
 ```json
-{ "ok": true, "accepted": 2, "created": 2, "buyAlerts": 1 }
+{ "ok": true, "accepted": 2, "created": 2, "hotAlerts": 1 }
 ```
 
 `created` counts new rows (replays of an already-seen signal dedupe to 0).
-`buyAlerts` counts fresh BUY-intent signals that triggered the owner email +
+`hotAlerts` counts fresh actionable signals that triggered the owner email +
 Web Push whisper.
 
 ## 3. Google Business Profile sync → `POST /api/ingest/google`
@@ -125,7 +125,8 @@ Each review lands with channel `GOOGLE`, source `GBP`, and a title like
    bring-your-own-key chain as the AI Ambassador (org key, then
    `GROQ_API_KEY` / `ANTHROPIC_API_KEY` / `XAI_API_KEY` / `GEMINI_API_KEY`).
    With no key configured, unclassified stays unclassified — never wrong.
-3. **BUY-intent alert** — fresh BUY signals email the pilot-request inbox
+3. **Hot-signal alert** — fresh BUY-intent **and** urgent-service (SERVICE)
+   signals email the pilot-request inbox
    (`PILOT_REQUEST_EMAIL`) and Web Push-whisper every registered device.
 4. **One-click action** — in Signals: → Lead (pipeline), → Insight
    (knowledge), or Dismiss.
