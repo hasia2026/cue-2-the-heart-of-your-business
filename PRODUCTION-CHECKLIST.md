@@ -65,6 +65,14 @@
       backoff from `lead_alert_queue` (cron `/api/alerts/cron` daily 06:10 UTC),
       and devices get real-time Web Push pings (VAPID keys; subscribe toggle on
       Pipeline → Scan-call leads)
+- [x] Undelivered-alert visibility: Resend bounce/warning forwarder at
+      `/api/webhooks/resend` (Svix-signed; refuses unsigned calls) records
+      `email.bounced` / `email.delivery_delayed` / `email.complained` for
+      digest, pilot-request, and hot-signal emails into `error_events`, so a
+      bounced owner alert surfaces on **Monitor → errors** in-app. Recent
+      hot-signal owner alerts (email + batched push, SENT/FAILED) are listed on
+      **Signals → "Recent owner alerts"**
+      — **owner step below (⑧)**
 - [ ] External uptime monitor on `/api/health` (Better Stack / Vercel checks) —
       **owner step**: point a hosted monitor at `/api/health` so outages are
       caught independently of Vercel's own crons
@@ -109,3 +117,9 @@ priority order):**
    ping cron cannot authenticate)
 7. WhatsApp Cloud creds (`WHATSAPP_*`) remain optional/undone — the channel
    honestly shows AVAILABLE but the webhook refuses unverified calls
+8. Resend bounce forwarder (owner console step): in the Resend dashboard →
+   Webhooks, add an endpoint `https://<your-app>/api/webhooks/resend`
+   subscribed to **email.bounced, email.delivery_delayed, email.complained**,
+   then copy the shown signing secret into `RESEND_WEBHOOK_SECRET` on Vercel.
+   Until then, bounced pilot-request / hot-signal digest emails are only
+   visible in the Resend console, not in-app

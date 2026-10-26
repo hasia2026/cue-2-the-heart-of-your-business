@@ -6,9 +6,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { clientKey, rateLimitResult } from "@/lib/rate-limit";
-import { ingestSignal, notifySignalAlert, parseGooglePayload, resolveIngestAuth } from "@/lib/market-signals";
+import { ingestSignal, notifySignalAlert, parseGooglePayload, pushSignalBatch, resolveIngestAuth, type RawSignalPayload } from "@/lib/market-signals";
 
 export const runtime = "nodejs";
+
+type HotAlert = RawSignalPayload & { id: string | null; intent: "BUY" | "SERVICE" };
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (!items.length) return NextResponse.json({ error: "No usable review — reviewer/comment required" }, { status: 400 });
 
   let created = 0;
-  const hotAlerts: Parameters<typeof notifySignalAlert>[0][] = [];
+  const hotAlerts: HotAlert[] = [];
   for (const it of items.slice(0, 50)) {
     const r = await ingestSignal({
       organizationId: auth.organizationId,
@@ -42,8 +44,16 @@ export async function POST(req: NextRequest) {
     // Fresh BUY-intent signals (keyword or AI) alert the owner inbox, like scan
     // leads. GBP SERVICE matches stay silent — 5-star "great service" reviews are
     // happy-customer noise, not urgent service requests.
-    if (r.created && r.intent === "BUY") hotAlerts.push({ ...it, intent: "BUY" as const, kind: "GBP" as const });
+    if (r.created && r.intent === "BUY") hotAlerts.push({ ...it, intent: "BUY" as const, id: r.id });
   }
-  for (const s of hotAlerts) await notifySignalAlert(s);
+  for (const s of hotAlerts) await notifySignalAlert({ organizationId: auth.organizationId, signalId: s.id, title: s.title, intent: s.intent, author: s.author, channel: s.channel, source: s.source, body: s.body, url: s.url, kind: "GBP" });
+  if (hotAlerts.length) {
+    await pushSignalBatch(auth.organizationId, {
+      count: hotAlerts.length,
+      intent: hotAlerts[0].intent,
+      firstTitle: `Google review: ${hotAlerts[0].title}`,
+      moreCount: hotAlerts.length - 1,
+    });
+  }
   return NextResponse.json({ ok: true, accepted: items.slice(0, 50).length, created, hotAlerts: hotAlerts.length });
 }

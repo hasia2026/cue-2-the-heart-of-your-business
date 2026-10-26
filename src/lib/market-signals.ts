@@ -253,11 +253,15 @@ export function parseGooglePayload(b: Record<string, unknown>): RawSignalPayload
 
 // ── Hot-signal pilot alert ───────────────────────────────────────────────────
 // Hot-signal whisper: a newly created actionable signal — someone asking to
-// buy (BUY) or urgent, actionable service (SERVICE) — routes to the SAME
-// owner inbox as scan-lead alerts — email via
-// Resend (failures retried by the lead_alert_queue cron), Web Push whisper to
-// registered devices. Fire-and-forget: ingest never fails because of an alert.
+// buy (BUY) or urgent, actionable service (SERVICE) — is emailed to the SAME
+// owner inbox as scan-lead alerts via Resend (failures retried by the
+// lead_alert_queue cron). Devices get ONE batched Web Push whisper per ingest
+// batch (pushSignalBatch). Every attempt lands in signal_alert_ledger so the
+// Signals page can show recent alerts and failures are traceable in-app.
+// Fire-and-forget: ingest never fails because of an alert.
 export async function notifySignalAlert(s: {
+  organizationId: string;
+  signalId: string | null;
   title: string;
   intent: "BUY" | "SERVICE";
   author: string | null;
@@ -268,9 +272,10 @@ export async function notifySignalAlert(s: {
   kind: SignalKind;
 }): Promise<void> {
   try {
-    const [{ pilotInboxEmails, enqueueFailedAlert }, { sendMail, mailerConnected }] = await Promise.all([
+    const [{ pilotInboxEmails, enqueueFailedAlert }, { sendMail, mailerConnected }, { sql }] = await Promise.all([
       import("./leads"),
       import("./mailer"),
+      import("./db"),
     ]);
     const targets = pilotInboxEmails();
     const channel = s.channel ?? s.source;
@@ -286,31 +291,65 @@ export async function notifySignalAlert(s: {
       `Convert it while it's hot: Signals -> Lead. Follow up within one business day.`,
     ].filter((v) => v !== null).join("\n");
 
+    let emailStatus: "SENT" | "FAILED" = "SENT";
+    let emailDetail: string | null = null;
     if (!mailerConnected()) {
+      emailStatus = "FAILED";
+      emailDetail = "mailer not configured (RESEND_API_KEY unset) — email is the alert of record";
       console.warn("hot-signal alert skipped — mailer not configured (signal still stored)");
     } else {
       try {
         const result = await sendMail({ to: targets, subject, text });
         if (!result.sent) {
-          console.error("hot-signal alert failed:", result.error ?? "unknown mailer error");
+          emailStatus = "FAILED";
+          emailDetail = result.error ?? "unknown mailer error";
+          console.error("hot-signal alert failed:", emailDetail);
           if (result.connected) await enqueueFailedAlert(targets, subject, text, result.error ?? "unknown mailer error");
         }
       } catch (e) {
-        const err = e instanceof Error ? e.message : String(e);
-        console.error("hot-signal alert failed:", err);
-        await enqueueFailedAlert(targets, subject, text, err);
+        emailStatus = "FAILED";
+        emailDetail = e instanceof Error ? e.message : String(e);
+        console.error("hot-signal alert failed:", emailDetail);
+        await enqueueFailedAlert(targets, subject, text, emailDetail);
       }
     }
 
-    // Real-time whisper — best effort, logged, never blocks.
+    // Ledger row for the Signals page (never blocks ingest).
     try {
-      const { pushPilotAlert } = await import("./push");
-      const pushed = await pushPilotAlert(`${s.intent} signal: ${s.title.slice(0, 60)}`, `${channel}${s.author ? ` · ${s.author}` : ""}`, "/signals");
-      if (!pushed.ok) console.warn("hot-signal push inconclusive:", pushed.detail);
+      await sql`
+        insert into signal_alert_ledger (organization_id, signal_id, kind, intent, subject, status, detail)
+        values (${s.organizationId}, ${s.signalId}, 'EMAIL', ${s.intent}, ${subject}, ${emailStatus}, ${emailDetail})`;
     } catch (e) {
-      console.warn("hot-signal push failed:", e instanceof Error ? e.message : String(e));
+      console.error("signal_alert_ledger insert failed:", e instanceof Error ? e.message : String(e));
     }
   } catch (e) {
     console.error("hot-signal alert crashed (ingest unaffected):", e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** One Web Push whisper per hot-signal ingest batch (not per signal). */
+export async function pushSignalBatch(organizationId: string, batch: {
+  count: number;
+  intent: "BUY" | "SERVICE";
+  firstTitle: string;
+  moreCount: number; // how many AFTER the first one were in the same batch
+}): Promise<void> {
+  try {
+    const { pushPilotAlert } = await import("./push");
+    const subject = `${batch.count} new hot signal${batch.count === 1 ? "" : "s"} (${batch.intent})`;
+    const body = `${batch.firstTitle.slice(0, 70)}${batch.moreCount > 0 ? ` +${batch.moreCount} more` : ""} — open Signals to convert them.`;
+    const pushed = await pushPilotAlert(subject, body, "/signals");
+
+    // Ledger row for the Signals page (never blocks ingest).
+    try {
+      const { sql } = await import("./db");
+      await sql`
+        insert into signal_alert_ledger (organization_id, kind, intent, subject, status, detail)
+        values (${organizationId}, 'PUSH', ${batch.intent}, ${subject}, ${pushed.ok ? "SENT" : "SKIPPED"}, ${pushed.detail ?? null})`;
+    } catch { /* ledger is best-effort */ }
+
+    if (!pushed.ok) console.warn("hot-signal batch push inconclusive:", pushed.detail);
+  } catch (e) {
+    console.warn("hot-signal batch push failed:", e instanceof Error ? e.message : String(e));
   }
 }

@@ -62,6 +62,24 @@ export default async function SignalsPage() {
   const inbox = rows.filter((r) => r.status === "NEW");
   const handled = rows.filter((r) => r.status !== "NEW");
 
+  // Recent owner alerts — emails + batched web-push whispers about hot signals
+  // (BUY / urgent SERVICE), newest first. FAILED/SKIPPED rows are the in-app
+  // trace of undelivered alerts (bounces also land on Monitor).
+  const alertRowsRaw = await sql
+    `select kind, intent, subject, status, detail, created_at
+    from signal_alert_ledger
+    where organization_id = ${session.organizationId}
+    order by created_at desc
+    limit 8`;
+  const alertRows = alertRowsRaw as unknown as {
+    kind: string;
+    intent: string | null;
+    subject: string;
+    status: string;
+    detail: string | null;
+    created_at: string;
+  }[];
+
   return (
     <div className="space-y-6">
       <div>
@@ -94,6 +112,35 @@ export default async function SignalsPage() {
           <form action={addDemoSignals}>
             <button className="btn-ghost">Add demo signals</button>
           </form>
+        </section>
+      )}
+
+      {alertRows.length > 0 && (
+        <section className="card p-6">
+          <h2 className="section-title mb-3">Recent owner alerts</h2>
+          <p className="muted text-xs mb-3">
+            Batched web-push whispers and pilot-inbox emails fired for hot signals (BUY / urgent SERVICE). Undelivered rows mean check the inbox&apos;s spam — or Monitor for bounces.
+          </p>
+          <ul className="divide-y divide-white/5">
+            {alertRows.map((a, i) => (
+              <li key={i} className="py-2.5 flex flex-wrap items-center gap-2">
+                <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-white/10">{a.kind === "PUSH" ? "🔔 Push" : "✉️ Email"}</span>
+                {a.intent && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${INTENT_STYLE[a.intent] ?? "bg-white/10"}`}>{a.intent}</span>}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    a.status === "SENT"
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : "bg-rose-500/15 text-rose-300"
+                  }`}
+                >
+                  {a.status}
+                </span>
+                <span className="text-sm truncate max-w-full" title={a.subject}>{a.subject}</span>
+                {a.status !== "SENT" && a.detail && <span className="muted text-xs" title={a.detail}>{a.detail.slice(0, 80)}</span>}
+                <span className="muted text-xs ml-auto">{when(a.created_at)}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
