@@ -3,7 +3,7 @@ import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import { MODULES, FIXED_MODULES } from "@/lib/modules";
 import { sql } from "@/lib/db";
 import OnboardingWizard from "./Wizard";
-import AvatarUpload from "./AvatarUpload";
+import AvatarUpload from "@/components/AvatarUpload";
 import { savePersona, saveBranding, saveModules } from "../settings/actions";
 
 export const dynamic = "force-dynamic";

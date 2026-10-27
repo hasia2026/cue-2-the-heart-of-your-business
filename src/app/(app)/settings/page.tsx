@@ -6,6 +6,7 @@ import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSe
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import { MODULES, FIXED_MODULES } from "@/lib/modules";
 import WorkspaceStudioForm from "./WorkspaceStudioForm";
+import AvatarUpload from "@/components/AvatarUpload";
 import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
@@ -332,6 +333,12 @@ export default async function SettingsPage({
             <button className="btn-primary">{t("settings.saveAmbassador")}</button>
           </div>
         </form>
+        {/* The Ambassador's photo lives here too — same shared uploader the
+            onboarding wizard and Workspace Studio ① persona tab use, so
+            people who looked under "AI Ambassador" find it. */}
+        <div className="mt-3">
+          <AvatarUpload currentUrl={ws.ambassadorAvatarUrl} />
+        </div>
       </section>
 
       <section className="card p-6">
