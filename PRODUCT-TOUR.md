@@ -52,6 +52,16 @@ The morning view — essentials only: priority insight (with evidence drawer), b
 **How to use it:** open it first every day; act on the priority insight.
 **Why it matters:** answers "what should I do today" in one glance.
 
+**First-run tour:** on an owner's or manager's first sign-in, the dashboard shows a one-time **"Welcome — 3 things to see first"** card (① type what you want · ② capture one document · ③ send one quote). Each step opens the real feature; every step is skippable, and you can always find these later on your own. Staff and members get a single dismissible line about ⌘K instead — nothing to click through.
+
+### Command bar (`⌘K` / Ctrl+K, anywhere)
+Press the bar anywhere in the app and write a sentence: "new job for Summit Air $1,250 replace heater at 4422 Cedar Ave Friday 9am". CUE parses it deterministically — no AI needed, no invented customers — fills in a real record draft, and waits for **you** to confirm. Nothing is written until you press Confirm.
+
+![ command bar open with a typed request ](docs/screenshots/command-bar.png)
+![ auto-filled draft — confirm or edit ](docs/screenshots/command-draft.png)
+
+**Why it matters:** the fastest path to "I have a job to log" without knowing where anything lives.
+
 ### Workspace Studio — make the workspace yours
 Three owner-tailorable layers, all backed by one per-org profile and wired through every branded surface:
 
@@ -162,6 +172,8 @@ Two collection motions, both owner-approved before anything sends:
 Leads, deals, inventory aging, service orders, and appointments in one dealership-aware view; 360° detail per lead/customer; the **unscheduled board** groups unassigned maintenance work by area for dispatching; the property-filtered service history and next-visit hint live on each customer's Jobs tab. Service orders record the **property address** they were for, so a customer's Jobs tab groups history by location — open one property and you see just that address's visits, with a **"next visit due"** hint based on how long it's been since the last visit there. No more scrolling 30 locations for one address.
 
 ![ leads + deals + inventory aging ](docs/screenshots/pipeline.png)
+
+![ service history grouped by property, with last-visit chips ](docs/screenshots/property-history.png)
 
 ### Pilot Report (`/report`)
 All real numbers: leaks found vs. acted vs. open, dollars at stake, the human-decision record (from the audit log), execution results, and dollars-recovered proxies.
