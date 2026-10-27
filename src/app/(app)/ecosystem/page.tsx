@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
@@ -14,8 +15,18 @@ export default async function EcosystemPage() {
   const session = await requireSession();
   const orgId = session.organizationId;
   const integrations = await sql`
-    select id, key, name, category, status, data_available, capabilities
+    select id, key, name, category, status, data_available, capabilities, webhook_secret
     from integrations where organization_id = ${orgId} order by category, name`;
+
+  // ReferPro ingest URL — shown here so the owner can hand it to ReferPro
+  // without touching the database. The secret is in the query because
+  // webhook senders (like calendar clients) cannot sign in or set headers.
+  const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host") ?? "localhost:3210";
+  const proto = (await headers()).get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+  const referproUrl = (ref: { key: string; webhook_secret: string | null } | undefined) =>
+    ref?.key === "referpro" && ref.webhook_secret
+      ? `${proto}://${host}/api/ingest/referpro?token=${ref.webhook_secret}`
+      : null;
 
   // WhatsApp status is computed live from env — never fabricated from the seed row.
   const liveStatus = (key: string, status: string) =>
@@ -35,7 +46,9 @@ export default async function EcosystemPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        {integrations.map((i) => (
+        {integrations.map((i) => {
+          const hook = referproUrl(i as { key: string; webhook_secret: string | null });
+          return (
           <div key={i.id} className="card p-5">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-white">{i.name}</span>
@@ -50,8 +63,16 @@ export default async function EcosystemPage() {
                 <div><dt className="inline text-navy-300">What CUE can do: </dt><dd className="inline text-navy-100">{i.capabilities}</dd></div>
               )}
             </dl>
+            {hook && (
+              <div className="mt-3 rounded-lg bg-white/[0.04] p-2.5 text-xs">
+                <div className="font-semibold text-navy-100">Your webhook URL — paste into ReferPro:</div>
+                <code className="mt-1 block break-all text-[11px] text-violet-200" style={{ wordBreak: "break-all" }}>{hook}</code>
+                <div className="mt-1 text-navy-300/70">Leads arrive in Pipeline tagged REFERPRO the moment ReferPro posts an event.</div>
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
         {integrations.length === 0 && <div className="card p-5 muted">No integrations configured yet.</div>}
       </div>
     </div>

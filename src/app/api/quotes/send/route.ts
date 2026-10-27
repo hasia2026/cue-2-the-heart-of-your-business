@@ -115,6 +115,38 @@ export async function POST(req: NextRequest) {
       items: items.map((r) => ({ description: r.description, amount: Number(r.amount) })),
       validUntil: inv.due_at ? new Date(inv.due_at).toLocaleDateString() : null,
     };
+  } else if (Array.isArray(body?.options)) {
+    // Multi-option quote (Good–Better–Best): 2–4 named choices, one click
+    // each in the email. Recorded in quote_responses with a secret token so
+    // the decision page /q/<token> works without customer sign-in.
+    type RawOpt = { name?: unknown; amount?: unknown; note?: unknown };
+    const KEYS = ["A", "B", "C", "D"];
+    const options = (body.options as RawOpt[])
+      .filter((o: RawOpt) => typeof o?.name === "string" && o.name.trim() && typeof o?.amount === "number" && Number.isFinite(o.amount))
+      .slice(0, 4)
+      .map((o: RawOpt, idx: number) => ({
+        key: KEYS[idx],
+        name: (o.name as string).trim().slice(0, 120),
+        amount: Math.round((o.amount as number) * 100) / 100,
+        note: typeof o.note === "string" && o.note.trim() ? (o.note as string).trim().slice(0, 200) : null,
+      }));
+    if (options.length < 2) return NextResponse.json({ error: "Two or more options required" }, { status: 400 });
+    const [row] = await sql`
+      insert into quote_responses (organization_id, customer_id, title, options, locale)
+      values (${orgId}, ${customerId}, ${typeof body?.title === "string" && body.title.trim() ? body.title.trim().slice(0, 120) : "Your quote"},
+              ${sql.json(options as unknown as Record<string, string>[])}, ${quoteLocale(delivery.locale)})
+      returning token`;
+    const appUrl = (process.env.APP_URL ?? "http://localhost:3210").replace(/\/+$/, "");
+    quote = {
+      customerName: delivery.name,
+      customerEmail: delivery.email,
+      title: typeof body?.title === "string" ? body.title.slice(0, 120) : "Your quote",
+      items: [],
+      options: options.map((o) => ({ ...o, key: o.key })),
+      decisionUrl: `${appUrl}/q/${row?.token}`,
+      notes: typeof body?.notes === "string" ? body.notes.slice(0, 500) : null,
+      validUntil: typeof body?.validUntil === "string" ? body.validUntil : null,
+    };
   } else if (Array.isArray(body?.items)) {
     const items = body.items
       .filter((i: { description?: unknown; amount?: unknown }) => typeof i?.description === "string" && typeof i?.amount === "number")

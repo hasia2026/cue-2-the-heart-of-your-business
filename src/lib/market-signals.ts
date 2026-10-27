@@ -280,16 +280,45 @@ export async function notifySignalAlert(s: {
     const targets = pilotInboxEmails();
     const channel = s.channel ?? s.source;
     const subject = `New ${s.intent === "BUY" ? "BUY-intent" : "urgent service"} signal — ${channel}${s.author ? ` (${s.author})` : ""}`;
+    // The owner reads this on a phone between jobs — every alert carries two
+    // links: the original post when the provider supplied one (or exact search
+    // instructions when it didn't), and the CUE Signals inbox to convert it.
+    const appUrl = (process.env.APP_URL ?? "http://localhost:3210").replace(/\/+$/, "");
+    const signalsLink = `${appUrl}/signals`;
+    const provenance = s.url
+      ? `Where it was posted:\n${s.url}`
+      : `No direct link came with this signal — search “${s.title}” on ${channel}${s.author ? `, by ${s.author}` : ""}.`;
     const text = [
       `Someone is ${s.intent === "BUY" ? "asking to buy" : "asking for service now — they can be converted today"}. Arrived via ${s.kind === "GBP" ? "Google Business Profile" : "a social-listening webhook"}.`,
       ``,
       `Signal: ${s.title}`,
       s.body ? `"${s.body.slice(0, 500)}${s.body.length > 500 ? "..." : ""}"` : null,
       s.author ? `By: ${s.author}` : null,
-      s.url ? `Source: ${s.url}` : null,
       ``,
-      `Convert it while it's hot: Signals -> Lead. Follow up within one business day.`,
+      provenance,
+      ``,
+      `Open the Signals inbox in CUE:`,
+      signalsLink,
+      ``,
+      `Convert it while it's hot: Signals → Lead, then follow up within one business day.`,
     ].filter((v) => v !== null).join("\n");
+
+    const esc = (t: string) => t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+    const btn = (href: string, label: string) =>
+      `<a href="${esc(href)}" style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:600">${label}</a>`;
+    const html = `<div style="font:16px/1.5 system-ui,-apple-system,sans-serif;color:#111827;max-width:560px">` +
+      `<p style="margin:0 0 12px">Someone is ${s.intent === "BUY" ? "<b>asking to buy</b>" : "<b>asking for service now</b>"} — they can be converted today. Arrived via ${esc(s.kind === "GBP" ? "Google Business Profile" : "a social-listening webhook")} on <b>${esc(channel)}</b>.</p>` +
+      `<blockquote style="margin:0 0 12px;padding:10px 14px;border-left:3px solid #7c3aed;background:#f5f3ff;border-radius:8px">` +
+      `<b>${esc(s.title)}</b>` +
+      (s.body ? `<br><span style="color:#374151">“${esc(s.body.slice(0, 500))}${s.body.length > 500 ? "…" : ""}”</span>` : "") +
+      (s.author ? `<br><span style="color:#6b7280;font-size:13px">by ${esc(s.author)}</span>` : "") +
+      `</blockquote>` +
+      (s.url
+        ? `<p style="margin:0 0 12px">The post itself: <a href="${esc(s.url)}" style="color:#7c3aed;font-weight:600">open it ↗</a></p>`
+        : `<p style="margin:0 0 12px;color:#6b7280">No direct link came with this signal — search <b>“${esc(s.title)}”</b> on ${esc(channel)}${s.author ? `, by ${esc(s.author)}` : ""}.</p>`) +
+      `<p style="margin:0 0 16px">${btn(signalsLink, "Open CUE Signals →")}</p>` +
+      `<p style="margin:0;color:#6b7280;font-size:13px">Respond within one business day — open the inbox, convert the signal to a Lead, and follow up.</p>` +
+      `</div>`;
 
     let emailStatus: "SENT" | "FAILED" = "SENT";
     let emailDetail: string | null = null;
@@ -299,7 +328,7 @@ export async function notifySignalAlert(s: {
       console.warn("hot-signal alert skipped — mailer not configured (signal still stored)");
     } else {
       try {
-        const result = await sendMail({ to: targets, subject, text });
+        const result = await sendMail({ to: targets, subject, text, html });
         if (!result.sent) {
           emailStatus = "FAILED";
           emailDetail = result.error ?? "unknown mailer error";

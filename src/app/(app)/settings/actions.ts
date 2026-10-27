@@ -20,12 +20,18 @@ export async function updateProfile(formData: FormData) {
   const orgId = session.organizationId;
   const g = (k: string) => String(formData.get(k) ?? "").trim() || null;
 
+  // Timezone arrives as an IANA name; free-typed values that aren't real IANA
+  // ids are refused (kept empty) instead of poisoning the calendar feed later.
+  const tz = g("timezone");
+  const tzValid = tz === null || (/^[A-Za-z_\-+/]{2,40}(?:\/[A-Za-z_\-+/0-9]{1,60})+$/.test(tz));
+
   await sql`
     update business_profiles set
       industry = ${g("industry")}, size = ${g("size")}, locations = ${g("locations")},
       business_model = ${g("businessModel")}, offerings = ${g("offerings")},
       target_customers = ${g("targetCustomers")}, mission = ${g("mission")},
-      values_text = ${g("values")}, operational_priorities = ${g("priorities")}
+      values_text = ${g("values")}, operational_priorities = ${g("priorities")},
+      timezone = ${tzValid ? tz : null}
     where organization_id = ${orgId}`;
 
   await logAudit({
@@ -34,6 +40,21 @@ export async function updateProfile(formData: FormData) {
   });
   revalidatePath("/settings");
   revalidatePath("/compass");
+  revalidatePath("/pipeline");
+}
+
+/** Regenerate the private .ics subscribe link — the old calendar URL stops
+ *  working the moment this runs, which is exactly the point of the button. */
+export async function regenerateCalendarToken() {
+  const session = await requireSessionAction();
+  await sql`
+    update business_profiles set calendar_token = gen_random_uuid()
+    where organization_id = ${session.organizationId}`;
+  await logAudit({
+    organizationId: session.organizationId, actorId: session.user.id,
+    action: "PROFILE_UPDATED", detail: "Calendar subscribe link regenerated",
+  });
+  revalidatePath("/settings");
 }
 
 export async function updateIndustryPack(formData: FormData) {

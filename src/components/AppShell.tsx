@@ -9,6 +9,7 @@ import TextSizePicker from "./TextSizePicker";
 import ReviMark from "./ReviMark";
 import { signOut } from "@/app/signin/actions";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
+import CommandBar from "./CommandBar";
 
 // Workspace Studio: sidebar item href ↔ module key. Anything absent stays stock;
 // a disabled module hides its item (and its children), a renamed label replaces it.
@@ -23,6 +24,7 @@ const ITEM_MODULE: Record<string, string> = {
   "/enhance": "enhance",
   "/execute": "execute",
   "/pipeline": "pipeline",
+  "/pipeline/customers": "pipeline",
   "/pipeline/unscheduled": "pipeline",
   "/pipeline/scan-leads": "pipeline",
   "/report": "report",
@@ -119,6 +121,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
           pulse: pulse.execute,
           children: [
             { href: "/pipeline", label: t("nav.pipeline") },
+            { href: "/pipeline/customers", label: t("nav.customers") },
             { href: "/pipeline/unscheduled", label: "Unscheduled board" },
             { href: "/pipeline/scan-leads", label: "Scan-call leads" },
             { href: "/report", label: t("nav.report") },
@@ -169,6 +172,8 @@ export default async function AppShell({ children }: { children: React.ReactNode
           </div>
         </header>
         <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+        {/* Type-what-you-want bar: desktop pill floats in the top bar, mobile FAB bottom-right */}
+        <CommandBar signedIn={!!session} />
         <footer className="border-t border-white/[0.06] px-6 py-4 text-xs text-navy-300/60">
           <div className="flex items-center gap-2">
             <LogoMark className="h-4 w-4" /> CUE — Built by HASI Technologies

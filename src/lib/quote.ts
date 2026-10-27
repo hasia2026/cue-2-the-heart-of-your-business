@@ -24,11 +24,15 @@ async function orgBrand(orgId: string): Promise<{ name: string | null; accent: s
 }
 
 export type QuoteItem = { description: string; amount: number };
+/** One choice in a multi-option (Good–Better–Best) quote. key: "A"|"B"|"C"|"D". */
+export type QuoteOption = { key: string; name: string; amount: number; note?: string | null };
 export type QuotePayload = {
   customerName: string;
   customerEmail: string | null;
   title: string;
   items: QuoteItem[];
+  options?: QuoteOption[]; // present → render as an options quote (items become a plain "single option")
+  decisionUrl?: string | null; // public /q/<token> once a send is recorded
   notes?: string | null;
   validUntil?: string | null; // already-formatted date string
 };
@@ -41,6 +45,12 @@ const L: Record<string, Record<string, string>> = {
     validUntil: "Valid until",
     notes: "Notes",
     accept: "Reply to this email to accept or ask any question — we answer same day.",
+    choose: "Choose an option",
+    optOn: "Option",
+    acceptBtn: "Accept", // x-crm-accept
+    declineBtn: "Decline",
+    declineAllBtn: "None of these are right",
+    noLink: "(Decision buttons arrive broken in the text version — open the email as HTML, or reply.)",
     closing: "Thank you for the opportunity to earn your business.",
     planCta: "Sign up for a maintenance plan →",
   },
@@ -51,6 +61,12 @@ const L: Record<string, Record<string, string>> = {
     validUntil: "Válida hasta",
     notes: "Notas",
     accept: "Responda a este correo para aceptar o hacer cualquier pregunta — contestamos el mismo día.",
+    choose: "Elija una opción",
+    optOn: "Opción",
+    acceptBtn: "Aceptar",
+    declineBtn: "No me interesa",
+    declineAllBtn: "Ninguna opción me sirve",
+    noLink: "(Los botones no aparecen en esta versión de texto — abra el email como HTML o responda.)",
     closing: "Gracias por la oportunidad de servirle.",
     planCta: "Regístrese en un plan de mantenimiento →",
   },
@@ -61,6 +77,12 @@ const L: Record<string, Record<string, string>> = {
     validUntil: "صالح حتى",
     notes: "ملاحظات",
     accept: "قم بالرد على هذا البريد للقبول أو لأي سؤال — نجيب في نفس اليوم.",
+    choose: "اختر خيارًا",
+    optOn: "الخيار",
+    acceptBtn: "قبول",
+    declineBtn: "رفض",
+    declineAllBtn: "لا يناسبني أي خيار",
+    noLink: "(الأزرار لا تظهر في نسخة النص — افتح البريد بصيغة HTML أو رُد.)",
     closing: "شكرًا لمنحنا فرصة خدمتك.",
     planCta: "سجّل في خطة صيانة →",
   },
@@ -71,6 +93,12 @@ const L: Record<string, Record<string, string>> = {
     validUntil: "Có hiệu lực đến",
     notes: "Ghi chú",
     accept: "Vui lòng trả lời email này để chấp nhận hoặc hỏi bất cứ điều gì — chúng tôi trả lời trong ngày.",
+    choose: "Chọn một phương án",
+    optOn: "Phương án",
+    acceptBtn: "Chấp nhận",
+    declineBtn: "Từ chối",
+    declineAllBtn: "Không phương án nào phù hợp",
+    noLink: "(Nút bấm không xuất hiện trong bản văn bản thuần — hãy mở email dạng HTML hoặc trả lời.)",
     closing: "Cảm ơn quý khách đã cho chúng tôi cơ hội phục vụ.",
     planCta: "Đăng ký gói bảo trì →",
   },
@@ -82,14 +110,27 @@ export function quoteLocale(locale: string | null | undefined): string {
 
 export function renderQuoteText(q: QuotePayload, locale: string | null | undefined, plansUrl?: string | null): string {
   const t = L[quoteLocale(locale)];
-  const total = q.items.reduce((s, i) => s + i.amount, 0);
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
+  const options = q.options ?? [];
+  const hasOptions = options.length > 0;
+  const optionBlock = hasOptions
+    ? [
+        "",
+        q.decisionUrl ? `${t.choose} — open this link in your browser:` : t.choose + " (reply with your letter — A, B, C…)" + (q.decisionUrl ? "" : ` ${t.noLink}`),
+        q.decisionUrl ? q.decisionUrl : "",
+        ...options.map((o) =>
+          `${t.optOn} ${o.key} — ${o.name} — ${money(o.amount)}${o.note ? ` (${o.note})` : ""}`,
+        ),
+      ]
+    : null;
+  const total = q.items.reduce((s, i) => s + i.amount, 0);
   return [
     `${t.heading} — ${q.title}`,
     "",
-    q.items.map((i) => `• ${i.description} — ${money(i.amount)}`).join("\n"),
-    "",
-    `${t.total}: ${money(total)}`,
+    // When options are present the “items” block is the base option; the
+    // choice itself is listed after it.
+    q.items.map((i) => `• ${i.description} — ${money(i.amount)}`).join("\n"),    ...(optionBlock ?? []),
+    hasOptions ? "" : `${t.total}: ${money(total)}`,
     q.validUntil ? `${t.validUntil}: ${q.validUntil}` : "",
     q.notes ? `${t.notes}: ${q.notes}` : "",
     "",
@@ -112,6 +153,28 @@ export function renderQuoteHtml(
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const money = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
   const total = q.items.reduce((s, i) => s + i.amount, 0);
+  const optionCards = (q.options ?? []).length > 0
+    ? `<div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b93b8;margin:4px 0 8px 4px;">${esc(t.choose)}</div>` +
+      (q.options ?? []).map((o) => {
+        const acceptHref = q.decisionUrl ? `${q.decisionUrl}?o=${o.key}` : null;
+        const declineHref = q.decisionUrl ? `${q.decisionUrl}?d=1` : null;
+        return `<div style="background:#141428;border-radius:12px;padding:16px 18px;margin:0 0 10px;border-left:4px solid ${accent};">` +
+          `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">` +
+          `<div style="font-size:15px;font-weight:700;color:#ffffff;">${esc(t.optOn)} ${esc(o.key)} · ${esc(o.name)}</div>` +
+          `<div style="font-size:16px;font-weight:700;color:${accent};white-space:nowrap;">${money(o.amount)}</div></div>` +
+          (o.note ? `<div style="font-size:12px;color:#8b93b8;margin-top:4px;">${esc(o.note)}</div>` : "") +
+          (acceptHref 
+            ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">` +
+              `<a href="${esc(acceptHref)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:13px;padding:8px 16px;border-radius:999px;text-decoration:none;">${esc(t.acceptBtn)} ✓</a>` +
+              `<a href="${esc(declineHref ?? "")}" style="display:inline-block;background:transparent;color:#8b93b8;font-weight:600;font-size:13px;padding:8px 16px;border-radius:999px;text-decoration:none;border:1px solid rgba(255,255,255,.15);">${esc(t.declineBtn)}</a>` +
+              `</div>`
+            : `<div style="margin-top:8px;font-size:12px;color:#6b7396;">${esc(t.noLink)}</div>`) +
+          `</div>`;
+      }).join("") +
+      (q.decisionUrl
+        ? `<div style="text-align:center;margin:2px 0 14px;"><a href="${esc(q.decisionUrl)}?d=1" style="color:#8b93b8;font-size:12px;text-decoration:underline;">${esc(t.declineAllBtn)}</a></div>`
+        : "")
+    : "";
   const dir = quoteLocale(locale) === "ar" ? ` dir="rtl"` : "";
   // Workspace Studio branding: accent falls back to the stock violet.
   const accent = brand?.accent ?? "#7c6cff";
@@ -135,6 +198,7 @@ export function renderQuoteHtml(
     ${q.validUntil ? `<div style="font-size:12px;color:#8b93b8;margin-top:8px;">${esc(t.validUntil)}: ${esc(q.validUntil)}</div>` : ""}
     ${q.notes ? `<div style="font-size:12px;color:#8b93b8;margin-top:4px;">${esc(t.notes)}: ${esc(q.notes)}</div>` : ""}
   </div>
+  ${optionCards}
   <div style="font-size:13px;color:#c9cdea;line-height:1.5;">${esc(t.accept)}<br/>${esc(t.closing)}</div>
   ${plansUrl ? `<div style="text-align:center;margin-top:16px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">${esc(t.planCta ?? "Sign up for a maintenance plan →")}</a></div>` : ""}
   ${contactFooter}

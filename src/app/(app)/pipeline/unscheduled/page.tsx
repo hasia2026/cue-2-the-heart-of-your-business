@@ -18,7 +18,7 @@ export default async function UnscheduledPage() {
 
   const rows = await sql`
     select so.id, c.name as customer, c.address, c.area, c.phone,
-           so.title, so.status, so.amount, so.opened_at,
+           so.property_address, so.title, so.status, so.amount, so.opened_at,
            -- one live maintenance agreement per customer (unique partial index)
            ma.plan_name as agreement
     from service_orders so
@@ -37,7 +37,8 @@ export default async function UnscheduledPage() {
   const jobs: Job[] = rows.map((r) => ({
     id: r.id,
     customer: r.customer,
-    address: r.address ?? null,
+    // The job's serviced property wins; fall back to the account address.
+    address: (r.property_address ?? r.address) ?? null,
     area: r.area ?? null,
     title: r.title,
     amount: Number(r.amount ?? 0),

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
@@ -8,6 +9,7 @@ import OrderActions from "./OrderActions";
 import DraftRelease from "./DraftRelease";
 import VisitActions from "./VisitActions";
 import LeadFollowUp from "./LeadFollowUp";
+import NewJobForm from "./NewJobForm";
 import { parseAuthorityBands } from "@/lib/desking";
 import { LeadServiceType, DealServiceType } from "./ServiceTypeInputs";
 import BackGrossInput from "./BackGrossInput";
@@ -17,11 +19,38 @@ export const dynamic = "force-dynamic";
 const money = (n: unknown) => `$${Number(n ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const ago = (d: Date | string | null) => d ? `${Math.floor((Date.now() - new Date(d).getTime()) / 864e5)}d ago` : "—";
 
+/** Wall-clock time in the ORG's timezone — travel-proof: the visit says 2:00 PM
+ *  for the shop no matter whose phone or which server renders it. */
+const fmtInTz = (d: Date | string, tz: string) =>
+  new Intl.DateTimeFormat("en-US", { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(new Date(d));
+const VALID_TZ = (tz: unknown): string =>
+  typeof tz === "string" && tz.includes("/") ? tz : "America/Chicago";
+
+type DecidedOpt = { key: string; name: string; amount: number; note?: string | null };
+
 export default async function PipelinePage() {
   await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
   const vocab = await getVocab(orgId);
+  // Org timezone: anchors every rendered appointment to the shop's wall clock.
+  const [tzRow] = (await sql`
+    select timezone from business_profiles where organization_id = ${orgId}`) as unknown as [{ timezone: unknown } | undefined] ?? [];
+  const orgTz = VALID_TZ(tzRow?.timezone);
+
+  const jobCustomers = await sql`
+    select id, name, address from customers
+    where organization_id = ${orgId} and status = 'ACTIVE'
+    order by name asc limit 200`;
+  // Recent quote decisions — the reply loop of the multi-option quotes.
+  const quoteDecisions = (await sql`
+    select r.id, r.token, r.title, r.options, r.decided, r.decided_at, r.response_note, r.created_at, c.name as customer
+    from quote_responses r left join customers c on c.id = r.customer_id
+    where r.organization_id = ${orgId}
+    order by r.created_at desc limit 6`) as unknown as {
+    id: string; token: string; title: string; options: unknown; decided: string | null;
+    decided_at: Date | null; response_note: string | null; created_at: Date; customer: string | null;
+  }[];
 
   const leads = await sql`
     select id, name, source, interest, est_value, status, created_at, last_contact_at, next_action_at, service_type
@@ -30,7 +59,7 @@ export default async function PipelinePage() {
       case status when 'NEW' then 0 when 'CONTACTED' then 1 when 'QUALIFIED' then 2 else 3 end,
       created_at desc limit 12`;
   const deals = await sql`
-    select d.id, d.deal_type, d.status, d.amount, d.created_at, c.name as customer,
+    select d.id, d.deal_type, d.status, d.amount, d.created_at, c.id as customer_id, c.name as customer,
       v.year, v.make, v.model, v.stock_number, e.name as closer
     from deals d join customers c on c.id = d.customer_id
       left join vehicles v on v.id = d.vehicle_id
@@ -43,11 +72,23 @@ export default async function PipelinePage() {
     from vehicles where organization_id = ${orgId} and status in ('AVAILABLE','RESERVED')
     order by listed_at asc limit 12`;
   const service = await sql`
-    select s.id, s.title, s.status, s.amount, s.opened_at, s.completed_at, s.invoiced_at, c.name as customer, s.service_type, e.name as seller
+    select s.id, s.title, s.status, s.amount, s.opened_at, s.completed_at, s.invoiced_at, c.id as customer_id, c.name as customer, s.service_type, e.name as seller,
+      s.checklist
     from service_orders s join customers c on c.id = s.customer_id
       left join employees e on e.id = s.sold_by
     where s.organization_id = ${orgId}
     order by case s.status when 'COMPLETED' then 0 when 'IN_PROGRESS' then 1 else 2 end, s.opened_at desc limit 10`;
+  // Checklist progress per row — Toni spots open work without opening jobs.
+  const checkProgress = (cl: unknown) => {
+    const items = (Array.isArray(cl) ? (cl as { label?: unknown; done?: unknown }[]) : []).filter((i) => i && typeof i.label === "string");
+    if (!items.length) return null;
+    const done = items.filter((i) => i.done).length;
+    return { done, total: items.length, label: `checklist ${done}/${items.length}` };
+  };
+  const cl = new Map(service.map((s) => {
+    const p = checkProgress(s.checklist);
+    return p ? [String(s.id), p] : [String(s.id), null];
+  }));
 
   // Live invoices per listed order, so the row shows "draft QD-… ready" and
   // never offers a second draft when one exists.
@@ -208,6 +249,47 @@ export default async function PipelinePage() {
         <QuoteSender customers={quoteCustomers as never} assemblies={bundleAssemblies} />
       </section>
 
+      {/* Quick add: job/estimate for an existing customer — the customer's new
+          address saves straight from the form (Toni Stone's ask), an optional
+          visit lands on the appointments board, and the job is billable. */}
+      <section className="card p-5">
+        <h2 className="section-title mb-1">Add a job or estimate for an existing customer</h2>
+        <p className="muted mb-3 text-xs">Type their new address right here — it saves to the customer, no detour. Leave it blank to keep the address on file. Adding a visit puts it on the schedule in the shop's timezone.</p>
+        <NewJobForm customers={jobCustomers as never} suggestions={suggestions} />
+      </section>
+
+      {/* Quote decisions: what customers clicked on multi-option (accept/
+          decline) quotes. Waiting rows link the decision page you can preview. */}
+      {quoteDecisions.length > 0 && (
+        <section className="card p-5">
+          <h2 className="section-title mb-1">Quote decisions</h2>
+          <p className="muted mb-3 text-xs">Option quotes (Good–Better–Best): what each customer accepted or declined — recorded the moment they click, no chasing emails.</p>
+          <div className="space-y-2">
+            {quoteDecisions.map((r) => {
+              const opts = Array.isArray(r.options) ? (r.options as DecidedOpt[]) : [];
+              return (
+                <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] px-3.5 py-2.5">
+                  <span className={`badge ${r.decided == null ? "badge-blue" : r.decided === "DECLINE" ? "badge-red" : "badge-green"}`}>
+                    {r.decided == null ? "waiting" : r.decided === "DECLINE" ? "declined" : `accepted ${r.decided}`}
+                  </span>
+                  <span className="font-medium text-navy-100">{r.title}</span>
+                  <span className="text-xs text-navy-300">{r.customer ?? "—"} · {ago(r.created_at)}</span>
+                  {r.decided && r.decided !== "DECLINE" && opts.find((o) => o.key === r.decided) && (
+                    <span className="text-xs text-emerald-300">{money(opts.find((o) => o.key === r.decided)!.amount)} — {opts.find((o) => o.key === r.decided)!.name}</span>
+                  )}
+                  {r.response_note && <span className="text-xs italic text-navy-300">“{r.response_note}”</span>}
+                  <span className="ms-auto flex gap-2 text-xs">
+                    {opts.length > 0 && !r.decided && (
+                      <Link href={`/q/${r.token}`} className="text-navy-300 hover:text-white">decision page ↗</Link>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* AR automation: draft-first payment reminders in the customer's language. */}
       <ArReminders canSend={session.role !== "MEMBER"} />
 
@@ -365,7 +447,7 @@ export default async function PipelinePage() {
             {deals.map((d) => (
               <div key={d.id} className="rounded-xl border border-white/[0.06] px-3.5 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-navy-100">{d.customer}</span>
+                  <Link href={`/pipeline/customers/${d.customer_id}`} className="font-medium text-navy-100 hover:text-violet-200">{d.customer}</Link>
                   <span className={`badge ms-auto ${d.status === "WON" ? "badge-green" : d.status === "LOST" ? "badge-low" : d.status === "PENDING_FINANCE" ? "badge-orange" : "badge-blue"}`}>
                     {d.status.replace("_", " ")}
                   </span>
@@ -413,12 +495,16 @@ export default async function PipelinePage() {
                   {s.service_type && s.service_type !== "Other" && (
                     <span className="badge-purple">{s.service_type}</span>
                   )}
+                  {(() => {
+                    const p = cl.get(String(s.id));
+                    return p ? <span className={`badge ${p.done === p.total ? "badge-green" : "badge-orange"}`}>{p.label}</span> : null;
+                  })()}
                   <span className={`badge ms-auto ${s.status === "COMPLETED" && !s.invoiced_at ? "badge-red" : s.status === "COMPLETED" ? "badge-green" : "badge-blue"}`}>
                     {s.status === "COMPLETED" && !s.invoiced_at ? "UNBILLED" : s.status.replace("_", " ")}
                   </span>
                 </div>
                 <div className="mt-1 text-xs text-navy-300">
-                  {s.customer} · {money(s.amount)}{s.seller ? " · sold by " + s.seller : ""}
+                  <Link href={`/pipeline/customers/${s.customer_id}`} className="text-navy-100 hover:text-violet-200">{s.customer}</Link> · {money(s.amount)}{s.seller ? " · sold by " + s.seller : ""}
                 </div>
                 <OrderActions
                   orderId={String(s.id)}
@@ -451,7 +537,7 @@ export default async function PipelinePage() {
                   {a.status.replace("_", " ")}
                 </span>
               </div>
-              <div className="text-xs text-navy-300">{a.customer} · {new Date(a.scheduled_for).toLocaleString()} · {a.kind.replace("_", " ")}</div>
+              <div className="text-xs text-navy-300">{a.customer} · {fmtInTz(a.scheduled_for, orgTz)} ({orgTz}) · {a.kind.replace("_", " ")}</div>
               <div className="mt-1.5">
                 <VisitActions apptId={a.id} status={a.status} canEdit={session.role !== "MEMBER"} />
               </div>

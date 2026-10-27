@@ -2,7 +2,7 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { PROVIDERS } from "@/lib/ambassador";
-import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateReminderCadence, updateReminderTemplate, updateVocab, savePersona, saveBranding, saveModules } from "./actions";
+import { updateProfile, updateAiSettings, saveAmbassadorSettings, updateDigestSettings, updateReminderCadence, updateReminderTemplate, updateVocab, savePersona, saveBranding, saveModules, regenerateCalendarToken } from "./actions";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import { MODULES, FIXED_MODULES } from "@/lib/modules";
 import WorkspaceStudioForm from "./WorkspaceStudioForm";
@@ -28,6 +28,20 @@ export default async function SettingsPage({
   const session = await requireSession();
   const orgId = session.organizationId;
   const [profile] = await sql`select * from business_profiles where organization_id = ${orgId}`;
+
+  // The private calendar feed needs a token it can hand to Google/Apple —
+  // calendar apps can't sign in, so the token is the auth. Mint lazily on
+  // first visit to this page; "New calendar link" rotates it.
+  let calendarToken = (profile?.calendar_token as string | null) ?? null;
+  if (!calendarToken) {
+    const [minted] = await sql`
+      update business_profiles set calendar_token = gen_random_uuid()
+      where organization_id = ${orgId} returning calendar_token`;
+    calendarToken = (minted?.calendar_token as string | null) ?? null;
+  }
+  const appUrl = (process.env.APP_URL ?? "http://localhost:3210").replace(/\/+$/, "");
+  const calendarUrl = calendarToken ? `${appUrl}/api/calendar/ics?token=${calendarToken}` : null;
+
   const [ai] = await sql`select * from ai_settings where organization_id = ${orgId}`;
   const team = await sql`
     select u.name, u.email, m.role from members m join users u on u.id = m.user_id
@@ -87,10 +101,47 @@ export default async function SettingsPage({
             <label className="label" htmlFor="values">{t("settings.values")}</label>
             <input id="values" name="values" defaultValue={profile?.values_text ?? ""} className="input" />
           </div>
+          <div>
+            <label className="label" htmlFor="tz-select">Calendar timezone — stays fixed no matter where you are (Toni&apos;s travel fix)</label>
+            <input
+              id="tz-select"
+              name="timezone"
+              defaultValue={typeof profile?.timezone === "string" ? profile.timezone : "America/Chicago"}
+              list="tz-options"
+              className="input"
+              placeholder="America/Chicago"
+            />
+            <datalist id="tz-options">
+              {["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu"].map((z) => (
+                <option key={z} value={z} />
+              ))}
+            </datalist>
+            <p className="muted mt-1 text-xs">Visits, follow-ups and the calendar subscribe feed all show in this timezone — even when you're traveling and your phone flips zones.</p>
+          </div>
           <div className="md:col-span-2">
             <button className="btn-primary">{t("settings.saveProfile")}</button>
           </div>
         </form>
+      </section>
+      
+      {/* Calendar subscribe link: paste once into Google/Apple/Outlook; every
+          scheduled visit (2-hour duration, shop timezone) then appears there. */}
+      <section className="card p-6">
+        <h2 className="section-title mb-1">Calendar subscription link</h2>
+        <p className="muted mb-3 text-xs">Subscribe once in any calendar app — new visits, and every change to them, stream in automatically and always show in the shop's timezone (the travel fix).</p>
+        {calendarUrl ? (
+          <>
+            <code className="block rounded-lg bg-white/[0.05] px-3 py-2 text-xs break-all" style={{ wordBreak: "break-all" }}>{calendarUrl}</code>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <form action={regenerateCalendarToken}>
+                <button className="btn-primary text-sm">New calendar link (old one stops working)</button>
+              </form>
+              <span className="muted text-xs">Google Calendar → Other calendars → From URL · Apple Calendar → File → New Calendar Subscription.</span>
+            </div>
+          </>
+        ) : (
+          <p className="muted text-sm">Save your profile once to mint your link.</p>
+        )}
       </section>
 
       {/* Weekly digest card: on/off, send day, owner WhatsApp destination. */}
