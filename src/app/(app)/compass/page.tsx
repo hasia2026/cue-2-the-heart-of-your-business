@@ -5,6 +5,8 @@ import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
 import type { DictKey } from "@/lib/i18n";
+import BusinessLibrary from "./BusinessLibrary";
+import { QUESTIONS, SECTION_ORDER, type LibraryQuestion } from "./questions";
 
 const DIM_LABELS: Record<string, DictKey> = {
   revenue: "compass.dim.revenue",
@@ -29,6 +31,18 @@ export default async function CompassPage() {
   const goals = profile
     ? await sql`select title, detail, horizon, status from goals where profile_id = ${profile.id} and status = 'ACTIVE'`
     : [];
+
+  // Executive library: answered questionnaire rows, newest edits first.
+  const library = (await sql`
+    select question, answer, updated_at as "updatedAt"
+    from business_library where organization_id = ${orgId} order by updated_at desc`) as {
+    question: string; answer: string; updatedAt: string;
+  }[];
+  const sections: Record<string, LibraryQuestion[]> = {};
+  for (const section of SECTION_ORDER) {
+    const qs = QUESTIONS.filter((q) => q.section === section);
+    if (qs.length) sections[section] = qs;
+  }
 
   return (
     <div className="space-y-6">
@@ -80,6 +94,13 @@ export default async function CompassPage() {
           </div>
         ))}
       </div>
+
+      {/* Executive library — the extensive business questionnaire */}
+      <BusinessLibrary
+        sections={sections}
+        answered={library.map((l) => ({ question: l.question, answer: l.answer, updatedAt: l.updatedAt }))}
+        canEdit={session.role !== "MEMBER"}
+      />
 
       {/* Profile + goals */}
       <div className="grid gap-6 lg:grid-cols-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import CuePrefillButton from "@/components/CuePrefill";
 import {
   toggleChecklistItem,
   addChecklistItem,
@@ -8,6 +9,9 @@ import {
 } from "./job-actions";
 
 export type CheckItem = { label: string; done: boolean };
+
+/** How long since this property was last serviced ("5 mo ago"), server-computed. */
+export type LastVisit = { days: number; label: string };
 
 export type Job = {
   id: string;
@@ -51,7 +55,7 @@ function ToggleCheck({ jobId, item, index }: { jobId: string; item: CheckItem; i
   );
 }
 
-function JobCard({ job }: { job: Job }) {
+function JobCard({ job, customerName }: { job: Job; customerName: string }) {
   const [editing, setEditing] = useState(false);
   const [newItem, setNewItem] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -74,11 +78,15 @@ function JobCard({ job }: { job: Job }) {
       {job.propertyAddress && (
         <div className="mt-0.5 text-xs text-violet-200">📍 {job.propertyAddress}</div>
       )}
-      <div className="mt-1 flex flex-wrap gap-3 text-xs text-navy-300">
+      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-navy-300">
         <span>{job.amount}</span>
         <span>opened {job.opened}</span>
         {job.completed && <span>completed {job.completed}</span>}
         {job.invoiced && <span className="text-emerald-300">invoiced {job.invoiced}</span>}
+        <CuePrefillButton
+          text={`schedule a visit for ${customerName}${job.propertyAddress ? ` at ${job.propertyAddress}` : ""}`}
+          label="⌘ Log next visit"
+        />
       </div>
 
       {job.scope && (
@@ -146,7 +154,15 @@ function JobCard({ job }: { job: Job }) {
   );
 }
 
-export default function JobChecklists({ jobs }: { jobs: Job[] }) {
+export default function JobChecklists({
+  jobs,
+  customerName,
+  lastVisitByProperty = {},
+}: {
+  jobs: Job[];
+  customerName: string;
+  lastVisitByProperty?: Record<string, LastVisit>;
+}) {
   // Property filter: a client with 30 locations never scrolls all 30 locations'
   // history at once — pick the address, see only that property's records.
   const [property, setProperty] = useState<string>("ALL");
@@ -187,10 +203,35 @@ export default function JobChecklists({ jobs }: { jobs: Job[] }) {
         )}
       </div>
       {properties.length > 1 && shown.length < jobs.length && (
-        <p className="muted mb-2 text-xs">Showing only <span className="text-violet-200">{property}</span> — {shown.length} job{shown.length === 1 ? "" : "s"} at this property.</p>
+        <p className="muted mb-2 text-xs">Showing only <span className="text-violet-200">{property}</span> — {shown.length} job{shown.length === 1 ? "" : "s"} at this property.
+          {lastVisitByProperty[property] ? (" Last serviced " + lastVisitByProperty[property].label + ".") : ""}</p>
+      )}
+      {properties.length > 1 && property === "ALL" && (
+        // Property summary: when several addresses share one account, the owner
+        // sees at a glance which sites are due for a visit.
+        <div className="mb-3 flex flex-wrap gap-2">
+          {properties.map((p) => {
+            const lv = lastVisitByProperty[p];
+            const stale = lv ? lv.days >= 180 : false;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setProperty(p)}
+                className={`rounded-lg border px-2 py-1 text-[11px] transition ${
+                  stale ? "border-orange-400/40 bg-orange-500/10 text-orange-200" : "border-white/[0.08] bg-white/[0.03] text-navy-300 hover:bg-white/[0.06]"
+                }`}
+                title={`Click to show only this property's history${lv ? ` · ${lv.days} day${lv.days === 1 ? "" : "s"} since last visit` : ""}`}
+              >
+                📍 {p}
+                {lv ? <span className={"ms-1.5 " + (stale ? "font-semibold" : "")}>{lv.days < 1 ? "serviced today" : lv.label}</span> : <span className="ms-1.5">no records</span>}
+              </button>
+            );
+          })}
+        </div>
       )}
       <div className="grid gap-3 md:grid-cols-2">
-        {shown.map((j) => <JobCard key={j.id} job={j} />)}
+        {shown.map((j) => <JobCard key={j.id} job={j} customerName={customerName} />)}
       </div>
       {jobs.length === 0 && <p className="muted">No jobs for this customer yet.</p>}
       {properties.length > 1 && property !== "ALL" && shown.length === 0 && (

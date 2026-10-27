@@ -10,6 +10,7 @@ import DraftRelease from "./DraftRelease";
 import VisitActions from "./VisitActions";
 import LeadFollowUp from "./LeadFollowUp";
 import NewJobForm from "./NewJobForm";
+import CuePrefillButton from "@/components/CuePrefill";
 import { parseAuthorityBands } from "@/lib/desking";
 import { LeadServiceType, DealServiceType } from "./ServiceTypeInputs";
 import BackGrossInput from "./BackGrossInput";
@@ -73,7 +74,7 @@ export default async function PipelinePage() {
     order by listed_at asc limit 12`;
   const service = await sql`
     select s.id, s.title, s.status, s.amount, s.opened_at, s.completed_at, s.invoiced_at, c.id as customer_id, c.name as customer, s.service_type, e.name as seller,
-      s.checklist
+      s.checklist, s.property_address
     from service_orders s join customers c on c.id = s.customer_id
       left join employees e on e.id = s.sold_by
     where s.organization_id = ${orgId}
@@ -503,8 +504,12 @@ export default async function PipelinePage() {
                     {s.status === "COMPLETED" && !s.invoiced_at ? "UNBILLED" : s.status.replace("_", " ")}
                   </span>
                 </div>
-                <div className="mt-1 text-xs text-navy-300">
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-navy-300">
                   <Link href={`/pipeline/customers/${s.customer_id}`} className="text-navy-100 hover:text-violet-200">{s.customer}</Link> · {money(s.amount)}{s.seller ? " · sold by " + s.seller : ""}
+                  <CuePrefillButton
+                    text={`schedule a visit for ${s.customer}${s.property_address ? ` at ${s.property_address}` : ""}`}
+                    label="⌘ Schedule visit"
+                  />
                 </div>
                 <OrderActions
                   orderId={String(s.id)}

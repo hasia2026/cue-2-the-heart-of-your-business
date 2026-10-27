@@ -71,7 +71,15 @@ export default function CommandBar({ signedIn }: { signedIn: boolean }) {
   }, []);
 
   useEffect(() => {
-    const onOpen = () => open();
+    const onOpen = (e: Event) => {
+      // detail.text pre-fills the input (from per-job shortcuts: "schedule a
+      // visit for Summit Air at 4422 Cedar Ave") so the tech only checks the
+      // draft and confirms; no detail behaves like a plain open.
+      const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+      if (text && typeof text === "string") setText(text.slice(0, 300));
+      else setText("");
+      open();
+    };
     window.addEventListener("cue:command-open", onOpen);
     return () => window.removeEventListener("cue:command-open", onOpen);
   }, [open]);
@@ -135,7 +143,10 @@ export default function CommandBar({ signedIn }: { signedIn: boolean }) {
       {/* Desktop launcher floats centered in the top bar header */}
       <button
         type="button"
-        onClick={open}
+        onClick={() => {
+          setText("");
+          open();
+        }}
         aria-label="Type what you want (Ctrl K)"
         className="fixed left-1/2 top-[0.65rem] z-20 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-navy-200 hover:bg-white/[0.08] lg:flex"
       >
@@ -145,7 +156,10 @@ export default function CommandBar({ signedIn }: { signedIn: boolean }) {
       {/* Mobile launcher floats above the bottom nav */}
       <button
         type="button"
-        onClick={open}
+        onClick={() => {
+          setText("");
+          open();
+        }}
         aria-label="Type what you want"
         className="fixed bottom-24 end-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/90 text-xl font-semibold text-white shadow-lg shadow-violet-500/30 lg:hidden"
       >

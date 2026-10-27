@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import CuePrefillButton from "@/components/CuePrefill";
 
 export type Job = {
   id: string;
@@ -152,7 +153,13 @@ export default function UnscheduledBoard({
                   <ul className="mt-2 space-y-1.5 text-xs">
                     {a.jobs.map((j) => (
                       <li key={j.id} className="rounded-lg bg-white/[0.03] px-2 py-1.5">
-                        <div className="text-navy-100">{j.customer}</div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-navy-100">{j.customer}</span>
+                          <CuePrefillButton
+                            text={`schedule a visit for ${j.customer}${j.address ? ` at ${j.address}` : ""}`}
+                            label="⌘"
+                          />
+                        </div>
                         <div className="text-navy-300/70">
                           {j.title} · {j.openedDays}d · ${j.amount.toLocaleString()}
                           {j.agreement ? ` · ${j.agreement}` : ""}

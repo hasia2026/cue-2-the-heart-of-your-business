@@ -21,7 +21,7 @@ const ffmpeg = require('ffmpeg-static');
 const slides = [
   ['landing-hero', 'CUE — The Heart of Your Business', "Welcome to Kyoo, the heart of your business. An A I operating system that connects the people, knowledge, workflows, and systems that keep a business moving."],
   ['score-result', 'Capture — Business score', "It starts with capture. Answer a few questions about your business, and Kyoo scores how you operate today."],
-  ['dashboard', 'Dashboard — Northgate Auto Group', "The dashboard puts your whole dealership on one screen. Key metrics, alerts, and next actions, all live."],
+  ['dashboard', 'Dashboard — Northgate Auto Group', "The dashboard puts your whole dealership on one screen. Key metrics, alerts, and next actions, all live. And anywhere in the app, press Command K and type what you want: new job for Summit Air, Friday at nine. CUE drafts the record, you confirm it, done."],
   ['hvac-dashboard', 'Dashboard — Summit Air HVAC', "And this is Summit Air Heating and Cooling, an H V A C company running the exact same loops, with vocabulary tuned to their trade."],
   ['nav-pulse', 'Pulse', "Pulse keeps you current, surfacing what changed and what needs a decision."],
   ['capture-document-manager', 'Capture — Document manager', "The document manager stores every contract, quote, and form, with share, move, edit, and delete controls, and a full audit trail."],
@@ -32,7 +32,7 @@ const slides = [
   ['pricing-studio', 'Pricing Studio', "Pricing studio simulates prices and margins, so you see the impact before you commit."],
   ['brand-studio', 'Brand Studio', "Brand studio keeps every message on voice, from quotes to campaigns."],
   ['execute-approvals', 'Execute — Approvals', "The execute loop proposes actions, and waits for your approval. Nothing moves without you."],
-  ['pipeline', 'Pipeline', "The pipeline tracker follows every deal from first touch to close, with terms that match your industry."],
+  ['pipeline', 'Pipeline', "The pipeline tracker follows every deal from first touch to close, with terms that match your industry. Service history is organized by property, so for a client with thirty locations, your techs see just the address they're standing at, and when the next visit is due."],
   ['pilot-report', 'Pilot report', "Pilot reports summarize exactly what Kyoo delivered, in numbers you can verify."],
   ['people', 'People', "People manages your team, with owner, admin, and member roles."],
   ['academy', 'Academy', "Academy trains your staff, one short module at a time."],

@@ -174,7 +174,7 @@ export default async function CustomerProfilePage({
 
       {active === "invoices" && <InvoicesTab customerId={id} />}
       {active === "deals" && <DealsTab customerId={id} />}
-      {active === "jobs" && <JobsTab customerId={id} />}
+      {active === "jobs" && <JobsTab customerId={id} customerName={cust.name} />}
       {active === "agreements" && <AgreementsTab customerId={id} />}
       {active === "comms" && <CommsTab customerId={id} />}
     </div>
@@ -252,7 +252,7 @@ async function DealsTab({ customerId }: { customerId: string }) {
   );
 }
 
-async function JobsTab({ customerId }: { customerId: string }) {
+async function JobsTab({ customerId, customerName }: { customerId: string; customerName: string }) {
   const rows = (await sql`
     select id, title, status, amount, service_type, opened_at, completed_at, invoiced_at, scope, checklist, property_address
     from service_orders
@@ -276,7 +276,28 @@ async function JobsTab({ customerId }: { customerId: string }) {
       .filter((i) => i && typeof i.label === "string")
       .map((i) => ({ label: i.label as string, done: Boolean(i.done) })),
   }));
-  return <JobChecklists jobs={jobs} />;
+
+  // Last visit per property (“5 mo ago”), for the property chips — the owner
+  // sees which sites are due before scrolling a single job.
+  const DAY_MS = 864e5;
+  const lastTs = new Map<string, number>();
+  for (const r of rows) {
+    const ts = new Date((r.completed_at ?? r.opened_at) as string).getTime();
+    if (Number.isNaN(ts)) continue;
+    const key = r.property_address ?? "(no address on record)";
+    const prev = lastTs.get(key);
+    if (prev === undefined || ts > prev) lastTs.set(key, ts);
+  }
+  const lastVisitByProperty: Record<string, { days: number; label: string }> = {};
+  for (const [prop, ts] of lastTs) {
+    const days = Math.floor((Date.now() - ts) / DAY_MS);
+    lastVisitByProperty[prop] = {
+      days,
+      label: days < 1 ? "today" : days < 31 ? `${days}d ago` : days < 365 ? `${Math.round(days / 30.4)} mo ago` : `${(days / 365).toFixed(1)} yr ago`,
+    };
+  }
+
+  return <JobChecklists jobs={jobs} customerName={customerName} lastVisitByProperty={lastVisitByProperty} />;
 }
 
 async function AgreementsTab({ customerId }: { customerId: string }) {

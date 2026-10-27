@@ -55,13 +55,13 @@ The morning view — essentials only: priority insight (with evidence drawer), b
 ### Workspace Studio — make the workspace yours
 Three owner-tailorable layers, all backed by one per-org profile and wired through every branded surface:
 
-1. **Ambassador persona** — name it, pick its avatar emoji, write its opening greeting, choose its voice (friendly / formal / concise / enthusiastic). The chat bubble on every page, its LLM voice, and the page footer all follow.
+1. **Ambassador persona** — name it, pick its avatar emoji **or upload a photo from your computer** (also available right on the wizard page), write its opening greeting, choose its voice (friendly / formal / concise / enthusiastic). The chat bubble on every page, its LLM voice, and the page footer all follow.
 2. **Branding** — business name, **logo upload from your computer** (PNG/JPEG/WebP/SVG ≤200 KB, stored per-org and served from a stable public URL email clients can load) or a pasted URL, accent color, contact phone/email, theme default. These flow into **customer-facing quotes**, the **weekly digest email**, and the printed **leave-behind page**.
 3. **Live preview** — before saving, render your choices through the *real* quote and digest builders with sample data in an in-page iframe. "Preview these unsaved edits" shows the form as-typed; "Preview saved branding" shows what's live now. Nothing is sent.
 4. **Module layout** — hide modules you don't use and rename them to your vocabulary. The sidebar follows; disabled module routes fall back to the dashboard (Dashboard and Settings always stay).
 
 Where to find it:
-- **Wizard:** `/onboarding` — the guided 3-step setup for non-technical owners, skippable at every step.
+- **Wizard:** `/onboarding` — the guided 3-step setup for non-technical owners, skippable at every step — with an Ambassador photo upload right on the page (optional; the emoji stays as fallback).
 - **DIY:** Settings → **Workspace Studio** — same controls, plus "Re-run the guided setup."
 - **Prompt:** the dashboard shows a setup checklist card until the steps are done (owners/admins/managers only).
 
@@ -69,6 +69,13 @@ Where to find it:
 ![ onboarding wizard ](docs/screenshots/onboarding.png)
 
 **Why it matters:** a workspace that adapts to the business — every branded artifact outgoing carries the owner's identity, not CUE's.
+
+### Command bar — type what you want (`⌘K` / `Ctrl+K`)
+A natural-language bar available on every signed-in page. Type a sentence like "new job for Summit Air $1,250 replace heater at 4422 Cedar Ave Friday 9am" and CUE parses it into a **draft card** — customer, amount, description, address, date — which you edit if needed and **Confirm**. Nothing is written until you confirm, and the parser is deterministic (no AI key, no hallucinated customers: unmatched names always ask).
+
+Understanding: "schedule a visit for John Doe tomorrow 2pm" drafts an appointment; "estimate for Jane Smith $3,400 new furnace quote" drafts an estimate. On a job in **Execute**, a shortcut pre-fills the bar with that job's customer **and property**, so the tech starts from "new job for <customer>" without typing an address.
+
+**Why it matters:** the fastest path from thought to record — and it works from any page, mid-task.
 
 ### Sidebar pulse
 The five loop parents show live attention counts — open insights (Understand), approvals waiting (Enhance), open tasks (Execute) — so the navigation itself tells you where attention is needed. Badges appear only for real open items.
@@ -152,7 +159,7 @@ Two collection motions, both owner-approved before anything sends:
 - **Automated cadence** — approve the cadence once in Settings (every 3/7/14 days) and a daily cron runs it; paid invoices drop off automatically; the owner's custom message template (with per-language placeholders) overrides the built-in drafts.
 
 ### Pipeline (`/pipeline`)
-Leads, deals, inventory aging, service orders, and appointments in one dealership-aware view; 360° detail per lead/customer; the **unscheduled board** groups unassigned maintenance work by area for dispatching.
+Leads, deals, inventory aging, service orders, and appointments in one dealership-aware view; 360° detail per lead/customer; the **unscheduled board** groups unassigned maintenance work by area for dispatching; the property-filtered service history and next-visit hint live on each customer's Jobs tab. Service orders record the **property address** they were for, so a customer's Jobs tab groups history by location — open one property and you see just that address's visits, with a **"next visit due"** hint based on how long it's been since the last visit there. No more scrolling 30 locations for one address.
 
 ![ leads + deals + inventory aging ](docs/screenshots/pipeline.png)
 

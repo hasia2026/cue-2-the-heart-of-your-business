@@ -83,10 +83,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const groups = [
     {
       title: "Command",
-      items: [
-        { href: "/dashboard", label: t("nav.dashboard"), icon: "◎" },
-        { href: "/intake", label: t("nav.intake"), icon: "⇥", children: [{ href: "/intake/import", label: t("nav.import") }] },
-      ],
+      items: [{ href: "/dashboard", label: t("nav.dashboard"), icon: "◎" }],
     },
     {
       // The five loops — each loop is a parent, its modules nest beneath it.
@@ -96,7 +93,11 @@ export default async function AppShell({ children }: { children: React.ReactNode
           href: "/capture",
           label: t("nav.capture"),
           icon: "⤓",
-          children: [{ href: "/signals", label: t("nav.signals") }],
+          children: [
+            { href: "/intake", label: t("nav.intake"), children: [] },
+            { href: "/intake/import", label: t("nav.import") },
+            { href: "/signals", label: t("nav.signals") },
+          ],
         },
         {
           href: "/understand",
