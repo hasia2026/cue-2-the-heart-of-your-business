@@ -22,7 +22,7 @@ export type WorkspaceProfile = {
   brandContactEmail: string | null;
   themeDefault: "system" | "light" | "dark" | null;
   modules: Partial<Record<ModuleKey, ModuleState>>;
-  setupCompleted: Partial<Record<"persona" | "branding" | "modules", boolean>>;
+  setupCompleted: Partial<Record<"persona" | "branding" | "modules" | "tour", boolean>>;
 };
 
 export const DEFAULT_WORKSPACE_PROFILE: WorkspaceProfile = {
@@ -63,12 +63,13 @@ function normalizeModules(raw: unknown, orgName: string): Partial<Record<ModuleK
   return out;
 }
 
-function normalizeSetup(raw: unknown): Partial<Record<"persona" | "branding" | "modules", boolean>> {
+function normalizeSetup(raw: unknown): Partial<Record<"persona" | "branding" | "modules" | "tour", boolean>> {
   const obj = safeJson(raw);
   return {
     persona: obj.persona === true,
     branding: obj.branding === true,
     modules: obj.modules === true,
+    tour: obj.tour === true,
   };
 }
 

@@ -10,6 +10,7 @@ import ReviMark from "./ReviMark";
 import { signOut } from "@/app/signin/actions";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import CommandBar from "./CommandBar";
+import WelcomeTour, { type TourVariant } from "./WelcomeTour";
 
 // Workspace Studio: sidebar item href ↔ module key. Anything absent stays stock;
 // a disabled module hides its item (and its children), a renamed label replaces it.
@@ -172,7 +173,18 @@ export default async function AppShell({ children }: { children: React.ReactNode
             )}
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+        <main className="flex-1 px-4 py-6 md:px-8">
+          {/* One-time welcome tour: owners/admins/managers get the 3-step card,
+              staff get a one-line ⌘K tip. Shows until dismissed — org-level for
+              the card, per-browser for the staff line (flag: setup_completed.tour). */}
+          {s && ws && !ws.setupCompleted.tour && (
+            <WelcomeTour
+              variant={(session.role === "MEMBER" ? "oneline" : "steps") as TourVariant}
+              ambassadorName={ws.ambassadorName}
+            />
+          )}
+          {children}
+        </main>
         {/* Type-what-you-want bar: desktop pill floats in the top bar, mobile FAB bottom-right */}
         <CommandBar signedIn={!!session} />
         <footer className="border-t border-white/[0.06] px-6 py-4 text-xs text-navy-300/60">
