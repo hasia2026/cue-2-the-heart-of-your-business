@@ -102,7 +102,7 @@ export default async function DashboardPage() {
         <section className="card card-hover border-l-2 border-l-violet-400/70 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <span className="eyebrow !text-violet-300">Set up your workspace</span>
-            <span className="muted text-xs">{pendingSetup.length} step{pendingSetup.length === 1 ? "" : "s"} left — optional, skips anytime</span>
+            <span className="muted text-xs">{pendingSetup.length} step{pendingSetup.length === 1 ? "" : "s"} left — optional, skip anytime</span>
             <a href="/onboarding" className="btn-primary ms-auto !px-3 !py-1.5 text-xs">Continue setup →</a>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">

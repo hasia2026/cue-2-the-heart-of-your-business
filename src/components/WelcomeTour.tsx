@@ -77,7 +77,7 @@ export default function WelcomeTour({
     {
       n: "①",
       title: "Type what you want",
-      body: `Press ⌘K (or Ctrl+K) anywhere and write a sentence ${ambassadorName ? `${ambassadorName} turns` : "CUE turns"} into a real record you confirm — jobs, quotes, visits.`,
+      body: `Press Ctrl+K (or ⌘K on Mac) anywhere, then type a sentence — ${ambassadorName ? `${ambassadorName} turns it` : "CUE turns it"} into a real record you confirm: jobs, quotes, visits.`,
       action: (
         <button type="button" onClick={openCommandBar} className="btn-primary !py-1.5 text-xs">
           Try it — open the command bar
@@ -88,7 +88,7 @@ export default function WelcomeTour({
     {
       n: "②",
       title: "Capture one document",
-      body: "Drop a policy, invoice, or photo into Capture — it gets classified, filed, deduplicated, and searchable on its own.",
+      body: "Drop any document or photo into Capture — it gets classified, filed and made searchable on its own. No data entry.",
       action: (
         <Link href="/capture" onClick={() => setStepDone((s) => ({ ...s, 2: true }))} className="btn-ghost !py-1.5 text-xs">
           Open Capture →
@@ -99,7 +99,7 @@ export default function WelcomeTour({
     {
       n: "③",
       title: "Send one quote",
-      body: "Build a price in the Pricing Studio, then send it in the customer's own language — branding included.",
+      body: "Build a price in the Pricing Studio, then send it in the customer's own language — your branding included.",
       action: (
         <Link href="/enhance" onClick={() => setStepDone((s) => ({ ...s, 3: true }))} className="btn-ghost !py-1.5 text-xs">
           Open Enhance →
@@ -121,7 +121,7 @@ export default function WelcomeTour({
         <div className="min-w-[200px] flex-1">
           <h2 className="text-lg font-semibold text-white">Welcome — 3 things to see first</h2>
           <p className="mt-0.5 text-xs text-navy-300">
-            Nothing is written anywhere until you confirm it. Skip any step; you can always find this on your own.
+            Nothing is written until you say so — every step is optional, and nothing here can go wrong.
           </p>
         </div>
         <button type="button" onClick={finish} className="btn-ghost !py-1.5 text-xs">
@@ -141,9 +141,14 @@ export default function WelcomeTour({
         ))}
       </ol>
       <div className="mt-3 flex justify-end">
-        <button type="button" onClick={finish} className={allDone ? "btn-primary !py-1.5 text-xs" : "btn-ghost !py-1.5 text-xs"}>
-          {allDone ? "Setup — I’m set ✓" : "Save & close"}
-        </button>
+        {/* The immediate-dismiss button lives top-right ("Skip"). This one only
+            exists once a step was tried, so a fresh owner sees one clear exit,
+            not two near-identical buttons. */}
+        {Object.keys(stepDone).length > 0 && (
+          <button type="button" onClick={finish} className={allDone ? "btn-primary !py-1.5 text-xs" : "btn-ghost !py-1.5 text-xs"}>
+            {allDone ? "I’m set ✓" : "Done for now — don’t show again"}
+          </button>
+        )}
       </div>
     </div>
   );
