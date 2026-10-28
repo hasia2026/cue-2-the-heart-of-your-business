@@ -2,8 +2,14 @@
 // Narration: Gemini TTS (if GEMINI_API_KEY in .env, natural voice) else Windows SAPI fallback.
 // Visuals: Ken Burns zoom/pan + burned-in caption per slide. Assembly: ffmpeg-static.
 // Usage: node scripts/build-product-tour.mjs   (or: npm run tour:video)
+//
+// Voice pools use disjoint filenames so nothing ever destroys another engine's clips:
+//   .tour-build/gem-NN.wav  — Gemini-synthesized narration (precious: free tier ≈10 req/day)
+//   .tour-build/sapi-NN.wav — Windows SAPI narration (regenerated every run, never a loss)
+// A gem clip survives between runs, so once the daily TTS pool resets a few more
+// slides synthesize until the whole video is Gemini-narrated.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -17,7 +23,7 @@ const ffmpeg = require('ffmpeg-static');
 
 // [screenshot id, burned-in caption, narration]
 // Narration uses spaced-out letters ("C U E") so every TTS engine spells it as
-// individual letters; SVOX/Docs-only phonetic hint ("kyoō") guides reuse.
+// individual letters; "Kyoo" gets a SAPI SSML phoneme hint below ("kyoō").
 const slides = [
   ['landing-hero', 'CUE — The Heart of Your Business', "Welcome to Kyoo, the heart of your business. An A I operating system that connects the people, knowledge, workflows, and systems that keep a business moving."],
   ['score-result', 'Capture — Business score', "It starts with capture. Answer a few questions about your business, and Kyoo scores how you operate today."],
@@ -69,13 +75,25 @@ async function geminiTts(text, outWav, log) {
   };
   const models = [TTS_MODEL, ...TTS_FALLBACK_MODELS];
   let lastErr = '';
-  for (let attempt = 1; attempt <= 10; attempt++) {
-    const model = models[Math.min(Math.floor((attempt - 1) / 5), models.length - 1)];
+  // Hard caps, not slow-bleed: a drained daily pool returns 429 permanently, so
+  // generous backoffs just trap the build for hours. Cap ~35s per attempt, and
+  // 3 attempts per model pool (2 pools), then fail the slide fast — the repo
+  // keeps whichever gem clips landed, the run ends on SAPI and the queue resets
+  // for the next day.
+  const backoff = [15_000, 30_000, 35_000];
+  for (let attempt = 1; attempt <= backoff.length * models.length; attempt++) {
+    const model = models[Math.floor((attempt - 1) / backoff.length)];
     try {
+      // Bounded requests only: a stalled connection without a timeout wedges the whole build.
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(45_000),
       });
-      if (res.status === 429 || res.status >= 500) { lastErr = `HTTP ${res.status} (attempt ${attempt})`; await new Promise(r => setTimeout(r, 20000 * attempt)); continue; }
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt === backoff.length * models.length) { lastErr = `HTTP ${res.status} (all attempts)`; break; }
+        lastErr = `HTTP ${res.status} (attempt ${attempt})`;
+        await new Promise(r => setTimeout(r, backoff[(attempt - 1) % backoff.length]));
+        continue;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
       const json = await res.json();
       const part = json.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
@@ -149,37 +167,53 @@ for (const [id] of slides) {
   const png = path.join(shotsDir, `${id}.png`);
   if (!existsSync(png)) { console.error(`missing screenshot ${png}`); process.exit(1); }
 }
-// Resume-friendly: wipe only stale segment artifacts, keep already-synthesized narration
-// WAVs (.tour-build/narr-NN.wav) from a prior partial run so we don't re-synthesize them.
 mkdirSync(workDir, { recursive: true });
 
-// 1) Narration
-const manifest = slides.map(([, , text], i) => ({ wav: path.join(workDir, `narr-${String(i).padStart(2, '0')}.wav`), text }));
+// Voice clips per slide. gem-NN.wav persists across runs (resume pool: skip a
+// slide whose gem clip is valid — every run moves the Gemini-voiced build closer).
+const gemClip = (i) => path.join(workDir, `gem-${String(i).padStart(2, '0')}.wav`);
+const sapiClip = (i) => path.join(workDir, `sapi-${String(i).padStart(2, '0')}.wav`);
+const validWav = (f) => existsSync(f) && wavDuration(f) > 0.5;
+
+// 1) Narration with Gemini, resuming whatever clips previous runs synthesized.
 let engine = 'none';
-// TOUR_FORCE_SAPI=1 skips the drained Gemini pools and goes straight to the (now
-// SSML-corrected) local Windows voice — keeps the pipeline usable during quota resets.
 const FORCE_SAPI = process.env.TOUR_FORCE_SAPI === '1';
 if (GEMINI_KEY && !FORCE_SAPI) {
-  console.log(`Synthesizing narration with Gemini TTS (${TTS_MODEL}, voice ${TTS_VOICE})...`);
-  let ok = 0;
-  for (let i = 0; i < slides.length; i++) {
-    if (existsSync(manifest[i].wav) && wavDuration(manifest[i].wav) > 0.5) { ok++; continue; } // resume: reuse prior run's synth clips
-    process.stdout.write(`  tts ${i + 1}/${slides.length}\r`);
-    if (await geminiTts(slides[i][2], manifest[i].wav, console.error)) ok++;
-    // Free tier: 10 requests/min for the TTS model. ~8.5s spacing keeps us at
-    // ~7 calls/min so a 22-slide narration never trips the quota.
-    if (i < slides.length - 1) await new Promise(r => setTimeout(r, 8500));
+  const todo = [];
+  for (let i = 0; i < slides.length; i++) if (!validWav(gemClip(i))) todo.push(i);
+  if (todo.length < slides.length) console.log(`Resuming: ${slides.length - todo.length}/${slides.length} Gemini clips already on disk.`);
+  console.log(`Synthesizing narration with Gemini TTS (${TTS_MODEL}, voice ${TTS_VOICE}), ${todo.length} clip(s) to go...`);
+  let ok = slides.length - todo.length;
+  let drained = 0; // consecutive slides whose ENTIRE per-pool attempt budget 429'd
+  for (const i of todo) {
+    process.stdout.write(`  tts ${ok + 1}/${slides.length}\r`);
+    const spot = geminiTts(slides[i][2], gemClip(i), console.error);
+    if (await spot) { ok++; drained = 0; }
+    else if (++drained >= 3) { // every pool hard-429'd 3 slides in a row → pool is dry for today
+      console.error(`Quota drained across ${drained} consecutive slides — skipping the remaining ${slides.length - ok} Gemini clips until the pool resets.`);
+      break;
+    }
+    if (i !== todo[todo.length - 1]) await new Promise(r => setTimeout(r, 8500));
   }
   console.log('');
   if (ok === slides.length) engine = 'gemini';
-  else console.error(`Gemini TTS only produced ${ok}/${slides.length} clips — falling back to SAPI for all slides.`);
+  else console.error(`Gemini TTS only has ${ok}/${slides.length} clips — falling back to SAPI for the whole video (gem clips stay on disk for the next run).`);
 }
-if (engine === 'none') {
+
+// Mixed engines never ship: a mid-video voice swap reads as a bug, so until every
+// slide has a Gemini clip the video is narrated end-to-end by SAPI. SAPI clips go
+// to sapi-NN.wav so they can never overwrite the precious gem clips.
+let encode;
+if (engine === 'gemini') {
+  encode = slides.map((_, i) => gemClip(i));
+} else {
   console.log('Synthesizing narration with Windows SAPI (set GEMINI_API_KEY in .env for a natural voice)...');
-  if (!sapiTts(manifest)) { console.error('SAPI TTS failed'); process.exit(1); }
+  encode = slides.map((_, i) => sapiClip(i));
+  const sapiManifest = encode.map((wav, i) => ({ wav, text: slides[i][2] }));
+  if (!sapiTts(sapiManifest)) { console.error('SAPI TTS failed'); process.exit(1); }
   engine = 'sapi';
 }
-for (const m of manifest) if (!existsSync(m.wav)) { console.error(`missing wav ${m.wav}`); process.exit(1); }
+for (const wav of encode) if (!validWav(wav)) { console.error(`missing wav ${wav}`); process.exit(1); }
 console.log(`Narration engine: ${engine}`);
 
 // 2) One ffmpeg segment per slide: Ken Burns motion + burned-in caption
@@ -191,9 +225,8 @@ const lines = [];
 let total = 0;
 for (let i = 0; i < slides.length; i++) {
   const [id, caption] = slides[i];
-  const wav = manifest[i].wav;
   const seg = path.join(workDir, `seg-${String(i).padStart(2, '0')}.mp4`);
-  const dur = wavDuration(wav) + tail;
+  const dur = wavDuration(encode[i]) + tail;
   total += dur;
   const D = Math.ceil(dur * 30);
   // Alternate motion: zoom-in centered / slow pan right / zoom-out centered (upscale first to reduce zoompan jitter)
@@ -210,9 +243,12 @@ for (let i = 0; i < slides.length; i++) {
     'format=yuv420p',
   ].join(',');
   execFileSync(ffmpeg, [
-    '-y', '-i', path.join(shotsDir, `${id}.png`), '-i', wav,
+    '-y', '-i', path.join(shotsDir, `${id}.png`), '-i', encode[i],
     '-t', (dur + 0.05).toFixed(3),
     '-vf', vf, '-af', 'apad',
+    // Normalize audio: pools mix sample rates (Gemini 24k/SAPI 16k), and the
+    // concat demuxer with -c copy needs matching audio parameters throughout.
+    '-ar', '44100',
     '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'stillimage',
     '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', seg,
   ], { stdio: 'pipe' });

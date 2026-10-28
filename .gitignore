@@ -23,3 +23,5 @@ tools/
 
 .tmp-devserver.log
 .tmp-devserver.pid
+
+.tour-build-gemini/
