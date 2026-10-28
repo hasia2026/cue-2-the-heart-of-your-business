@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import type { PendingQuery } from "postgres";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
@@ -7,10 +8,22 @@ import EvidenceDrawer from "@/components/EvidenceDrawer";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+// Owner dashboard period switcher: the chips set ?range= and every tile below
+// recomputes inside that window. Each window is a SQL fragment, so the six-tile
+// aggregate below stays one query regardless of selection.
+const RANGES: { key: string; label: string; when: PendingQuery<readonly (object | undefined)[]> }[] = [
+  { key: "30d", label: "30 Days", when: sql`now() - interval '30 days'` },
+  { key: "today", label: "Today", when: sql`date_trunc('day', now())` },
+  { key: "week", label: "This Week", when: sql`date_trunc('week', now())` },
+  { key: "month", label: "This Month", when: sql`date_trunc('month', now())` },
+  { key: "quarter", label: "Quarter", when: sql`date_trunc('quarter', now())` },
+  { key: "ytd", label: "YTD", when: sql`date_trunc('year', now())` },
+];
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
   const [session] = await Promise.all([import("@/lib/auth").then((m) => m.requireSession())]);
   const orgId = session.organizationId;
   const { t } = await getT();
+  const sp = await searchParams;
   const vocab = await getVocab(orgId);
   // Workspace Studio guided setup — checklist ticks derive from live profile state.
   const ws = await getWorkspaceProfile(orgId);
@@ -22,6 +35,26 @@ export default async function DashboardPage() {
   const pendingSetup = setupSteps.filter((s) => !ws.setupCompleted[s.id]);
   const showSetupCard = Boolean(pendingSetup.length) && session.role !== "MEMBER";
   const health = await computeHealth(orgId);
+
+  // Period switcher (KPI tiles): validated ?range=, defaults to the rolling 30
+  // days so a brand-new org never opens on empty tiles.
+  const rangeKey = RANGES.some((r) => r.key === sp?.range) ? sp.range! : "30d";
+  const range = RANGES.find((r) => r.key === rangeKey)!;
+  // Six-tile KPI strip, computed from live records in the selected window only.
+  const [agg] = await sql`
+    select
+      (select count(*)::int from service_orders where organization_id = ${orgId} and opened_at >= ${range.when}) as jobs_booked,
+      (select coalesce(sum(amount),0)::float from service_orders where organization_id = ${orgId} and opened_at >= ${range.when}) as booked_dollars,
+      (select count(*)::int from service_orders where organization_id = ${orgId} and completed_at >= ${range.when}) as jobs_completed,
+      (select coalesce(sum(amount),0)::float from service_orders where organization_id = ${orgId} and completed_at >= ${range.when}) as completed_dollars,
+      (select count(*)::int from leads where organization_id = ${orgId} and created_at >= ${range.when}) as new_leads,
+      (select count(*)::int from leads where organization_id = ${orgId} and created_at >= ${range.when} and status = 'LOST') as lost_leads,
+      (select coalesce(sum(est_value),0)::float from leads where organization_id = ${orgId} and created_at >= ${range.when} and status = 'LOST') as lost_value,
+      (select coalesce(sum(amount),0)::float from payments where organization_id = ${orgId} and received_at >= ${range.when}) as collected,
+      (select count(*)::int from payments where organization_id = ${orgId} and received_at >= ${range.when}) as payments_n,
+      (select count(*)::int from invoices where organization_id = ${orgId} and issued_at >= ${range.when} and status = 'OVERDUE') as overdue_n,
+      (select coalesce(sum(amount),0)::float from invoices where organization_id = ${orgId} and issued_at >= ${range.when} and status = 'OVERDUE') as overdue_amount
+  `;
 
   const insights = await sql`
     select id, title, summary, severity, type, impact_value, status, created_at
@@ -65,6 +98,27 @@ export default async function DashboardPage() {
   const overdue = Math.round(revenue?.overdue ?? 0);
   const stake = Math.round(atStake?.total ?? 0);
   const fmt = (n: number) => "$" + n.toLocaleString();
+
+  // KPI tile strip (the reference design's language: color-tinted tiles, one
+  // giant number, one sub-metric) — driven by the period switcher above.
+  const bookedAvg = (agg?.booked_dollars ?? 0) / Math.max(agg?.jobs_booked ?? 0, 1);
+  const completedAvg = (agg?.completed_dollars ?? 0) / Math.max(agg?.jobs_completed ?? 0, 1);
+  const kpiTiles = [
+    { label: "Jobs booked", icon: "▤", tint: "cyan", value: String(agg?.jobs_booked ?? 0), sub: `${fmt(Math.round(agg?.booked_dollars ?? 0))} booked`, note: `avg ${fmt(Math.round(bookedAvg))} / job` },
+    { label: "Jobs completed", icon: "✔", tint: "emerald", value: String(agg?.jobs_completed ?? 0), sub: `${fmt(Math.round(agg?.completed_dollars ?? 0))} closed`, note: `avg ${fmt(Math.round(completedAvg))} / job` },
+    { label: "New leads", icon: "◈", tint: "violet", value: String(agg?.new_leads ?? 0), sub: "captured by CUE" },
+    { label: "Cash collected", icon: "$", tint: "sky", value: fmt(Math.round(agg?.collected ?? 0)), sub: `${agg?.payments_n ?? 0} payments` },
+    { label: "Lost leads", icon: "✕", tint: "red", value: String(agg?.lost_leads ?? 0), sub: `${fmt(Math.round(agg?.lost_value ?? 0))} walked away` },
+    { label: "Overdue invoices", icon: "⚠", tint: "amber", value: String(agg?.overdue_n ?? 0), sub: `${fmt(Math.round(agg?.overdue_amount ?? 0))} uncollected` },
+  ];
+  const TINT: Record<string, { text: string; glow: string }> = {
+    cyan: { text: "text-cyan-300", glow: "bg-cyan-500/10" },
+    emerald: { text: "text-emerald-300", glow: "bg-emerald-500/10" },
+    violet: { text: "text-violet-300", glow: "bg-violet-500/10" },
+    sky: { text: "text-sky-300", glow: "bg-sky-500/10" },
+    red: { text: "text-red-300", glow: "bg-red-500/10" },
+    amber: { text: "text-amber-300", glow: "bg-amber-500/10" },
+  };
   const gradeBadge =
     health.grade === "HEALTHY" ? "badge-green" : health.grade === "WATCH" ? "badge-orange" : "badge-red";
   const healthCaption =
@@ -119,6 +173,40 @@ export default async function DashboardPage() {
         <span className="text-lg font-semibold text-white md:text-xl">{t("dash.taglineTop")}</span>
         <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-navy-300">{vocab.dashPack}</div>
       </div>
+
+      {/* KPI strip + period switcher — the owner's first read, then the loops */}
+      <section className="card min-w-0 p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {RANGES.map((r) => (
+            <a
+              key={r.key}
+              href={`/dashboard?range=${r.key}`}
+              aria-current={r.key === rangeKey ? "true" : undefined}
+              className={`rounded-full px-3 py-1 text-xs transition-colors ${r.key === rangeKey ? "bg-violet-500/25 font-semibold text-violet-100 ring-1 ring-violet-400/50" : "text-navy-300 hover:bg-white/5 hover:text-white"}`}
+            >
+              {r.label}
+            </a>
+          ))}
+          <span className="ms-auto muted text-xs">tiles reflect the selected window · scorecard below is all-time</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+          {kpiTiles.map((s) => {
+            const tint = TINT[s.tint];
+            return (
+              <div key={s.label} className="card relative min-w-0 overflow-hidden p-3.5">
+                <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${tint.glow} blur-2xl`} />
+                <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-navy-300">
+                  <span aria-hidden className={`text-sm ${tint.text}`}>{s.icon}</span>
+                  <span className="truncate">{s.label}</span>
+                </div>
+                <div className="kpi mt-1.5 !text-3xl">{s.value}</div>
+                <div className="muted mt-1 truncate text-[11px]">{s.sub}</div>
+                {s.note && <div className={`truncate text-[11px] ${tint.text}`}>{s.note}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* COMMAND CENTER — the recommended next action leads the page */}
       <section className="card relative min-w-0 overflow-hidden border-l-2 border-l-violet-400/80 p-5">
