@@ -17,6 +17,8 @@ import {
   type ImportIssue,
   type ImportOptions,
 } from "@/lib/import-db";
+import { buildSuggestedOrder, suggestedOrderCsv } from "@/lib/suggested-order";
+import { getWorkspaceProfile } from "@/lib/workspace-profile";
 
 // CSV importer — drops a real DMS/plate-list/service-board export into CUE's
 // structured records. Four actions, one machinery core (src/lib/import-db.ts):
@@ -246,4 +248,26 @@ export async function exportReconciliationAction(kind: ImportKind): Promise<Reco
   const csv = [headers, ...rows].map((cols) => cols.map(csvField).join(",")).join("\n") + "\n";
   const today = new Date().toISOString().slice(0, 10);
   return { fileName: `reconciliation-${kind.toLowerCase()}-${today}.csv`, csv };
+}
+
+// Revi's suggested order — the follow-up chase list built from the org's
+// records (overdue money, stuck deliveries, unreachable customers). Read-only.
+// Downloaded through the client card; the summary is computed during page
+// render so the card shows the counts without a roundtrip.
+
+export async function suggestedOrderCsvAction(): Promise<ReconciliationExport> {
+  const session = await requireSessionAction();
+  const orgId = session.organizationId;
+  const [[org], ws] = await Promise.all([
+    sql`select name from organizations where id = ${orgId}` as unknown as [{ name: string }],
+    getWorkspaceProfile(orgId),
+  ]);
+  const order = await buildSuggestedOrder(orgId);
+  const { fileName, csv } = suggestedOrderCsv(
+    order,
+    org?.name ?? "",
+    ws.ambassadorName ?? "Revi",
+    new Date().toISOString().slice(0, 10),
+  );
+  return { fileName, csv };
 }

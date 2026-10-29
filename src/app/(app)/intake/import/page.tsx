@@ -4,8 +4,11 @@ import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
 import { sql } from "@/lib/db";
 import { KIND_LABELS } from "@/lib/csv";
+import { buildSuggestedOrder } from "@/lib/suggested-order";
+import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import Importer from "./Importer";
 import ExportBtn from "./ExportBtn";
+import SuggestedOrderCard from "./SuggestedOrderCard";
 import type { ImportHistoryRow } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +44,13 @@ export default async function ImportPage({
           order by created_at desc limit 12`) as unknown as ImportHistoryRow[])
       : [];
 
+  // The ambassador's suggested chase list is read-only, so every signed-in
+  // role gets the counts; the CSV download inside the card re-checks on click.
+  const [order, ws] = await Promise.all([
+    buildSuggestedOrder(s.organizationId),
+    getWorkspaceProfile(s.organizationId),
+  ]);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -48,6 +58,7 @@ export default async function ImportPage({
         <p className="page-sub">Drop an export from your DMS, office software, or billing system, map the columns, check the preview, then commit.</p>
       </div>
       <Importer canImport={canImport} pack={vocab.pack} initialKind={initialKind} />
+      <SuggestedOrderCard ambassadorName={ws.ambassadorName ?? "Revi"} summary={order.summary} />
       {history.length > 0 && (
           <section className="rounded-xl border border-white/[0.06] p-4">
           <h2 className="text-sm font-medium text-navy-100">Recent imports</h2>

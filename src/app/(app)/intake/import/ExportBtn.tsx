@@ -32,12 +32,13 @@ export default function ExportBtn({ kind, label }: { kind: string; label: string
   return (
     <button
       type="button"
-      className={`btn-ghost !px-2 !py-0.5 text-[11px] ${failed ? "!text-red-300" : ""}`}
+      aria-busy={busy}
+      className={`btn-ghost !px-2 !py-0.5 text-[11px] ${busy ? "animate-pulse" : ""} ${failed ? "!text-red-300" : ""}`}
       disabled={busy}
       onClick={() => void download()}
-      title={failed ? "Download failed — try again" : `Download every ${kind.toLowerCase()} record as a CSV reconciliation copy`}
+      title={failed ? "Download failed — try again" : `Download every ${kind.toLowerCase()} record as a CSV reconciliation copy — large record sets take a moment`}
     >
-      {failed ? "retry ↓" : busy ? "…" : label}
+      {failed ? "retry ↓" : busy ? "writing…" : label}
     </button>
   );
 }
