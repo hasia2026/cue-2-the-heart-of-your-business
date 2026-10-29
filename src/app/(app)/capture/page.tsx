@@ -2,10 +2,13 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
+import { getVocab } from "@/lib/vocab";
+import { importGuideForPack } from "@/lib/import-guides";
 import { FOLDER_FOR_KIND } from "@/lib/capture-classify";
 import Link from "next/link";
 import CaptureClient from "./CaptureClient";
 import DocumentRow from "./DocumentRow";
+import ImportGuide from "./ImportGuide";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,7 @@ export default async function CapturePage({
       (select count(*) from documents where organization_id = ${orgId})::int as docs,
       (select count(*) from entities where organization_id = ${orgId})::int as entities,
       (select count(*) from facts where organization_id = ${orgId})::int as facts`;
+  const guide = importGuideForPack((await getVocab(orgId)).pack);
 
   return (
     <div className="space-y-6">
@@ -65,6 +69,8 @@ export default async function CapturePage({
       </div>
 
       <CaptureClient />
+
+      <ImportGuide guide={guide} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="card p-4"><div className="text-xs uppercase tracking-widest text-navy-300">{t("capture.docs")}</div><div className="kpi mt-1">{stats?.docs ?? 0}</div></div>

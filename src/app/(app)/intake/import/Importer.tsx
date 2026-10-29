@@ -7,7 +7,7 @@ import type { CsvParse, CsvPreview, CsvCommit, CsvIssue } from "./actions";
 // commit. The server owns parsing/validation/inserts; the client only holds
 // the user's decision-making (which file, which column feeds which field).
 
-type Kind = "CUSTOMERS" | "VEHICLES" | "INVOICES";
+type Kind = "CUSTOMERS" | "VEHICLES" | "INVOICES" | "SERVICE_ORDERS" | "AGREEMENTS";
 
 /** Paste fallback alongside the file picker — same parse path as a dropped
  *  file, and the path clipboard exports usually arrive through anyway. */
@@ -41,12 +41,33 @@ function PasteBox({ onUse }: { onUse: (text: string, name?: string) => void }) {
 const KIND_META: { id: Kind; title: string; blurb: string; icon: string }[] = [
   { id: "VEHICLES", title: "Vehicles", blurb: "Plate lists / DMS inventory exports", icon: "🚗" },
   { id: "CUSTOMERS", title: "Customers", blurb: "Customer rosters from your CRM export", icon: "🧑" },
+  { id: "SERVICE_ORDERS", title: "Completed jobs", blurb: "Work-order history — every completed call becomes a record with its date, home and invoice amount", icon: "🔧" },
+  { id: "AGREEMENTS", title: "Service plans", blurb: "Maintenance-agreement members become recurring plans the detectors watch", icon: "📅" },
   { id: "INVOICES", title: "Invoices", blurb: "Billing exports — unknown customers can be created on import", icon: "🧾" },
 ];
 
-export default function Importer({ canImport }: { canImport: boolean }) {
+/** Industry-aware target list, ordered so the pack's main entity leads. */
+function kindsForPack(pack: string | null): Kind[] {
+  if (pack === "HOME_SERVICES") return ["CUSTOMERS", "SERVICE_ORDERS", "AGREEMENTS", "INVOICES"];
+  if (pack === "AUTO_DEALERSHIP") return ["VEHICLES", "CUSTOMERS", "INVOICES", "SERVICE_ORDERS"];
+  return ["CUSTOMERS", "VEHICLES", "INVOICES", "SERVICE_ORDERS", "AGREEMENTS"];
+}
+
+export default function Importer({
+  canImport,
+  pack = null,
+  initialKind = null,
+}: {
+  canImport: boolean;
+  pack?: string | null;
+  initialKind?: Kind | null;
+}) {
+  const allowed = kindsForPack(pack);
+  const startKind: Kind = initialKind && KIND_META.some((k) => k.id === initialKind && allowed.includes(initialKind))
+    ? initialKind
+    : allowed[0];
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [kind, setKind] = useState<Kind>("VEHICLES");
+  const [kind, setKind] = useState<Kind>(startKind);
   const [csv, setCsv] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
   const [parse, setParse] = useState<CsvParse | null>(null);
@@ -151,7 +172,9 @@ export default function Importer({ canImport }: { canImport: boolean }) {
       {step === 1 && (
         <section className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
-            {KIND_META.map((k) => (
+            {allowed.map((id) => {
+              const k = KIND_META.find((x) => x.id === id)!;
+              return (
               <button
                 key={k.id}
                 type="button"
@@ -166,7 +189,8 @@ export default function Importer({ canImport }: { canImport: boolean }) {
                 <div className="mt-1 font-medium text-navy-100">{k.title}</div>
                 <div className="muted text-xs">{k.blurb}</div>
               </button>
-            ))}
+              );
+            })}
           </div>
 
           <label
@@ -237,7 +261,7 @@ export default function Importer({ canImport }: { canImport: boolean }) {
               {busy ? "Validating…" : "Validate rows"}
             </button>
           </div>
-          {kind === "INVOICES" && (
+          {(kind === "INVOICES" || kind === "SERVICE_ORDERS" || kind === "AGREEMENTS") && (
             <label className="flex items-start gap-3 rounded-xl border border-white/[0.06] px-4 py-3">
               <input
                 type="checkbox"
@@ -248,7 +272,7 @@ export default function Importer({ canImport }: { canImport: boolean }) {
               <span>
                 <span className="text-sm text-navy-100">Create customers that aren&apos;t in CUE yet</span>
                 <span className="muted block text-xs">
-                  When on, rows billed to an unknown customer get a new customer record — no prior customers import needed.
+                  When on, rows for an unknown customer get a new customer record — no prior customers import needed.
                 </span>
               </span>
             </label>

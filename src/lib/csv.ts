@@ -158,6 +158,26 @@ export const IMPORT_TYPES = {
     { name: "issued_at", label: "Issued date", type: "date", guess: ["issuedat", "invoicedate", "dateissued", "issued", "date"] },
     { name: "due_at", label: "Due date", type: "date", guess: ["duedate", "dueat", "date_due", "due"] },
   ],
+  // Home-services pack targets: completed work-order history and maintenance
+  // agreements, so an HVAC/HVAC-adjacent spreadsheet becomes structured
+  // records instead of a dead captured file.
+  SERVICE_ORDERS: [
+    { name: "title", label: "Job title", required: true, type: "text", guess: ["title", "jobtitle", "workorderdescription", "workorder", "description", "summary", "job"] },
+    { name: "customer", label: "Customer name", required: true, type: "text", guess: ["customername", "customer", "name", "accountname", "client"] },
+    { name: "status", label: "Status", type: "enum", options: ["OPEN", "IN_PROGRESS", "AWAITING_PARTS", "COMPLETED"], guess: ["status", "orderstatus", "jobstatus"] },
+    { name: "amount", label: "Amount", type: "money", guess: ["amount", "total", "totalamount", "ordertotal", "invoicetotal"] },
+    { name: "opened_at", label: "Opened date", type: "date", guess: ["openedat", "dateopened", "orderdate", "workorderdate", "date", "createdat"] },
+    { name: "completed_at", label: "Completed date", type: "date", guess: ["completedat", "datecompleted", "completeddate", "closeddate", "closedat"] },
+  ],
+  AGREEMENTS: [
+    { name: "customer", label: "Customer name", required: true, type: "text", guess: ["customername", "customer", "name", "accountname", "client"] },
+    { name: "plan_name", label: "Plan name", type: "text", guess: [ "planname", "plan", "agreementtype", "servicename", "maintenanceplan"] },
+    { name: "annual_value", label: "Annual value", type: "money", guess: ["annualvalue", "value", "contractvalue", "annualamount", "amount", "price"] },
+    { name: "starts_at", label: "Start date", type: "date", guess: ["startat", "startdate", "begindate", "effectivedate", "date", "createdat"] },
+    { name: "ends_at", label: "End date", type: "date", guess: [ "endsat", "enddate", "renewaldate", "expirydate", "expiresat"] },
+    { name: "status", label: "Status", type: "enum", options: ["ACTIVE", "EXPIRED", "CANCELLED"], guess: ["status", "agreementstatus", "planstatus"] },
+    { name: "notes", label: "Notes", type: "text", guess: ["notes", "note", "comments"] },
+  ],
 } as const satisfies Record<string, FieldDef[]>;
 
 export type ImportKind = keyof typeof IMPORT_TYPES;
@@ -267,8 +287,16 @@ export function validateRows(kind: ImportKind, mapping: Mapping, rows: CsvRow[])
  *  nothing numeric remains. */
 export function parseMoney(raw: string | null): number | null {
   if (raw == null) return null;
-  const cleaned = raw.replace(/[$\s]/g, "").replace(/,/g, "");
-  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return null;
+  // Strips quote marks too: some exports mangle "$13,450" into a quoted
+  // field whose escapes leave stray quote characters behind.
+  const cleaned = raw.replace(/[$\s\"']/g, "").replace(/,/g, "");
+  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) {
+    // Decorated values like "$240/yr" or "$1,080.00 subtotal": take the
+    // leading numeric run instead of rejecting the whole column.
+    const prefix = /^-?\d+(?:\.\d+)?/.exec(cleaned);
+    if (!prefix) return null;
+    return Number(prefix[0]);
+  }
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }

@@ -13,6 +13,7 @@
     "db:reset": "node scripts/db-setup.mjs --fresh && node scripts/seed-dealership.mjs",
     "tour:video": "node scripts/build-product-tour.mjs",
     "test:e2e": "node scripts/e2e.mjs",
+    "verify:import": "tsx scripts/verify-import.mts",
     "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
