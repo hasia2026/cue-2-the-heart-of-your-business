@@ -129,12 +129,12 @@ export type FieldDef = {
 
 export const IMPORT_TYPES = {
   CUSTOMERS: [
-    { name: "name", label: "Customer name", required: true, type: "text", guess: ["customername", "customer", "name", "contact", "companyname"] },
+    { name: "name", label: "Customer name", required: true, type: "text", guess: ["customername", "customer", "name", "accountname", "contact", "companyname"] },
     { name: "email", label: "Email", type: "text", guess: ["email", "emailaddress", "email1"] },
     { name: "phone", label: "Phone", type: "text", guess: ["phone", "phonenumber", "phone1", "cellphone", "mobile", "workphone"] },
     { name: "type", label: "Type", type: "enum", options: ["RETAIL", "WHOLESALE", "FLEET"], guess: ["customertype", "type", "seg", "segment"] },
     { name: "address", label: "Address", type: "text", guess: ["address", "streetaddress", "addressline1", "mailingaddress"] },
-    { name: "notes", label: "Notes", type: "text", guess: ["notes", "note", "comments", "comment"] },
+    { name: "notes", label: "Notes", type: "text", guess: ["accountnotes", "notes", "note", "comments", "comment"] },
   ],
   VEHICLES: [
     { name: "stock", label: "Stock number", required: true, type: "text", guess: ["stocknumber", "stockno", "stock", "stocknum", "invlocationcode"] },

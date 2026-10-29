@@ -19,10 +19,11 @@ import {
 } from "@/lib/import-db";
 
 // CSV importer — drops a real DMS/plate-list/service-board export into CUE's
-// structured records. Three actions, one machinery core (src/lib/import-db.ts):
-//   csvParseAction    — parse + headers + guessed mapping (no validation, no writes)
-//   csvPreviewAction  — full validation + DB-collision checks (importRows dry-run)
-//   csvCommitAction   — session + re-validate + insert + audit (importRows)
+// structured records. Four actions, one machinery core (src/lib/import-db.ts):
+//   csvParseAction           — parse + headers + guessed mapping (no validation, no writes)
+//   csvPreviewAction         — full validation + DB-collision checks (importRows dry-run)
+//   csvCommitAction          — session + re-validate + insert + audit (importRows)
+//   exportReconciliationAction — download an org's records back as CSV (read-only)
 // The org scoping inside import-db uses the SESSION org id — never client input.
 
 export type CsvIssue = ImportIssue;
@@ -166,4 +167,83 @@ export async function csvCommitAction(
   revalidatePath("/capture");
   revalidatePath("/intake/import");
   return { imported: res.imported, skipped: res.skipped, customersCreated: res.customersCreated, excludedUser: res.excludedUser };
+}
+
+// ── Reconciliation export ──────────────────────────────────────────
+// Downloads an org's CURRENT record set for an import kind back as a CSV in
+// the same column shape an import reads, so the owner can diff CUE against
+// the source export in a spreadsheet (which rows landed, which got fixed by
+// hand since). Read-only and org-scoped by session, like every other read.
+
+export type ReconciliationExport = { fileName: string; csv: string };
+
+/** RFC-4180 escaping — quote a field when it contains a comma, quote or
+ *  newline, doubling embedded quotes (notes fields hit this constantly). */
+function csvField(v: unknown): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export async function exportReconciliationAction(kind: ImportKind): Promise<ReconciliationExport> {
+  const session = await requireSessionAction();
+  if (session.role === "MEMBER") throw new Error("Only Owners, Admins and Managers can export data.");
+  assertKind(kind);
+  const orgId = session.organizationId;
+  const d = (x: Date | null) => (x ? new Date(x).toISOString().slice(0, 10) : "");
+  const money = (x: unknown) => (x == null ? "" : String(Number(x)));
+
+  let headers: string[];
+  let rows: unknown[][];
+  if (kind === "VEHICLES") {
+    headers = ["Stock Number", "VIN", "Year", "Make", "Model", "Trim", "New or Used", "Inv Status", "List Price", "Date In Stock"];
+    const r = await sql`
+      select stock_number, vin, year, make, model, trim, kind, status, list_price, listed_at
+      from vehicles where organization_id = ${orgId} order by stock_number`;
+    rows = (r as unknown as Record<string, unknown>[]).map((v) => [
+      v.stock_number, v.vin, v.year, v.make, v.model, v.trim, v.kind, v.status,
+      money(v.list_price), d(v.listed_at as Date | null),
+    ]);
+  } else if (kind === "CUSTOMERS") {
+    headers = ["Customer Name", "Email", "Phone", "Customer Type", "Address", "Account Notes"];
+    const r = await sql`
+      select name, email, phone, type, address, notes from customers
+      where organization_id = ${orgId} order by name`;
+    rows = (r as unknown as Record<string, unknown>[]).map((c) => [
+      c.name, c.email, c.phone, c.type, c.address, c.notes,
+    ]);
+  } else if (kind === "INVOICES") {
+    headers = ["Invoice Number", "Bill To", "Invoice Total", "Invoice Type", "Payment Status", "Invoice Date", "Due Date"];
+    const r = await sql`
+      select i.number, c.name as customer, i.amount, i.kind, i.status, i.issued_at, i.due_at
+      from invoices i left join customers c on c.id = i.customer_id
+      where i.organization_id = ${orgId} order by i.number`;
+    rows = (r as unknown as Record<string, unknown>[]).map((v) => [
+      v.number, v.customer, money(v.amount), v.kind, v.status,
+      d(v.issued_at as Date | null), d(v.due_at as Date | null),
+    ]);
+  } else if (kind === "SERVICE_ORDERS") {
+    headers = ["Job Title", "Customer Name", "Status", "Amount", "Opened Date", "Completed Date"];
+    const r = await sql`
+      select w.title, c.name as customer, w.status, w.amount, w.opened_at, w.completed_at
+      from service_orders w left join customers c on c.id = w.customer_id
+      where w.organization_id = ${orgId} order by w.opened_at desc, w.title`;
+    rows = (r as unknown as Record<string, unknown>[]).map((v) => [
+      v.title, v.customer, v.status, money(v.amount),
+      d(v.opened_at as Date | null), d(v.completed_at as Date | null),
+    ]);
+  } else {
+    headers = ["Customer Name", "Plan Name", "Annual Value", "Start Date", "End Date", "Status", "Notes"];
+    const r = await sql`
+      select c.name as customer, a.plan_name, a.annual_value, a.starts_at, a.ends_at, a.status, a.notes
+      from maintenance_agreements a left join customers c on c.id = a.customer_id
+      where a.organization_id = ${orgId} order by a.starts_at desc`;
+    rows = (r as unknown as Record<string, unknown>[]).map((v) => [
+      v.customer, v.plan_name, money(v.annual_value),
+      d(v.starts_at as Date | null), d(v.ends_at as Date | null), v.status, v.notes,
+    ]);
+  }
+
+  const csv = [headers, ...rows].map((cols) => cols.map(csvField).join(",")).join("\n") + "\n";
+  const today = new Date().toISOString().slice(0, 10);
+  return { fileName: `reconciliation-${kind.toLowerCase()}-${today}.csv`, csv };
 }

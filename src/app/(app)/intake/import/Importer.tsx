@@ -46,6 +46,16 @@ const KIND_META: { id: Kind; title: string; blurb: string; icon: string }[] = [
   { id: "INVOICES", title: "Invoices", blurb: "Billing exports — unknown customers can be created on import", icon: "🧾" },
 ];
 
+/** Singular noun per kind so success copy reads right in every voice:
+ *  "6 invoice record(s)", "live in your service plans". */
+const KIND_NOUN: Record<Kind, { one: string; liveIn: string }> = {
+  VEHICLES: { one: "vehicle record", liveIn: "your vehicles" },
+  CUSTOMERS: { one: "customer record", liveIn: "your customers" },
+  INVOICES: { one: "invoice record", liveIn: "your invoices" },
+  SERVICE_ORDERS: { one: "service-order record", liveIn: "your service-order history" },
+  AGREEMENTS: { one: "service-plan record", liveIn: "your service plans" },
+};
+
 /** Industry-aware target list, ordered so the pack's main entity leads. */
 function kindsForPack(pack: string | null): Kind[] {
   if (pack === "HOME_SERVICES") return ["CUSTOMERS", "SERVICE_ORDERS", "AGREEMENTS", "INVOICES"];
@@ -311,11 +321,11 @@ export default function Importer({
         <section className="space-y-3">
           {commit ? (
             <div className="rounded-xl border border-cue-green/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-              ✓ Imported <strong>{commit.imported}</strong> {kind.toLowerCase()} record(s)
-              {commit.customersCreated > 0 && <> — created <strong>{commit.customersCreated}</strong> new customer(s)</>}
+              ✓ Imported <strong>{commit.imported}</strong> {KIND_NOUN[kind].one}{commit.imported === 1 ? "" : "s"}
+              {commit.customersCreated > 0 && <> — created <strong>{commit.customersCreated}</strong> new customer{commit.customersCreated === 1 ? "" : "s"}</>}
               {commit.excludedUser > 0 && <> — left out {commit.excludedUser} row(s) you marked</>}
               {commit.skipped > 0 && <> — {commit.skipped} row(s) still failed validation</>}. They&apos;re live in{" "}
-              {kind === "VEHICLES" ? "your vehicles" : kind === "CUSTOMERS" ? "your customers" : "your invoices"} — the
+              {KIND_NOUN[kind].liveIn} — the
               detectors read them from now on.
               <div className="mt-2">
                 <button type="button" className="btn-ghost !px-3 !py-1.5 text-xs" onClick={reset}>Import another file</button>
@@ -329,7 +339,7 @@ export default function Importer({
                   : "border-amber-400/30 bg-amber-500/10 text-amber-200"
               }`}>
                 {preview.blocked === 0
-                  ? `✓ All ${preview.valid} row(s) look good — ready to import into ${kind.toLowerCase()}.`
+                  ? `✓ All ${preview.valid} row(s) look good — ready to import as ${KIND_NOUN[kind].one}${preview.valid === 1 ? "" : "s"}.`
                   : `${preview.valid} row(s) ready · ${preview.blocked} blocked (problems listed below). Blocked rows are skipped on import.`}
               </div>
               {preview.customersToCreate.length > 0 && (
