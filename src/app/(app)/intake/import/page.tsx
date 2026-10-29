@@ -2,7 +2,10 @@ import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
+import { sql } from "@/lib/db";
+import { KIND_LABELS } from "@/lib/csv";
 import Importer from "./Importer";
+import type { ImportHistoryRow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +30,16 @@ export default async function ImportPage({
     ["CUSTOMERS", "VEHICLES", "INVOICES", "SERVICE_ORDERS", "AGREEMENTS"] as const
   ).find((k) => k.toLowerCase() === kindParam?.toLowerCase()) ?? null;
 
+  // Import history — one row per committed file, so an owner can see what
+  // entered CUE and reconcile it against the source export.
+  const history: ImportHistoryRow[] =
+    canImport
+      ? ((await sql`
+          select id, kind, file_name, actor_name, row_count, imported, skipped, customers_created, excluded_user, created_at
+          from import_history where organization_id = ${s.organizationId}
+          order by created_at desc limit 12`) as unknown as ImportHistoryRow[])
+      : [];
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -34,6 +47,42 @@ export default async function ImportPage({
         <p className="page-sub">Drop an export from your DMS, office software, or billing system, map the columns, check the preview, then commit.</p>
       </div>
       <Importer canImport={canImport} pack={vocab.pack} initialKind={initialKind} />
+      {history.length > 0 && (
+        <section className="rounded-xl border border-white/[0.06] p-4">
+          <h2 className="text-sm font-medium text-navy-100">Recent imports</h2>
+          <p className="muted mb-3 text-xs">Every committed file, its counts, and who ran it.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="muted uppercase tracking-widest">
+                <tr>
+                  <th className="py-2 pe-3 font-medium">When</th>
+                  <th className="py-2 pe-3 font-medium">File</th>
+                  <th className="py-2 pe-3 font-medium">Target</th>
+                  <th className="py-2 pe-3 font-medium">Rows</th>
+                  <th className="py-2 pe-3 font-medium">Imported</th>
+                  <th className="py-2 pe-3 font-medium">Skipped</th>
+                  <th className="py-2 pe-3 font-medium">By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} className="border-t border-white/[0.05]">
+                    <td className="py-2 pe-3 text-navy-100">{new Date(h.created_at).toLocaleDateString()}</td>
+                    <td className="py-2 pe-3 text-navy-100">{h.file_name}</td>
+                    <td className="muted py-2 pe-3">{KIND_LABELS[h.kind as keyof typeof KIND_LABELS] ?? h.kind.toLowerCase()}</td>
+                    <td className="muted py-2 pe-3">{h.row_count}</td>
+                    <td className="py-2 pe-3 text-emerald-300">{h.imported}</td>
+                    <td className="muted py-2 pe-3">
+                      {h.skipped + h.excluded_user || "—"}
+                    </td>
+                    <td className="muted py-2 pe-3">{h.actor_name ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
       <p className="muted text-xs">
         Every imported row is org-scoped and audited — {t("app.tagline")}
       </p>

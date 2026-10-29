@@ -27,6 +27,11 @@ export type ImportOptions = {
   createMissingCustomers?: boolean;
   /** Validate only — no writes at all (preview steps run with this). */
   dryRun?: boolean;
+  /** Row indexes the user explicitly chose to leave out (partial-import
+   *  resolution in the preview step). Excluded rows are skipped even when
+   *  valid: no customer gets auto-created for them, and they are counted in
+   *  ImportResult.excludedUser instead of silently inflating `skipped`. */
+  exclude?: number[];
 };
 
 export type ImportResult = {
@@ -39,6 +44,9 @@ export type ImportResult = {
   /** Dry-run only: names (first-seen spelling) that WOULD get new customer
    *  records on a real commit. */
   customersToCreate: string[];
+  /** Rows excluded by the user (partial-import resolution) — distinct from
+   *  rows skipped for failing validation so the summary can say both. */
+  excludedUser: number;
 };
 
 /** Kinds whose "customer" is a by-NAME reference resolved at insert time
@@ -179,6 +187,11 @@ export async function importRows(
   const { issues: dbIssues, missingCustomers } = await dbChecks(kind, orgId, mapping, dataRows, opts);
   errors.push(...withinFileDupes(kind, mapping, dataRows), ...dbIssues);
   const blocked = new Set(errors.map((e) => e.index));
+  // User exclusions only touch rows the user saw and marked — out-of-range
+  // indexes (stale preview) are ignored rather than trusted.
+  const excluded = new Set(
+    (opts.exclude ?? []).filter((n) => Number.isInteger(n) && n >= 0 && n < dataRows.length && !blocked.has(n)),
+  );
 
   if (opts.dryRun) {
     return {
@@ -187,6 +200,7 @@ export async function importRows(
       customersCreated: 0,
       issues: errors,
       customersToCreate: opts.createMissingCustomers ? missingCustomers : [],
+      excludedUser: excluded.size,
     };
   }
 
@@ -200,7 +214,7 @@ export async function importRows(
     if (CUSTOMER_NAME_KINDS.includes(kind) && opts.createMissingCustomers) {
       const names = new Set<string>();
       for (let i = 0; i < dataRows.length; i++) {
-        if (blocked.has(i)) continue;
+        if (blocked.has(i) || excluded.has(i)) continue;
         const v = validateRow(kind, mapping, dataRows[i]);
         if (v.ok) names.add(String(v.values.customer).trim().slice(0, 300));
       }
@@ -221,7 +235,7 @@ export async function importRows(
     }
 
     for (let i = 0; i < dataRows.length; i++) {
-      if (blocked.has(i)) continue;
+      if (blocked.has(i) || excluded.has(i)) continue;
       const row = dataRows[i];
       const v = validateRow(kind, mapping, row);
       if (!v.ok) continue; // raced state — preview was fresher; skip row
@@ -316,5 +330,5 @@ export async function importRows(
     });
   }
 
-  return { imported, skipped: blocked.size, customersCreated, issues: errors, customersToCreate: [] };
+  return { imported, skipped: blocked.size, customersCreated, issues: errors, customersToCreate: [], excludedUser: excluded.size };
 }

@@ -174,6 +174,22 @@ async function main() {
     check("unknown customer created with the invoice", invCommit.imported === 1 && invCommit.customersCreated === 1);
   }
 
+  // ── 4. Partial-import resolution: exclude option ──
+  const excCsv = [
+    `Stock Number,VIN,Year,Make,Model,List Price,New or Used,Status,Date In Stock`,
+    `IV-VERIFY-5,1FA6P8TH5H5211111,2017,Ford,Fusion,19995,USED,AVAILABLE,`,
+    `IV-VERIFY-6,1FA6P8TH5H5222222,2018,Ford,Fusion,20995,USED,AVAILABLE,`,
+  ].join("\n");
+  const excResult = await importRows(org.id, null, "VEHICLES", vehMapping, parseCsv(excCsv).rows, { exclude: [0] });
+  check(
+    "user-excluded row is skipped while the rest imports",
+    excResult.imported === 1 && excResult.excludedUser === 1 && excResult.skipped === 0,
+    `imported=${excResult.imported} excluded=${excResult.excludedUser} skipped=${excResult.skipped}`,
+  );
+  const excRow = (await sql`
+    select 1 from vehicles where organization_id = ${org.id} and stock_number = 'IV-VERIFY-5'`) as unknown as unknown[];
+  check("excluded row really stays out of the DB", excRow.length === 0);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exitCode = fail === 0 ? 0 : 1;
 }

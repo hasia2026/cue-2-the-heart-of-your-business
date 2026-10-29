@@ -74,6 +74,9 @@ export default function Importer({
   const [mapping, setMapping] = useState<Record<string, string>>({}); // field → header
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [commit, setCommit] = useState<CsvCommit | null>(null);
+  // Partial-import resolution: row indexes the user marks "don't import" in
+  // the preview. Reset whenever a fresh preview runs.
+  const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createCustomers, setCreateCustomers] = useState(false);
@@ -112,6 +115,9 @@ export default function Importer({
       const { csvPreviewAction } = await import("./actions");
       const res = await csvPreviewAction(kind, csv, mapping, { createMissingCustomers: createCustomers });
       setPreview(res);
+      // A fresh preview reflects the current mapping — previous exclusions
+      // no longer map to the same rows.
+      setExcluded(new Set());
       setStep(3);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -126,7 +132,10 @@ export default function Importer({
     setError(null);
     try {
       const { csvCommitAction } = await import("./actions");
-      const res = await csvCommitAction(kind, csv, mapping, { createMissingCustomers: createCustomers });
+      const res = await csvCommitAction(kind, csv, mapping, fileName, {
+        createMissingCustomers: createCustomers,
+        exclude: [...excluded],
+      });
       setCommit(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -143,6 +152,7 @@ export default function Importer({
     setMapping({});
     setPreview(null);
     setCommit(null);
+    setExcluded(new Set());
     setError(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -155,6 +165,20 @@ export default function Importer({
     list.push(i);
     errorsByRow.set(i.index, list);
   }
+  const errorRowIndexes = [...errorsByRow.keys()];
+  const blockedIdx = new Set(errorRowIndexes);
+  // Rows already blocked by validation are skipped anyway — marking them
+  // “don't import” is an acknowledgment, not an extra cut. Only exclusions
+  // of would-import rows reduce the commit count.
+  const excludedCount = [...excluded].filter((i) => !blockedIdx.has(i)).length;
+  const goingCount = (preview?.valid ?? 0) - excludedCount;
+  const toggleExclude = (idx: number) =>
+    setExcluded((s) => {
+      const next = new Set(s);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
 
   return (
     <div className="space-y-4">
@@ -286,7 +310,8 @@ export default function Importer({
             <div className="rounded-xl border border-cue-green/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
               ✓ Imported <strong>{commit.imported}</strong> {kind.toLowerCase()} record(s)
               {commit.customersCreated > 0 && <> — created <strong>{commit.customersCreated}</strong> new customer(s)</>}
-              {commit.skipped > 0 && <> — skipped {commit.skipped} row(s) that still failed validation</>}. They&apos;re live in{" "}
+              {commit.excludedUser > 0 && <> — left out {commit.excludedUser} row(s) you marked</>}
+              {commit.skipped > 0 && <> — {commit.skipped} row(s) still failed validation</>}. They&apos;re live in{" "}
               {kind === "VEHICLES" ? "your vehicles" : kind === "CUSTOMERS" ? "your customers" : "your invoices"} — the
               detectors read them from now on.
               <div className="mt-2">
@@ -309,20 +334,65 @@ export default function Importer({
                   Will create {preview.customersToCreate.length} new customer(s): {preview.customersToCreate.join(", ")}
                 </div>
               )}
+              {preview.errors.length > 0 && preview.valid > 0 && (
+                <p className="muted text-xs">
+                  Bad rows don&apos;t have to block the good ones — mark any problem row to leave it out and import the rest.
+                </p>
+              )}
               {preview.errors.slice(0, 50).map((e, i) => (
-                <div key={`${e.index}-${i}`} className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                  Row {e.index + 1}{e.field ? ` · ${e.field}` : ""}: {e.message}
-                </div>
+                  <div key={`${e.index}-${i}`} className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                    <div className="flex items-start justify-between gap-2">
+                      <span>
+                        Row {e.index + 1}{e.field ? ` · ${e.field}` : ""}: {e.message}
+                      </span>
+                      {canImport && !commit && (
+                        <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-amber-200">
+                          <input
+                            type="checkbox"
+                            className="accent-cue-blue"
+                            checked={excluded.has(e.index)}
+                            onChange={() => toggleExclude(e.index)}
+                          />
+                          Don&apos;t import
+                        </label>
+                      )}
+                    </div>
+                  </div>
               ))}
               {preview.errors.length > 50 && (
                 <p className="muted text-xs">…and {preview.errors.length - 50} more issue(s).</p>
               )}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button type="button" className="btn-ghost !px-4 !py-2 text-xs" disabled={busy} onClick={() => setStep(2)}>Adjust mapping</button>
-                <button type="button" className="btn-primary !px-4 text-sm" disabled={busy} onClick={() => void runCommit()}>
-                  {busy ? "Importing…" : `Import ${preview.valid} row(s)`}
+                {errorRowIndexes.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn-ghost !px-4 !py-2 text-xs"
+                    disabled={busy}
+                    onClick={() =>
+                      setExcluded((s) => {
+                        const isAll = errorRowIndexes.every((x) => s.has(x));
+                        return isAll ? new Set<number>() : new Set<number>([...s, ...errorRowIndexes]);
+                      })
+                    }
+                  >
+                    {errorRowIndexes.every((x) => excluded.has(x))
+                      ? "Include problem rows again"
+                      : `Don't import all ${errorRowIndexes.length} problem row(s)`}
+                  </button>
+                )}
+                <button type="button" className="btn-primary !px-4 text-sm" disabled={busy || goingCount === 0} onClick={() => void runCommit()}>
+                  {busy ? "Importing…" : `Import ${goingCount} row(s)`}
                 </button>
               </div>
+              {excludedCount > 0 && (
+                <p className="muted text-xs">{excludedCount} row(s) marked “don't import” — they stay in your spreadsheet, nothing is inserted for them.</p>
+              )}
+              {[...excluded].some((i) => blockedIdx.has(i)) && (
+                <p className="muted text-xs">
+                  Marked rows that already failed validation are skipped either way; the count above only drops for rows that would otherwise import.
+                </p>
+              )}
             </>
           )}
         </section>

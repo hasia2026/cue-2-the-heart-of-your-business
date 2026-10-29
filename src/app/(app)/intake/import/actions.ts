@@ -74,7 +74,21 @@ export type CsvPreview = CsvParse & {
    *  get NEW customer records at commit (first-seen spelling). */
   customersToCreate: string[];
 };
-export type CsvCommit = { imported: number; skipped: number; customersCreated: number };
+export type CsvCommit = { imported: number; skipped: number; customersCreated: number; excludedUser: number };
+
+/** Last commits shown to the owner under the importer. */
+export type ImportHistoryRow = {
+  id: string;
+  kind: string;
+  file_name: string;
+  actor_name: string | null;
+  row_count: number;
+  imported: number;
+  skipped: number;
+  customers_created: number;
+  excluded_user: number;
+  created_at: string;
+};
 
 /** Step 2: full validation with the confirmed mapping, plus the DB-aware
  *  checks (duplicate stock/invoice numbers in this org, customer lookups,
@@ -103,11 +117,14 @@ export async function csvPreviewAction(
 }
 
 /** Step 3: session-checked commit — re-validate inside a transaction, then
- *  insert the valid rows (handled in import-db). */
+ *  insert the valid rows (handled in import-db). Every commit lands one
+ *  import_history row so owners can see what entered CUE, from which file,
+ *  when and by whom. */
 export async function csvCommitAction(
   kind: ImportKind,
   csv: string,
   mapping: Mapping,
+  fileName: string,
   opts: CsvImportOptions = {},
 ): Promise<CsvCommit> {
   const session = await requireSessionAction();
@@ -116,6 +133,18 @@ export async function csvCommitAction(
   const { rows } = parseFile(kind, csv);
   const dataRows = rows.slice(0, MAX_IMPORT_ROWS);
   const res = await importRows(orgId, session.user.id, kind, mapping, dataRows, opts);
+
+  try {
+    await sql`
+      insert into import_history
+        (organization_id, actor_id, actor_name, kind, file_name, row_count, imported, skipped, customers_created, excluded_user)
+      values (${orgId}, ${session.user.id}, ${session.user.name}, ${kind}, ${fileName.slice(0, 200)},
+        ${dataRows.length}, ${res.imported}, ${res.skipped}, ${res.customersCreated}, ${res.excludedUser})`;
+  } catch (e) {
+    // The import itself is committed; a history-write failure must not
+    // surface as a botched import. Log loudly instead.
+    console.error("import_history insert failed", e);
+  }
 
   // Intake checklist marks the import step done on the first successful import.
   if (res.imported > 0) {
@@ -133,5 +162,5 @@ export async function csvCommitAction(
   revalidatePath("/intake");
   revalidatePath("/capture");
   revalidatePath("/intake/import");
-  return { imported: res.imported, skipped: res.skipped, customersCreated: res.customersCreated };
+  return { imported: res.imported, skipped: res.skipped, customersCreated: res.customersCreated, excludedUser: res.excludedUser };
 }

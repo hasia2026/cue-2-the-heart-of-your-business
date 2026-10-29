@@ -181,6 +181,17 @@ export const IMPORT_TYPES = {
 } as const satisfies Record<string, FieldDef[]>;
 
 export type ImportKind = keyof typeof IMPORT_TYPES;
+
+/** Human label per import kind — shared by the importer and the history
+ *  table. Lives in this plain module because a `"use server"` file can only
+ *  export async functions (a const there breaks the Next build). */
+export const KIND_LABELS: Record<ImportKind, string> = {
+  CUSTOMERS: "Customers",
+  VEHICLES: "Vehicles",
+  INVOICES: "Invoices",
+  SERVICE_ORDERS: "Service orders",
+  AGREEMENTS: "Service plans",
+};
 export type Mapping = Partial<Record<string, string>>; // field name → CSV header
 
 export function fieldsFor(kind: ImportKind): readonly FieldDef[] {
