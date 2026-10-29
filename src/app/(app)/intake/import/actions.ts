@@ -114,18 +114,21 @@ export async function csvPreviewAction(
     blocked: res.skipped,
     customersToCreate: res.customersToCreate,
   };
-}
-
-/** Step 3: session-checked commit — re-validate inside a transaction, then
- *  insert the valid rows (handled in import-db). Every commit lands one
- *  import_history row so owners can see what entered CUE, from which file,
- *  when and by whom. */
+}/** Step 3: session-checked commit — re-validate inside a transaction, then
+  *  insert the valid rows (handled in import-db). Every commit lands one
+  *  import_history row so owners can see what entered CUE, from which file,
+  *  when and by whom.
+  *  fileName is LAST and optional: positional callers that predate the
+  *  history log (scripts/e2e.mjs drives the real action with fixed args)
+  *  pass `kind, csv, mapping, opts` and must not get their opts misread
+  *  as an import-history file name — that regression blocked the whole
+  *  createMissingCustomers commit path. */
 export async function csvCommitAction(
   kind: ImportKind,
   csv: string,
   mapping: Mapping,
-  fileName: string,
   opts: CsvImportOptions = {},
+  fileName = "pasted.csv",
 ): Promise<CsvCommit> {
   const session = await requireSessionAction();
   if (session.role === "MEMBER") throw new Error("Only Owners, Admins and Managers can import data.");

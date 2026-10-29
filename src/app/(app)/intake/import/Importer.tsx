@@ -132,10 +132,13 @@ export default function Importer({
     setError(null);
     try {
       const { csvCommitAction } = await import("./actions");
-      const res = await csvCommitAction(kind, csv, mapping, fileName, {
-        createMissingCustomers: createCustomers,
-        exclude: [...excluded],
-      });
+      const res = await csvCommitAction(
+        kind,
+        csv,
+        mapping,
+        { createMissingCustomers: createCustomers, exclude: [...excluded] },
+        fileName || "pasted.csv",
+      );
       setCommit(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
