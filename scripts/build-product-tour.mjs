@@ -48,7 +48,7 @@ const slides = [
   ['lab', 'Innovation Lab', "The innovation lab collects ideas, and turns the best ones into experiments."],
   ['ecosystem', 'Ecosystem', "Ecosystem connects the tools you already use."],
   ['settings', 'Settings', "Settings put you in control of your organization, theme, and A I configuration."],
-  ['book-call', 'Book a call', "Ready to see it on your own business? Book a call with our team."],
+  ['book-call', 'Book a call — Shannon Freeman, founder & CEO', "Ready to see it on your own business? Book a call with Shannon Freeman, the founder and chief executive officer, at six five seven, eight eight three, four zero six two. Twenty minutes, your numbers, no pitch deck."],
   ['partners', 'CUE Partners', "Kyoo partners help you roll out across locations. Kyoo. The heart of your business."],
 ];
 
@@ -229,17 +229,23 @@ for (let i = 0; i < slides.length; i++) {
   const dur = wavDuration(encode[i]) + tail;
   total += dur;
   const D = Math.ceil(dur * 30);
-  // Alternate motion: zoom-in centered / slow pan right / zoom-out centered (upscale first to reduce zoompan jitter)
-  const style = i % 3;
+  // Fit, never crop: a dealership watching must see the whole page — headers,
+  // sidebars, footers — so the screenshot is scaled to FIT the 16:9 canvas and
+  // letterboxed, then gently pushed in. (The old increase+crop cut page tops
+  // and slice-barred sidebar labels.) Alternate push-in / pull-back centered;
+  // no pans: hanging onto padding reads as a mis-framed slide.
+  const style = i % 2;
   const zoomExpr = style === 0
-    ? `z='1+0.12*on/${D}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
-    : style === 1
-      ? `z='1.10':x='(iw-iw/zoom)*on/${D}':y='(ih-ih/zoom)/2'`
-      : `z='1.12-0.12*on/${D}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
+    ? `z='1+0.07*on/${D}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
+    : `z='1.07-0.07*on/${D}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
   const vf = [
-    'scale=2560:1440:force_original_aspect_ratio=increase,crop=2560:1440',
+    'scale=2560:1440:force_original_aspect_ratio=decrease',
+    "pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=0x0b1020",
     `zoompan=${zoomExpr}:d=${D}:s=1280x720:fps=30`,
-    `drawtext=fontfile='${FONT}':text='${esc(caption)}':fontsize=34:fontcolor=white:borderw=3:bordercolor=black@0.7:x=(w-text_w)/2:y=h-70`,
+    // Reserved caption band: the scrim keeps captions off the page content
+    // (used to overlap invoices bars, team cards, checklist rows).
+    `drawbox=x=0:y=ih-84:w=iw:h=84:color=0x0b1020@0.82:t=fill`,
+    `drawtext=fontfile='${FONT}':text='${esc(caption)}':fontsize=30:fontcolor=white:borderw=2:bordercolor=black@0.7:x=(w-text_w)/2:y=h-60`,
     'format=yuv420p',
   ].join(',');
   execFileSync(ffmpeg, [
