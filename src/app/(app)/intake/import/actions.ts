@@ -17,7 +17,13 @@ import {
   type ImportIssue,
   type ImportOptions,
 } from "@/lib/import-db";
-import { buildSuggestedOrder, suggestedOrderCsv } from "@/lib/suggested-order";
+import {
+  buildSuggestedOrder,
+  suggestedOrderCsv,
+  dismissSuggestedOrderItem,
+  restoreSuggestedOrderItem,
+  type SuggestedOrderCategory,
+} from "@/lib/suggested-order";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 
 // CSV importer — drops a real DMS/plate-list/service-board export into CUE's
@@ -270,4 +276,27 @@ export async function suggestedOrderCsvAction(): Promise<ReconciliationExport> {
     new Date().toISOString().slice(0, 10),
   );
   return { fileName, csv };
+}
+
+// ── Chase check-off ─────────────────────────────────────────────────
+// Marking a follow-up chased ("done") drops it from the card, the digest and
+// the order CSV until it's restored. This is view bookkeeping, not a change to
+// the underlying record, so any signed-in role may do it — the same logic that
+// lets MEMBERs see the card. Dismissals are org-shared (everyone stops seeing
+// the row) and recorded, so the Restore strip shows who closed what.
+
+const SUGGESTED_CATEGORIES: SuggestedOrderCategory[] = ["INVOICE_OVERDUE", "VEHICLE_IN_TRANSIT", "CONTACT_INFO"];
+
+export async function dismissSuggestedOrderAction(category: string, record: string, detail: string): Promise<void> {
+  const session = await requireSessionAction();
+  const cat = SUGGESTED_CATEGORIES.find((c) => c === category);
+  if (!cat) throw new Error("Unknown follow-up category.");
+  await dismissSuggestedOrderItem(session.organizationId, session.user.id, session.user.name, { category: cat, record, detail });
+  revalidatePath("/intake/import");
+}
+
+export async function restoreSuggestedOrderAction(id: string): Promise<void> {
+  const session = await requireSessionAction();
+  await restoreSuggestedOrderItem(session.organizationId, id);
+  revalidatePath("/intake/import");
 }

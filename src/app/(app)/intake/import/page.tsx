@@ -4,7 +4,7 @@ import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
 import { sql } from "@/lib/db";
 import { KIND_LABELS } from "@/lib/csv";
-import { buildSuggestedOrder } from "@/lib/suggested-order";
+import { buildSuggestedOrder, listDismissed } from "@/lib/suggested-order";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import Importer from "./Importer";
 import ExportBtn from "./ExportBtn";
@@ -45,9 +45,12 @@ export default async function ImportPage({
       : [];
 
   // The ambassador's suggested chase list is read-only, so every signed-in
-  // role gets the counts; the CSV download inside the card re-checks on click.
-  const [order, ws] = await Promise.all([
+  // role gets the counts; check-off/restore re-check nothing — they are view
+  // bookkeeping, not record changes — while the CSV download inside the card
+  // re-checks on click.
+  const [order, dismissed, ws] = await Promise.all([
     buildSuggestedOrder(s.organizationId),
+    listDismissed(s.organizationId),
     getWorkspaceProfile(s.organizationId),
   ]);
 
@@ -58,7 +61,12 @@ export default async function ImportPage({
         <p className="page-sub">Drop an export from your DMS, office software, or billing system, map the columns, check the preview, then commit.</p>
       </div>
       <Importer canImport={canImport} pack={vocab.pack} initialKind={initialKind} />
-      <SuggestedOrderCard ambassadorName={ws.ambassadorName ?? "Revi"} summary={order.summary} />
+      <SuggestedOrderCard
+        ambassadorName={ws.ambassadorName ?? "Revi"}
+        rows={order.rows}
+        summary={order.summary}
+        dismissed={dismissed}
+      />
       {history.length > 0 && (
           <section className="rounded-xl border border-white/[0.06] p-4">
           <h2 className="text-sm font-medium text-navy-100">Recent imports</h2>

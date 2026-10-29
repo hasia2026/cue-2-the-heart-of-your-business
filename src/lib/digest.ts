@@ -1,5 +1,6 @@
 import { sql } from "./db";
 import { getWorkspaceProfile, validAccent } from "./workspace-profile";
+import { buildSuggestedOrder } from "./suggested-order";
 
 type DigestSection = { heading: string; lines: string[] };
 
@@ -7,6 +8,9 @@ export type DigestData = {
   orgName: string;
   openLeaks: DigestSection;
   pendingDecisions: DigestSection;
+  /** Revi's follow-up chase list — same build the import-page card reads
+   *  (dismissed rows already excluded), in the money-first priority order. */
+  suggestedOrder: DigestSection;
   actionItems: DigestSection;
   approvedThisWeek: DigestSection;
   unbilled: DigestSection;
@@ -16,8 +20,12 @@ export type DigestData = {
 
 /** All digest figures come from the same live tables the dashboard reads. */
 export async function buildDigestData(orgId: string): Promise<DigestData> {
-  const [org] = await sql`select name from organizations where id = ${orgId}`;
+  const [[org], profile] = await Promise.all([
+    sql`select name from organizations where id = ${orgId}`,
+    getWorkspaceProfile(orgId),
+  ]);
   if (!org) throw new Error("Organization not found");
+  const ambassadorName = profile.ambassadorName ?? "Revi";
 
   const openInsights = await sql`
     select title, severity, impact_value
@@ -123,6 +131,43 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
       : ["• Every completed job is invoiced or carries a live draft."],
   };
 
+  // Revi's suggested follow-up order — the exact build the Intake → Import
+  // card shows (overdue invoices → in-transit vehicles → contact gaps), with
+  // chases the owner already checked off excluded. The digest shows the head
+  // of the list because the Monday agenda needs the top actions, not all 20;
+  // the full list lives in the card and its CSV worklist.
+  const order = await buildSuggestedOrder(orgId);
+  const CATEGORY_HEAD: Record<string, string> = {
+    INVOICE_OVERDUE: "Collect",
+    VEHICLE_IN_TRANSIT: "Delivery",
+    CONTACT_INFO: "Contact",
+  };
+  const orderHead = order.rows.slice(0, 5);
+  const suggestedOrderLines = orderHead.map((r) => {
+    const bits = [CATEGORY_HEAD[r.category] ?? r.category, r.record || r.customer];
+    if (r.detail) bits.push(r.detail);
+    if (r.since) bits.push(`since ${r.since}`);
+    return `• ${bits.join(" — ")}`;
+  });
+  if (!suggestedOrderLines.length) {
+    suggestedOrderLines.push("• All clear — nothing to chase.");
+  } else {
+    // Money total belongs in the heading so the owner sees the stake up front.
+    if (order.rows.length > orderHead.length) {
+      suggestedOrderLines.push(`• … and ${order.rows.length - orderHead.length} more in ${ambassadorName}'s full order (download it from Intake → Import).`);
+    }
+    if (order.dismissedCount > 0) {
+      suggestedOrderLines.push(`• ${order.dismissedCount} chase${order.dismissedCount === 1 ? "" : "s"} you checked off are kept out of this list.`);
+    }
+  }
+  const suggestedOrder: DigestSection = {
+    heading:
+      order.rows.length
+        ? `${ambassadorName}'s suggested order (${order.rows.length} follow-up${order.rows.length === 1 ? "" : "s"}${order.summary.invoices ? ` — ${money(order.summary.invoiceTotal)} to collect` : ""})`
+        : "No suggested order this week",
+    lines: suggestedOrderLines,
+  };
+
   const moneyFound: DigestSection = {
     heading: "Money found / recovered",
     lines: [
@@ -160,7 +205,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
       : "• Nothing pending — every request has been decided.",
   );
 
-  return { orgName: org.name, openLeaks, pendingDecisions, actionItems, approvedThisWeek, unbilled, moneyFound, planSignups };
+  return { orgName: org.name, openLeaks, pendingDecisions, suggestedOrder, actionItems, approvedThisWeek, unbilled, moneyFound, planSignups };
 }
 
 /** Plain-text rendering — the same body goes to WhatsApp and the email fallback.
@@ -168,7 +213,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
  *  structure — leaks → decisions → who owns what → what was approved → money. */
 export function renderDigest(d: DigestData): string {
   const section = (s: DigestSection) => `${s.heading}\n${s.lines.join("\n")}`;
-  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.actionItems, d.approvedThisWeek, d.planSignups, d.unbilled, d.moneyFound].map(section).join("\n\n")}`;
+  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.suggestedOrder, d.actionItems, d.approvedThisWeek, d.planSignups, d.unbilled, d.moneyFound].map(section).join("\n\n")}`;
 }
 
 export type DigestBrand = { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null };
@@ -208,6 +253,7 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
       <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:18px;">${esc(d.orgName)}</div>
       ${card(d.openLeaks, "#f87171")}
       ${card(d.pendingDecisions, "#c084fc")}
+      ${card(d.suggestedOrder, "#a78bfa")}
       ${card(d.actionItems, "#7c6cff")}
       ${card(d.approvedThisWeek, "#22d3ee")}
       ${card(d.planSignups, "#fbbf24")}

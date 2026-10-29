@@ -414,6 +414,10 @@ function buildSampleDigest(orgName: string) {
     orgName,
     openLeaks: { heading: "Open revenue leaks (1) — $4,951 at stake", lines: ["• [HIGH] Sample leak — $4,951 (preview)"] },
     pendingDecisions: { heading: "Decisions awaiting your approval (1)", lines: ["• Sample decision — $1,200 (preview)"] },
+    suggestedOrder: {
+      heading: "Revi's suggested order (3 follow-ups — $640.00 to collect)",
+      lines: ["• Collect — INV-1002 — $640.00 SERVICE", "• Delivery — N-1148 — 2020 Chevrolet Equinox LT (preview)", "• Contact — Jordan Ellis — Missing email (preview)"],
+    },
     actionItems: { heading: "Action items with owners (1 open)", lines: ["• [MEDIUM] Sample task — owner: (you)"] },
     approvedThisWeek: { heading: "Approvals this week (0)", lines: ["• No new approvals in the last 7 days."] },
     unbilled: { heading: "Unbilled completed work (2 jobs) — $6,400 never invoiced", lines: ["• 2 completed job(s) totaling $6,400 still have no invoice (preview)"] },
