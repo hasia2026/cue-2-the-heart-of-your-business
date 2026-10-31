@@ -416,7 +416,12 @@ function buildSampleDigest(orgName: string) {
     pendingDecisions: { heading: "Decisions awaiting your approval (1)", lines: ["• Sample decision — $1,200 (preview)"] },
     suggestedOrder: {
       heading: "Revi's suggested order (3 follow-ups — $640.00 to collect)",
-      lines: ["• Collect — INV-1002 — $640.00 SERVICE", "• Delivery — N-1148 — 2020 Chevrolet Equinox LT (preview)", "• Contact — Jordan Ellis — Missing email (preview)"],
+      lines: [
+        "• ⚠ 1 overdue invoice is more than 30 days past due — start there, before the routine chases.",
+        "• Collect — INV-1002 — $640.00 SERVICE — ⚠ 34 days overdue",
+        "• Delivery — N-1148 — 2020 Chevrolet Equinox LT (preview)",
+        "• Contact — Jordan Ellis — Missing email (preview)",
+      ],
     },
     actionItems: { heading: "Action items with owners (1 open)", lines: ["• [MEDIUM] Sample task — owner: (you)"] },
     approvedThisWeek: { heading: "Approvals this week (0)", lines: ["• No new approvals in the last 7 days."] },

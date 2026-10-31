@@ -27,6 +27,15 @@ export type SuggestedOrderRow = {
   customerPhone: string;
   customerEmail: string;
   since: string;
+  /** Where the owner fixes this chase in the app: customer record id when one
+   *  is behind the row (customer's Invoices tab for overdue money, profile
+   *  page for contact gaps, Deals tab for a vehicle that's already sold);
+   *  null for a vehicle with no deal yet — the digest falls back to the
+   *  import page, where a stuck status actually gets corrected. */
+  customerId: string | null;
+  /** Invoice rows only: whole days past due. Drives the digest's >30-day
+   *  escalation nudge. */
+  daysOverdue: number | null;
 };
 
 export type SuggestedOrder = {
@@ -60,7 +69,7 @@ export async function buildSuggestedOrder(orgId: string): Promise<SuggestedOrder
 
   const inv = await sql`
     select i.number, i.amount, i.kind, i.status, i.due_at,
-           c.name as customer, c.phone as customer_phone, c.email as customer_email
+           c.id as customer_id, c.name as customer, c.phone as customer_phone, c.email as customer_email
     from invoices i left join customers c on c.id = i.customer_id
     where i.organization_id = ${orgId}
       and (i.status = 'OVERDUE' or (i.status = 'SENT' and i.due_at < now()))
@@ -87,19 +96,25 @@ export async function buildSuggestedOrder(orgId: string): Promise<SuggestedOrder
       customerPhone: String(r.customer_phone ?? ""),
       customerEmail: String(r.customer_email ?? ""),
       since: d(r.due_at as Date | null),
+      customerId: (r.customer_id as string | null) ?? null,
+      daysOverdue: r.due_at
+        ? Math.max(0, Math.floor((Date.now() - new Date(r.due_at as Date).getTime()) / 864e5))
+        : null,
     });
   }
 
   const veh = await sql`
-    select stock_number, year, make, model, trim, listed_at
-    from vehicles
-    where organization_id = ${orgId} and status = 'IN_TRANSIT'
+    select v.stock_number, v.year, v.make, v.model, v.trim, v.listed_at,
+           (select d.customer_id from deals d where d.vehicle_id = v.id
+            order by d.created_at desc limit 1) as customer_id
+    from vehicles v
+    where v.organization_id = ${orgId} and v.status = 'IN_TRANSIT'
       and not exists (
         select 1 from suggested_order_dismissals dod
-        where dod.organization_id = vehicles.organization_id
+        where dod.organization_id = v.organization_id
           and dod.category = 'VEHICLE_IN_TRANSIT'
-          and dod.record = vehicles.stock_number)
-    order by listed_at asc nulls last, stock_number`;
+          and dod.record = v.stock_number)
+    order by v.listed_at asc nulls last, v.stock_number`;
   let vehicles = 0;
   for (const r of veh as unknown as Record<string, unknown>[]) {
     vehicles += 1;
@@ -113,19 +128,21 @@ export async function buildSuggestedOrder(orgId: string): Promise<SuggestedOrder
       customerPhone: "",
       customerEmail: "",
       since: d(r.listed_at as Date | null),
+      customerId: (r.customer_id as string | null) ?? null,
+      daysOverdue: null,
     });
   }
 
   const cust = await sql`
-    select name, email, phone
-    from customers
-    where organization_id = ${orgId} and (coalesce(email, '') = '' or coalesce(phone, '') = '')
+    select c.id as customer_id, c.name, c.email, c.phone
+    from customers c
+    where c.organization_id = ${orgId} and (coalesce(c.email, '') = '' or coalesce(c.phone, '') = '')
       and not exists (
         select 1 from suggested_order_dismissals dod
-        where dod.organization_id = customers.organization_id
+        where dod.organization_id = c.organization_id
           and dod.category = 'CONTACT_INFO'
-          and dod.record = customers.name)
-    order by name`;
+          and dod.record = c.name)
+    order by c.name`;
   let contact = 0;
   for (const r of cust as unknown as Record<string, unknown>[]) {
     contact += 1;
@@ -143,6 +160,8 @@ export async function buildSuggestedOrder(orgId: string): Promise<SuggestedOrder
       customerPhone: String(r.phone ?? ""),
       customerEmail: String(r.email ?? ""),
       since: "",
+      customerId: (r.customer_id as string | null) ?? null,
+      daysOverdue: null,
     });
   }
 

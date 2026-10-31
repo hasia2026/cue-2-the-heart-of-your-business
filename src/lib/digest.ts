@@ -1,8 +1,8 @@
 import { sql } from "./db";
 import { getWorkspaceProfile, validAccent } from "./workspace-profile";
-import { buildSuggestedOrder } from "./suggested-order";
+import { buildSuggestedOrder, type SuggestedOrderRow } from "./suggested-order";
 
-type DigestSection = { heading: string; lines: string[] };
+type DigestSection = { heading: string; lines: string[]; /** Same index as `lines` — app-record deep link when present (rendered in the HTML email; text version ignores it). */ hrefs?: (string | null)[] };
 
 export type DigestData = {
   orgName: string;
@@ -137,27 +137,59 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   // of the list because the Monday agenda needs the top actions, not all 20;
   // the full list lives in the card and its CSV worklist.
   const order = await buildSuggestedOrder(orgId);
+  const base = (process.env.APP_URL ?? "http://localhost:3210").replace(/\/+$/, "");
   const CATEGORY_HEAD: Record<string, string> = {
     INVOICE_OVERDUE: "Collect",
     VEHICLE_IN_TRANSIT: "Delivery",
     CONTACT_INFO: "Contact",
   };
+  // Deep link per line: open the exact record the owner fixes — an overdue
+  // invoice lands on the customer's Invoices tab, a contact gap on the
+  // profile, a stuck delivery on the Deals tab when the vehicle is already
+  // on a deal (otherwise the import page, where a status actually gets
+  // corrected). Same base-URL rule the quote/reminder emails use (APP_URL).
+  const linkFor = (r: SuggestedOrderRow): string | null => {
+    if (r.category === "INVOICE_OVERDUE") return r.customerId ? `${base}/pipeline/customers/${r.customerId}?tab=invoices` : null;
+    if (r.category === "VEHICLE_IN_TRANSIT") return r.customerId ? `${base}/pipeline/customers/${r.customerId}?tab=deals` : `${base}/intake/import`;
+    return r.customerId ? `${base}/pipeline/customers/${r.customerId}` : `${base}/pipeline/customers`;
+  };
+
+  // Escalation nudge: an invoice past 30 days due is qualitatively different
+  // from a fresh overdue — payment becomes a promise, then a write-off. The
+  // count covers the WHOLE order (not just the head shown); the staleness tag
+  // rides each head line; nowhere is anything invented — the days come from
+  // the invoice's own due date.
+  const staleInvoices = order.rows.filter((r) => r.category === "INVOICE_OVERDUE" && (r.daysOverdue ?? 0) > 30);
+
   const orderHead = order.rows.slice(0, 5);
-  const suggestedOrderLines = orderHead.map((r) => {
+  const suggestedOrderLines: string[] = [];
+  const suggestedOrderHrefs: (string | null)[] = [];
+  if (staleInvoices.length) {
+    suggestedOrderLines.push(
+      `• ⚠ ${staleInvoices.length} overdue invoice${staleInvoices.length === 1 ? " is" : "s are"} more than 30 days past due — start there, before the routine chases.`,
+    );
+    suggestedOrderHrefs.push(null);
+  }
+  for (const r of orderHead) {
     const bits = [CATEGORY_HEAD[r.category] ?? r.category, r.record || r.customer];
     if (r.detail) bits.push(r.detail);
+    if (r.category === "INVOICE_OVERDUE" && (r.daysOverdue ?? 0) > 30) bits.push(`⚠ ${r.daysOverdue} days overdue`);
     if (r.since) bits.push(`since ${r.since}`);
-    return `• ${bits.join(" — ")}`;
-  });
+    suggestedOrderLines.push(`• ${bits.join(" — ")}`);
+    suggestedOrderHrefs.push(linkFor(r));
+  }
   if (!suggestedOrderLines.length) {
     suggestedOrderLines.push("• All clear — nothing to chase.");
+    suggestedOrderHrefs.push(null);
   } else {
     // Money total belongs in the heading so the owner sees the stake up front.
     if (order.rows.length > orderHead.length) {
       suggestedOrderLines.push(`• … and ${order.rows.length - orderHead.length} more in ${ambassadorName}'s full order (download it from Intake → Import).`);
+      suggestedOrderHrefs.push(`${base}/intake/import`);
     }
     if (order.dismissedCount > 0) {
       suggestedOrderLines.push(`• ${order.dismissedCount} chase${order.dismissedCount === 1 ? "" : "s"} you checked off are kept out of this list.`);
+      suggestedOrderHrefs.push(null);
     }
   }
   const suggestedOrder: DigestSection = {
@@ -166,6 +198,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
         ? `${ambassadorName}'s suggested order (${order.rows.length} follow-up${order.rows.length === 1 ? "" : "s"}${order.summary.invoices ? ` — ${money(order.summary.invoiceTotal)} to collect` : ""})`
         : "No suggested order this week",
     lines: suggestedOrderLines,
+    hrefs: suggestedOrderHrefs,
   };
 
   const moneyFound: DigestSection = {
@@ -244,7 +277,13 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
   const card = (s: DigestSection, accent: string) => `
     <div style="background:#141428;border-radius:12px;padding:18px 20px;margin:0 0 14px;border-left:4px solid ${accent};">
       <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b93b8;margin-bottom:8px;">${esc(s.heading)}</div>
-      ${s.lines.map((l) => `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${esc(l)}</div>`).join("")}
+      ${s.lines.map((l, i) => {
+        const href = s.hrefs?.[i];
+        const inner = href
+          ? `<a href="${esc(href)}" style="color:#c4b5fd;text-decoration:underline;text-underline-offset:2px;">${esc(l)}</a>`
+          : esc(l);
+        return `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${inner}</div>`;
+      }).join("")}
     </div>`;
   return `<!doctype html><html><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
     <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
