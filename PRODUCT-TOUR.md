@@ -173,6 +173,10 @@ Leads, deals, inventory aging, service orders, and appointments in one dealershi
 
 ![ leads + deals + inventory aging ](docs/screenshots/pipeline.png)
 
+The overdue part of the book gets its own drill-down (`/pipeline/aging`): one bucket at a time — 0–15 / 15–30 / 30+ days past due — with the exact invoices behind each bucket and the money at stake up front. The weekly digest's colored aging chips deep-link here.
+
+![ overdue-invoice aging buckets ](docs/screenshots/pipeline-aging.png)
+
 ![ service history grouped by property, with last-visit chips ](docs/screenshots/property-history.png)
 
 ### Pilot Report (`/report`)
@@ -219,6 +223,10 @@ Every integration labeled honestly: **DEMO** (sample data), **AVAILABLE** (archi
 Business profile, vocabulary overrides with industry packs, the weekly digest (email + WhatsApp, chosen send day), AR reminder cadence + custom message template, text size and display accessibility, the **AI ladder** (how much autonomy CUE has), **Workspace Studio** (persona / branding / preview / modules — see §2), the AI Ambassador LLM key, team/roles, subscription (Stripe), Message-the-builder feedback, and the full **audit trail**.
 
 ![ AI ladder + audit log ](docs/screenshots/settings.png)
+
+The weekly digest email itself carries the chase list, the overdue-aging buckets and the checked-off tally: Revi's suggested order with a 30-day escalation nudge, followed by the money-found card where each aging bucket is colored (green 0–15 · orange 15–30 · red 30+ days) and clickable straight to the matching bucket in Pipeline → Overdue invoices.
+
+![ digest email with click-through aging buckets ](docs/screenshots/digest-aging.png)
 
 **Why it matters:** governance — what makes CUE enterprise-safe and fundable.
 

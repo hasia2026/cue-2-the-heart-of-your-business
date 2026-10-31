@@ -1,8 +1,19 @@
 import { sql } from "./db";
 import { getWorkspaceProfile, validAccent } from "./workspace-profile";
-import { buildSuggestedOrder, type SuggestedOrderRow } from "./suggested-order";
+import {
+  buildSuggestedOrder,
+  agingBreakdown,
+  AGING_COLORS,
+  type SuggestedOrderRow,
+  type AgingBucketKey,
+} from "./suggested-order";
 
-type DigestSection = { heading: string; lines: string[]; /** Same index as `lines` — app-record deep link when present (rendered in the HTML email; text version ignores it). */ hrefs?: (string | null)[] };
+/** A rendered line: plain text, or a part with its own color and app deep
+ *  link (the HTML email turns it into a colored, clickable chip; text and
+ *  WhatsApp render the text only). */
+export type DigestLine = string | { text: string; color?: string; href?: string | null };
+
+type DigestSection = { heading: string; lines: DigestLine[]; /** Same index as `lines` — deep link for string lines (chips carry their own). */ hrefs?: (string | null)[] };
 
 export type DigestData = {
   orgName: string;
@@ -201,31 +212,28 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
     hrefs: suggestedOrderHrefs,
   };
 
-  // Overdue aging — same invoice definition as the suggested order
-  // (OVERDUE, or SENT whose due date slipped), bucketed by days past due so
-  // the owner sees whether the AR book is fresh or quietly going stale.
-  const [aging] = await sql`
-    select
-      count(*) filter (where now() - due_at <= interval '15 days')::int as fresh_n,
-      coalesce(sum(amount) filter (where now() - due_at <= interval '15 days'), 0)::float as fresh_amt,
-      count(*) filter (where now() - due_at > interval '15 days' and now() - due_at <= interval '30 days')::int as mid_n,
-      coalesce(sum(amount) filter (where now() - due_at > interval '15 days' and now() - due_at <= interval '30 days'), 0)::float as mid_amt,
-      count(*) filter (where now() - due_at > interval '30 days')::int as stale_n,
-      coalesce(sum(amount) filter (where now() - due_at > interval '30 days'), 0)::float as stale_amt
-    from invoices
-    where organization_id = ${orgId}
-      and (status = 'OVERDUE' or (status = 'SENT' and due_at < now()))
-      and due_at is not null`;
-  const agingLine =
-    Number(aging?.stale_n ?? 0) + Number(aging?.mid_n ?? 0) + Number(aging?.fresh_n ?? 0) > 0
-      ? `• Overdue aging: 0–15d ${money(Number(aging?.fresh_amt ?? 0))} (${aging?.fresh_n}) · 15–30d ${money(Number(aging?.mid_amt ?? 0))} (${aging?.mid_n}) · 30+d ${money(Number(aging?.stale_amt ?? 0))} (${aging?.stale_n})`
-      : "• Overdue aging: nothing past due.";
+  // Overdue aging — one bucket source with the /pipeline/aging page the
+  // buckets link to. Money at stake, invoice count, color as weight (green
+  // fresh → orange → red 30+ days): the owner sees whether the AR book is
+  // fresh or quietly going stale, and can open the exact invoices.
+  const buckets = await agingBreakdown(orgId);
+  const openBuckets = buckets.filter((b) => b.count > 0);
+  const agingLines = openBuckets.length
+    ? ([
+        "• Overdue aging (money at stake · invoices past due):",
+        ...openBuckets.map((b): { text: string; color?: string; href?: string | null } => ({
+          text: `   ${b.label}: ${money(b.total)} (${b.count})`,
+          color: AGING_COLORS[b.key],
+          href: `${base}/pipeline/aging?bucket=${b.key}`,
+        })),
+      ] as DigestLine[])
+    : (["• Overdue aging: nothing past due."] as DigestLine[]);
 
   const moneyFound: DigestSection = {
     heading: "Money found / recovered",
     lines: [
       `• Invoiced late-completed work: ${money(Number(dollars?.invoiced_late ?? 0))}`,
-      agingLine,
+      ...agingLines,
       `• Overdue invoices collected: ${money(Number(dollars?.collected_late ?? 0))}`,
       `• Won pipeline: ${money(Number(dollars?.won_pipeline ?? 0))}`,
       `• Total recovered / protected: ${money(recovered)}`,
@@ -266,7 +274,8 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
  *  Framed as the owner's Monday agenda: it doubles as the weekly meeting
  *  structure — leaks → decisions → who owns what → what was approved → money. */
 export function renderDigest(d: DigestData): string {
-  const section = (s: DigestSection) => `${s.heading}\n${s.lines.join("\n")}`;
+  const line = (l: DigestLine) => (typeof l === "string" ? l : l.text);
+  const section = (s: DigestSection) => `${s.heading}\n${s.lines.map(line).join("\n")}`;
   return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.suggestedOrder, d.actionItems, d.approvedThisWeek, d.planSignups, d.unbilled, d.moneyFound].map(section).join("\n\n")}`;
 }
 
@@ -298,13 +307,23 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
   const card = (s: DigestSection, accent: string) => `
     <div style="background:#141428;border-radius:12px;padding:18px 20px;margin:0 0 14px;border-left:4px solid ${accent};">
       <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b93b8;margin-bottom:8px;">${esc(s.heading)}</div>
-      ${s.lines.map((l, i) => {
-        const href = s.hrefs?.[i];
-        const inner = href
-          ? `<a href="${esc(href)}" style="color:#c4b5fd;text-decoration:underline;text-underline-offset:2px;">${esc(l)}</a>`
-          : esc(l);
-        return `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${inner}</div>`;
-      }).join("")}
+      ${s.lines
+        .map((l, i) => {
+          if (typeof l !== "string") {
+            // Chip line: colored text, optionally a clickable deep link in app.
+            const color = l.color ?? "#e8eaf6";
+            const inner = l.href
+              ? `<a href="${esc(l.href)}" style="color:${color};text-decoration:underline;text-underline-offset:2px;">${esc(l.text)}</a>`
+              : `<span style="color:${color};">${esc(l.text)}</span>`;
+            return `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${inner}</div>`;
+          }
+          const href = s.hrefs?.[i];
+          const inner = href
+            ? `<a href="${esc(href)}" style="color:#c4b5fd;text-decoration:underline;text-underline-offset:2px;">${esc(l)}</a>`
+            : esc(l);
+          return `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${inner}</div>`;
+        })
+        .join("")}
     </div>`;
   return `<!doctype html><html><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
     <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
@@ -317,7 +336,7 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
       ${card(d.actionItems, "#7c6cff")}
       ${card(d.approvedThisWeek, "#22d3ee")}
       ${card(d.planSignups, "#fbbf24")}
-      ${card(d.unbilled, d.unbilled.lines[0]?.startsWith("•") === false ? "#f87171" : "#fbbf24")}
+      ${card(d.unbilled, typeof d.unbilled.lines[0] === "object" ? "#f87171" : "#fbbf24")}
       ${card(d.moneyFound, "#34d399")}
       ${plansUrl ? `<div style="text-align:center;margin-top:18px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">Sign up for a maintenance plan →</a></div>` : ""}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>

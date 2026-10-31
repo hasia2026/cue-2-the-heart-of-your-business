@@ -433,7 +433,10 @@ function buildSampleDigest(orgName: string) {
     moneyFound: {
       heading: "Money found / recovered",
       lines: [
-        "• Overdue aging: 0–15d $0.00 (0) · 15–30d $640.00 (1) · 30+d $0.00 (0) (preview)",
+        "• Overdue aging (money at stake · invoices past due):",
+        { text: "   0–15 days past due: $614.75 (1)", color: "#34d399", href: null },
+        { text: "   15–30 days past due: $640.00 (1)", color: "#fb923c", href: null },
+        { text: "   30+ days past due: $412.50 (1)", color: "#f87171", href: null },
         "• Total recovered / protected: $0 (preview)",
       ],
     },

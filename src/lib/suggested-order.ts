@@ -209,6 +209,82 @@ export async function restoreSuggestedOrderItem(orgId: string, id: string): Prom
   await sql`delete from suggested_order_dismissals where organization_id = ${orgId} and id = ${id}`;
 }
 
+// ── Overdue AR aging ──────────────────────────────────────────────────────
+// One definition of "overdue" for both readers of this data — the digest's
+// aging buckets and the /pipeline/aging page the buckets link to: OVERDUE
+// status, or SENT whose due date slipped, grouped by whole days past due.
+
+export type AgingBucketKey = "fresh" | "mid" | "stale";
+export type AgingBucket = { key: AgingBucketKey; label: string; count: number; total: number };
+
+export const AGING_COLORS: Record<AgingBucketKey, string> = {
+  fresh: "#34d399",
+  mid: "#fb923c",
+  stale: "#f87171",
+};
+
+export async function agingBreakdown(orgId: string): Promise<AgingBucket[]> {
+  const r = (await sql`
+    select
+      count(*) filter (where now() - due_at <= interval '15 days')::int as fresh_n,
+      coalesce(sum(amount) filter (where now() - due_at <= interval '15 days'),0)::float as fresh_amt,
+      count(*) filter (where now() - due_at > interval '15 days' and now() - due_at <= interval '30 days')::int as mid_n,
+      coalesce(sum(amount) filter (where now() - due_at > interval '15 days' and now() - due_at <= interval '30 days'),0)::float as mid_amt,
+      count(*) filter (where now() - due_at > interval '30 days')::int as stale_n,
+      coalesce(sum(amount) filter (where now() - due_at > interval '30 days'),0)::float as stale_amt
+    from invoices
+    where organization_id = ${orgId}
+      and (status = 'OVERDUE' or (status = 'SENT' and due_at < now()))
+      and due_at is not null`) as unknown as Record<string, number>[];
+  const a = r[0] ?? {};
+  return [
+    { key: "fresh", label: "0–15 days past due", count: Number(a.fresh_n ?? 0), total: Number(a.fresh_amt ?? 0) },
+    { key: "mid", label: "15–30 days past due", count: Number(a.mid_n ?? 0), total: Number(a.mid_amt ?? 0) },
+    { key: "stale", label: "30+ days past due", count: Number(a.stale_n ?? 0), total: Number(a.stale_amt ?? 0) },
+  ];
+}
+
+const BUCKET_CLAUSE = {
+  fresh: sql`now() - due_at <= interval '15 days'`,
+  mid: sql`now() - due_at > interval '15 days' and now() - due_at <= interval '30 days'`,
+  stale: sql`now() - due_at > interval '30 days'`,
+} as const;
+
+export type AgingInvoiceRow = {
+  id: string;
+  number: string;
+  kind: string;
+  amount: string | number;
+  customer: string | null;
+  customerId: string | null;
+  dueAt: string;
+  daysOverdue: number;
+};
+
+/** The overdue invoices behind one aging bucket — the page the digest's
+ *  bucket links open. Org-scoped, oldest past-due first. */
+export async function agingInvoices(orgId: string, key: AgingBucketKey): Promise<AgingInvoiceRow[]> {
+  const clause = BUCKET_CLAUSE[key];
+  if (!clause) throw new Error("Unknown aging bucket.");
+  const r = await sql`
+    select i.id, i.number, i.kind, i.amount, i.due_at, c.id as customer_id, c.name as customer
+    from invoices i left join customers c on c.id = i.customer_id
+    where i.organization_id = ${orgId}
+      and (i.status = 'OVERDUE' or (i.status = 'SENT' and i.due_at < now()))
+      and i.due_at is not null and ${clause}
+    order by i.due_at asc, i.number`;
+  return (r as unknown as Record<string, unknown>[]).map((x) => ({
+    id: String(x.id),
+    number: String(x.number ?? ""),
+    kind: String(x.kind ?? ""),
+    amount: x.amount as string | number,
+    customer: (x.customer as string | null) ?? null,
+    customerId: (x.customer_id as string | null) ?? null,
+    dueAt: d(x.due_at as Date | null),
+    daysOverdue: Math.floor((Date.now() - new Date(x.due_at as Date).getTime()) / 864e5),
+  }));
+}
+
 const COLUMNS = ["Priority", "Category", "Record", "Detail", "What to ask for", "Customer", "Customer Phone", "Customer Email", "Since"] as const;
 
 function csvField(v: unknown): string {
