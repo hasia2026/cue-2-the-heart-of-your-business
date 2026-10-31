@@ -195,16 +195,37 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   const suggestedOrder: DigestSection = {
     heading:
       order.rows.length
-        ? `${ambassadorName}'s suggested order (${order.rows.length} follow-up${order.rows.length === 1 ? "" : "s"}${order.summary.invoices ? ` — ${money(order.summary.invoiceTotal)} to collect` : ""})`
+        ? `${ambassadorName}'s suggested order (${order.rows.length} follow-up${order.rows.length === 1 ? "" : "s"}${order.dismissedCount > 0 ? `, ${order.dismissedCount} checked off` : ""}${order.summary.invoices ? ` — ${money(order.summary.invoiceTotal)} to collect` : ""})`
         : "No suggested order this week",
     lines: suggestedOrderLines,
     hrefs: suggestedOrderHrefs,
   };
 
+  // Overdue aging — same invoice definition as the suggested order
+  // (OVERDUE, or SENT whose due date slipped), bucketed by days past due so
+  // the owner sees whether the AR book is fresh or quietly going stale.
+  const [aging] = await sql`
+    select
+      count(*) filter (where now() - due_at <= interval '15 days')::int as fresh_n,
+      coalesce(sum(amount) filter (where now() - due_at <= interval '15 days'), 0)::float as fresh_amt,
+      count(*) filter (where now() - due_at > interval '15 days' and now() - due_at <= interval '30 days')::int as mid_n,
+      coalesce(sum(amount) filter (where now() - due_at > interval '15 days' and now() - due_at <= interval '30 days'), 0)::float as mid_amt,
+      count(*) filter (where now() - due_at > interval '30 days')::int as stale_n,
+      coalesce(sum(amount) filter (where now() - due_at > interval '30 days'), 0)::float as stale_amt
+    from invoices
+    where organization_id = ${orgId}
+      and (status = 'OVERDUE' or (status = 'SENT' and due_at < now()))
+      and due_at is not null`;
+  const agingLine =
+    Number(aging?.stale_n ?? 0) + Number(aging?.mid_n ?? 0) + Number(aging?.fresh_n ?? 0) > 0
+      ? `• Overdue aging: 0–15d ${money(Number(aging?.fresh_amt ?? 0))} (${aging?.fresh_n}) · 15–30d ${money(Number(aging?.mid_amt ?? 0))} (${aging?.mid_n}) · 30+d ${money(Number(aging?.stale_amt ?? 0))} (${aging?.stale_n})`
+      : "• Overdue aging: nothing past due.";
+
   const moneyFound: DigestSection = {
     heading: "Money found / recovered",
     lines: [
       `• Invoiced late-completed work: ${money(Number(dollars?.invoiced_late ?? 0))}`,
+      agingLine,
       `• Overdue invoices collected: ${money(Number(dollars?.collected_late ?? 0))}`,
       `• Won pipeline: ${money(Number(dollars?.won_pipeline ?? 0))}`,
       `• Total recovered / protected: ${money(recovered)}`,

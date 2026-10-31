@@ -84,6 +84,9 @@ export default function SuggestedOrderCard({
 
   const shown = rows.slice(0, MAX_ROWS_SHOWN);
   const overflow = rows.length - shown.length;
+  // Escalation nudge, same rule as the digest: an invoice past 30 days due
+  // is a promise, not a routine chase — flag it before the regular rows.
+  const stale = rows.filter((r) => r.category === "INVOICE_OVERDUE" && (r.daysOverdue ?? 0) > 30);
   const lines: string[] = [];
   if (summary.invoices > 0) {
     lines.push(`${summary.invoices} overdue invoice${summary.invoices === 1 ? "" : "s"} — ${money(summary.invoiceTotal)} to collect`);
@@ -107,6 +110,11 @@ export default function SuggestedOrderCard({
             What to chase next, written from your imported records — priority-ordered: money first, then deliveries, then data to collect.
             Check a row off once it’s handled and it drops off the card, the digest, and the worklist.
           </p>
+          {stale.length > 0 && (
+            <p className="mt-2 text-xs text-orange-300">
+              ⚠ {stale.length} overdue invoice{stale.length === 1 ? "" : "s"} {stale.length === 1 ? "is" : "are"} more than 30 days past due — start there, before the routine chases.
+            </p>
+          )}
           <ol className="mt-2 space-y-1.5 text-xs text-navy-100">
             {shown.map((r) => {
               const key = `${r.category}:${r.record}`;
@@ -117,6 +125,9 @@ export default function SuggestedOrderCard({
                     <span className="font-medium">{r.record || r.customer}</span>
                     <span className="muted"> · {CATEGORY_LABEL[r.category]}</span>
                     <span className="muted"> · {r.detail}</span>
+                    {r.category === "INVOICE_OVERDUE" && (r.daysOverdue ?? 0) > 30 && (
+                      <span className="text-orange-300"> · ⚠ {r.daysOverdue} days overdue</span>
+                    )}
                     {r.customer && r.record && r.customer !== r.record && (
                       <span className="muted"> · {r.customer}</span>
                     )}

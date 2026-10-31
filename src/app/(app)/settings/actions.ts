@@ -415,7 +415,7 @@ function buildSampleDigest(orgName: string) {
     openLeaks: { heading: "Open revenue leaks (1) — $4,951 at stake", lines: ["• [HIGH] Sample leak — $4,951 (preview)"] },
     pendingDecisions: { heading: "Decisions awaiting your approval (1)", lines: ["• Sample decision — $1,200 (preview)"] },
     suggestedOrder: {
-      heading: "Revi's suggested order (3 follow-ups — $640.00 to collect)",
+      heading: "Revi's suggested order (3 follow-ups, 2 checked off — $640.00 to collect)",
       lines: [
         "• ⚠ 1 overdue invoice is more than 30 days past due — start there, before the routine chases.",
         "• Collect — INV-1002 — $640.00 SERVICE — ⚠ 34 days overdue",
@@ -430,7 +430,13 @@ function buildSampleDigest(orgName: string) {
       heading: "Plan sign-ups this week (0 new)",
       lines: ["• No plan sign-ups this week.", "• Nothing pending — every request has been decided."],
     },
-    moneyFound: { heading: "Money found / recovered", lines: ["• Total recovered / protected: $0 (preview)"] },
+    moneyFound: {
+      heading: "Money found / recovered",
+      lines: [
+        "• Overdue aging: 0–15d $0.00 (0) · 15–30d $640.00 (1) · 30+d $0.00 (0) (preview)",
+        "• Total recovered / protected: $0 (preview)",
+      ],
+    },
   };
 }
 
