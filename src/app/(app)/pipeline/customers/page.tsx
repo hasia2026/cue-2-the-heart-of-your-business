@@ -36,7 +36,7 @@ export default async function CustomersPage({
           (select count(*) from service_orders s where s.customer_id = c.id)::int as jobs
         from customers c
         where c.organization_id = ${orgId}
-          and (c.name ilike ${"%" + needle + "%"} or coalesce(c.email, "") ilike ${"%" + needle + "%"} or coalesce(c.phone, "") ilike ${"%" + needle + "%"})
+          and (c.name ilike ${"%" + needle + "%"} or coalesce(c.email, '') ilike ${"%" + needle + "%"} or coalesce(c.phone, '') ilike ${"%" + needle + "%"})
         order by c.created_at desc limit 200`
     : await sql`
         select c.id, c.name, c.email, c.phone, c.type, c.status, c.area, c.created_at,
