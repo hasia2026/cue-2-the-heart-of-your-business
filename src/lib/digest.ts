@@ -10,8 +10,9 @@ import {
 
 /** A rendered line: plain text, or a part with its own color and app deep
  *  link (the HTML email turns it into a colored, clickable chip; text and
- *  WhatsApp render the text only). */
-export type DigestLine = string | { text: string; color?: string; href?: string | null };
+ *  WhatsApp render the text only). `indent` nests the chip under the line
+ *  above it (the aging buckets under "Overdue aging"). */
+export type DigestLine = string | { text: string; color?: string; href?: string | null; indent?: boolean };
 
 type DigestSection = { heading: string; lines: DigestLine[]; /** Same index as `lines` — deep link for string lines (chips carry their own). */ hrefs?: (string | null)[] };
 
@@ -133,12 +134,13 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
         where i.service_order_id = so.id and i.status <> 'VOID')`;
   const unbilledN = Number(unbilledRow?.n ?? 0);
   const unbilledTotal = Number(unbilledRow?.total ?? 0);
+  const jobWord = (n: number) => `${n} completed job${n === 1 ? "" : "s"}`;
   const unbilled: DigestSection = {
     heading: unbilledN
-      ? `⚠ Unbilled completed work (${unbilledN} jobs) — ${money(unbilledTotal)} never invoiced`
-      : "Unbilled completed work (0 jobs)",
+      ? `⚠ Unbilled completed work (${unbilledN} job${unbilledN === 1 ? "" : "s"}) — ${money(unbilledTotal)} never invoiced`
+      : "Unbilled completed work (none)",
     lines: unbilledN
-      ? [`• ${unbilledN} completed job(s) totaling ${money(unbilledTotal)} still have no invoice — draft and release them in Pipeline → Work orders.`]
+      ? [`• ${jobWord(unbilledN)} totaling ${money(unbilledTotal)} still ${unbilledN === 1 ? "has" : "have"} no invoice — draft and release ${unbilledN === 1 ? "it" : "them"} in Pipeline → Work orders.`]
       : ["• Every completed job is invoiced or carries a live draft."],
   };
 
@@ -173,12 +175,15 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   const staleInvoices = order.rows.filter((r) => r.category === "INVOICE_OVERDUE" && (r.daysOverdue ?? 0) > 30);
 
   const orderHead = order.rows.slice(0, 5);
-  const suggestedOrderLines: string[] = [];
+  const suggestedOrderLines: DigestLine[] = [];
   const suggestedOrderHrefs: (string | null)[] = [];
   if (staleInvoices.length) {
-    suggestedOrderLines.push(
-      `• ⚠ ${staleInvoices.length} overdue invoice${staleInvoices.length === 1 ? " is" : "s are"} more than 30 days past due — start there, before the routine chases.`,
-    );
+    // Orange callout above the routine rows: a 30-day-past-due invoice is a
+    // broken promise, not another chase line.
+    suggestedOrderLines.push({
+      text: `⚠ ${staleInvoices.length} overdue invoice${staleInvoices.length === 1 ? " is" : "s are"} more than 30 days past due — start there, before the routine chases.`,
+      color: "#fb923c",
+    });
     suggestedOrderHrefs.push(null);
   }
   for (const r of orderHead) {
@@ -206,7 +211,7 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   const suggestedOrder: DigestSection = {
     heading:
       order.rows.length
-        ? `${ambassadorName}'s suggested order (${order.rows.length} follow-up${order.rows.length === 1 ? "" : "s"}${order.dismissedCount > 0 ? `, ${order.dismissedCount} checked off` : ""}${order.summary.invoices ? ` — ${money(order.summary.invoiceTotal)} to collect` : ""})`
+        ? `${ambassadorName}'s suggested order (${order.rows.length} follow-up${order.rows.length === 1 ? "" : "s"}${order.dismissedCount > 0 ? `, ${order.dismissedCount} checked off` : ""}${order.summary.invoices ? ` · ${money(order.summary.invoiceTotal)} to collect` : ""})`
         : "No suggested order this week",
     lines: suggestedOrderLines,
     hrefs: suggestedOrderHrefs,
@@ -218,25 +223,31 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   // fresh or quietly going stale, and can open the exact invoices.
   const buckets = await agingBreakdown(orgId);
   const openBuckets = buckets.filter((b) => b.count > 0);
-  const agingLines = openBuckets.length
-    ? ([
-        "• Overdue aging (money at stake · invoices past due):",
-        ...openBuckets.map((b): { text: string; color?: string; href?: string | null } => ({
-          text: `   ${b.label}: ${money(b.total)} (${b.count})`,
-          color: AGING_COLORS[b.key],
-          href: `${base}/pipeline/aging?bucket=${b.key}`,
-        })),
-      ] as DigestLine[])
-    : (["• Overdue aging: nothing past due."] as DigestLine[]);
+  const agingLines: DigestLine[] = openBuckets.length
+    ? [
+        "• Still past due — money at stake, oldest first:",
+        ...openBuckets.map(
+          (b): { text: string; color?: string; href?: string | null; indent?: boolean } => ({
+            text: `${b.label}: ${money(b.total)} (${b.count} invoice${b.count === 1 ? "" : "s"})`,
+            color: AGING_COLORS[b.key],
+            href: `${base}/pipeline/aging?bucket=${b.key}`,
+            indent: true,
+          }),
+        ),
+      ]
+    : ["• Still past due: nothing — the whole AR book is current."];
 
+  // Recovered money first, then what is STILL out there: mixing unpaid aging
+  // into the "found" figures read as if the past-due book had been collected.
   const moneyFound: DigestSection = {
     heading: "Money found / recovered",
     lines: [
       `• Invoiced late-completed work: ${money(Number(dollars?.invoiced_late ?? 0))}`,
-      ...agingLines,
       `• Overdue invoices collected: ${money(Number(dollars?.collected_late ?? 0))}`,
       `• Won pipeline: ${money(Number(dollars?.won_pipeline ?? 0))}`,
       `• Total recovered / protected: ${money(recovered)}`,
+      "",
+      ...agingLines,
     ],
   };
 
@@ -270,13 +281,28 @@ export async function buildDigestData(orgId: string): Promise<DigestData> {
   return { orgName: org.name, openLeaks, pendingDecisions, suggestedOrder, actionItems, approvedThisWeek, unbilled, moneyFound, planSignups };
 }
 
+/** The order both renderers show: money at risk first (leaks, then work never
+ *  invoiced), then decisions and the chase list, then who owns what, then the
+ *  recovered-money scoreboard last. Keeping one list keeps the text and HTML
+ *  emails in the same order. */
+export function digestSections(d: DigestData): DigestSection[] {
+  return [d.openLeaks, d.pendingDecisions, d.suggestedOrder, d.unbilled, d.actionItems, d.approvedThisWeek, d.planSignups, d.moneyFound];
+}
+
+/** "Week ending Nov 8, 2026" — a weekly email with no period reference makes
+ *  every number ambiguous. */
+export function digestPeriod(now = new Date()): string {
+  return `Week ending ${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+}
+
 /** Plain-text rendering — the same body goes to WhatsApp and the email fallback.
  *  Framed as the owner's Monday agenda: it doubles as the weekly meeting
- *  structure — leaks → decisions → who owns what → what was approved → money. */
+ *  structure — leaks → decisions → chases → unbilled work → owners → money. */
 export function renderDigest(d: DigestData): string {
-  const line = (l: DigestLine) => (typeof l === "string" ? l : l.text);
+  const line = (l: DigestLine) =>
+    typeof l === "string" ? l : `${l.indent ? "   " : ""}${l.text}`;
   const section = (s: DigestSection) => `${s.heading}\n${s.lines.map(line).join("\n")}`;
-  return `CUE weekly agenda — ${d.orgName}\n\n${[d.openLeaks, d.pendingDecisions, d.suggestedOrder, d.actionItems, d.approvedThisWeek, d.planSignups, d.unbilled, d.moneyFound].map(section).join("\n\n")}`;
+  return `CUE weekly digest — ${d.orgName}\n${digestPeriod()}\n\n${digestSections(d).map(section).join("\n\n")}`;
 }
 
 export type DigestBrand = { name: string | null; accent: string | null; logo: string | null; contactPhone: string | null; contactEmail: string | null };
@@ -304,19 +330,26 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
     : "";
   const contactBits = [brand?.contactPhone, brand?.contactEmail].filter((x): x is string => Boolean(x)).map(esc).join(" · ");
   const contactFooter = contactBits ? `<div style="font-size:11px;color:#6b7396;margin-top:8px;">${contactBits}</div>` : "";
+  // Accents follow digestSections(): risk red, decisions purple, chase violet,
+  // unbilled red only when it's a warning, work violet, approvals cyan,
+  // sign-ups amber, recovered money green.
+  const accents = ["#f87171", "#c084fc", "#a78bfa", d.unbilled.heading.startsWith("⚠") ? "#f87171" : "#fbbf24", "#7c6cff", "#22d3ee", "#fbbf24", "#34d399"];
   const card = (s: DigestSection, accent: string) => `
     <div style="background:#141428;border-radius:12px;padding:18px 20px;margin:0 0 14px;border-left:4px solid ${accent};">
-      <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b93b8;margin-bottom:8px;">${esc(s.heading)}</div>
+      <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#a5adcc;margin-bottom:8px;">${esc(s.heading)}</div>
       ${s.lines
         .map((l, i) => {
           if (typeof l !== "string") {
             // Chip line: colored text, optionally a clickable deep link in app.
+            // Indented chips sit under the line above them (the aging buckets).
             const color = l.color ?? "#e8eaf6";
             const inner = l.href
               ? `<a href="${esc(l.href)}" style="color:${color};text-decoration:underline;text-underline-offset:2px;">${esc(l.text)}</a>`
               : `<span style="color:${color};">${esc(l.text)}</span>`;
-            return `<div style="font-size:14px;color:#e8eaf6;padding:3px 0;">${inner}</div>`;
+            return `<div style="font-size:14px;color:#e8eaf6;padding:3px 0 3px ${l.indent ? "14px" : "0"};">${inner}</div>`;
           }
+          // Empty string = breathing room between two blocks in one card.
+          if (l === "") return `<div style="height:8px;line-height:8px;font-size:1px;">&nbsp;</div>`;
           const href = s.hrefs?.[i];
           const inner = href
             ? `<a href="${esc(href)}" style="color:#c4b5fd;text-decoration:underline;text-underline-offset:2px;">${esc(l)}</a>`
@@ -325,19 +358,13 @@ export function renderDigestHtml(d: DigestData, brand?: DigestBrand, plansUrl?: 
         })
         .join("")}
     </div>`;
-  return `<!doctype html><html><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
+  return `<!doctype html><html lang="en"><body style="margin:0;background:#0b0b18;font-family:-apple-system,Segoe UI,Roboto,sans-serif;">
     <div style="max-width:600px;margin:0 auto;padding:24px 16px;">
       ${logo}
       <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:${accent};margin-bottom:6px;">CUE · weekly digest</div>
-      <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:18px;">${esc(d.orgName)}</div>
-      ${card(d.openLeaks, "#f87171")}
-      ${card(d.pendingDecisions, "#c084fc")}
-      ${card(d.suggestedOrder, "#a78bfa")}
-      ${card(d.actionItems, "#7c6cff")}
-      ${card(d.approvedThisWeek, "#22d3ee")}
-      ${card(d.planSignups, "#fbbf24")}
-      ${card(d.unbilled, typeof d.unbilled.lines[0] === "object" ? "#f87171" : "#fbbf24")}
-      ${card(d.moneyFound, "#34d399")}
+      <div style="font-size:22px;font-weight:700;color:#ffffff;margin-bottom:4px;">${esc(d.orgName)}</div>
+      <div style="font-size:12px;color:#8b93b8;margin-bottom:18px;">${digestPeriod()}</div>
+      ${digestSections(d).map((s, i) => card(s, accents[i])).join("")}
       ${plansUrl ? `<div style="text-align:center;margin-top:18px;"><a href="${esc(plansUrl)}" style="display:inline-block;background:${accent};color:#0b0b18;font-weight:700;font-size:14px;padding:12px 22px;border-radius:999px;text-decoration:none;">Sign up for a maintenance plan →</a></div>` : ""}
       <div style="font-size:11px;color:#6b7396;margin-top:16px;">Computed from your live records. Manage delivery in Settings → Weekly digest.</div>
       ${contactFooter}
