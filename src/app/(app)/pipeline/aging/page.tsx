@@ -7,6 +7,7 @@ import {
   AGING_COLORS,
   type AgingBucketKey,
 } from "@/lib/suggested-order";
+import AgingRowActions from "./AgingRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,11 @@ export default async function AgingPage({
   const rows = await agingInvoices(orgId, active);
   const activeBucket = buckets.find((b) => b.key === active)!;
   const edge = active === "fresh" ? "0–15" : active === "mid" ? "15–30" : "30+";
+  // Row actions are per-record and shared with the suggested-order card; a
+  // MEMBER can check a chase off but only Owner/Admin/Manager may send to a
+  // real customer (same rule as /api/invoices/remind).
+  const canRemind = session.role !== "MEMBER";
+  const checkedOff = rows.filter((r) => r.dismissalId).length;
 
   return (
     <div className="space-y-6">
@@ -44,7 +50,9 @@ export default async function AgingPage({
         <h1 className="page-title mt-1">Overdue invoices — {activeBucket.label}</h1>
         <p className="page-sub">
           {money(activeBucket.total)} at stake in {activeBucket.count} invoice{activeBucket.count === 1 ? "" : "s"}.
-          The same overdue book the weekly digest buckets — chase oldest first; suggest the fix from Intake → Import when a customer&apos;s records are behind.
+          The same overdue book the weekly digest buckets — chase oldest first, check a chase off once it&apos;s handled
+          (it then drops from Revi&apos;s card and the digest), and send the approved reminder straight from the row.
+          {checkedOff > 0 && ` ${checkedOff} chase${checkedOff === 1 ? " is" : "s are"} checked off here.`}
         </p>
       </div>
 
@@ -72,9 +80,12 @@ export default async function AgingPage({
         </h2>
         <div className="space-y-2">
           {rows.map((r) => (
-            <div key={r.id} className="rounded-xl border border-white/[0.06] px-3.5 py-2.5">
+            <div
+              key={r.id}
+              className={`rounded-xl border px-3.5 py-2.5 ${r.dismissalId ? "border-white/[0.04] opacity-70" : "border-white/[0.06]"}`}
+            >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-navy-100">{r.number}</span>
+                <span className={`font-medium text-navy-100 ${r.dismissalId ? "line-through decoration-white/30" : ""}`}>{r.number}</span>
                 <span className="badge-purple">{r.kind}</span>
                 {r.customerId ? (
                   <Link href={`/pipeline/customers/${r.customerId}`} className="text-navy-100/80 hover:text-violet-200">
@@ -91,6 +102,12 @@ export default async function AgingPage({
                 <span className="font-semibold text-navy-100">{money(r.amount)}</span>
                 <span>due {r.dueAt}</span>
               </div>
+              <AgingRowActions
+                invoiceId={r.id}
+                dismissalId={r.dismissalId}
+                canRemind={canRemind}
+                stale={active === "stale"}
+              />
             </div>
           ))}
           {rows.length === 0 && <p className="muted">Nothing in this bucket — that part of the book is clean.</p>}

@@ -259,16 +259,26 @@ export type AgingInvoiceRow = {
   customerId: string | null;
   dueAt: string;
   daysOverdue: number;
+  /** Set when the owner checked this chase off (suggested_order_dismissals).
+   *  The row stays in the AR book — money owed is a fact — but the chase is
+   *  closed and restorable from here. */
+  dismissalId: string | null;
 };
 
 /** The overdue invoices behind one aging bucket — the page the digest's
- *  bucket links open. Org-scoped, oldest past-due first. */
+ *  bucket links open. Org-scoped, oldest past-due first. Checked-off chases
+ *  are flagged, not hidden: the aging page is where they get restored. */
 export async function agingInvoices(orgId: string, key: AgingBucketKey): Promise<AgingInvoiceRow[]> {
   const clause = BUCKET_CLAUSE[key];
   if (!clause) throw new Error("Unknown aging bucket.");
   const r = await sql`
-    select i.id, i.number, i.kind, i.amount, i.due_at, c.id as customer_id, c.name as customer
+    select i.id, i.number, i.kind, i.amount, i.due_at, c.id as customer_id, c.name as customer,
+           dod.id as dismissal_id
     from invoices i left join customers c on c.id = i.customer_id
+    left join suggested_order_dismissals dod
+      on dod.organization_id = i.organization_id
+     and dod.category = 'INVOICE_OVERDUE'
+     and dod.record = i.number
     where i.organization_id = ${orgId}
       and (i.status = 'OVERDUE' or (i.status = 'SENT' and i.due_at < now()))
       and i.due_at is not null and ${clause}
@@ -282,6 +292,7 @@ export async function agingInvoices(orgId: string, key: AgingBucketKey): Promise
     customerId: (x.customer_id as string | null) ?? null,
     dueAt: d(x.due_at as Date | null),
     daysOverdue: Math.floor((Date.now() - new Date(x.due_at as Date).getTime()) / 864e5),
+    dismissalId: (x.dismissal_id as string | null) ?? null,
   }));
 }
 

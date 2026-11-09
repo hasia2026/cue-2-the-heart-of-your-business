@@ -84,9 +84,9 @@ export type ArSendResult = {
  */
 export async function sendArReminders(
   orgId: string,
-  opts: { limit?: number; auditAction?: string; auditDetail?: string } = {},
+  opts: { limit?: number; auditAction?: string; auditDetail?: string; invoiceIds?: string[] } = {},
 ): Promise<ArSendResult> {
-  const all = await buildArReminders(orgId);
+  const all = await buildArReminders(orgId, { invoiceIds: opts.invoiceIds });
   const drafts = all.slice(0, opts.limit ?? 10);
   const leftover = Math.max(0, all.length - drafts.length);
   const mailOn = mailerConnected();
@@ -139,10 +139,14 @@ export async function sendArReminders(
 
 /** Every open billed invoice grouped per customer. "Open" = billed but not
  *  paid/void: SENT (due passed or due soon — the schema keeps SENT rather
- *  than flipping to OVERDUE automatically) and OVERDUE (explicitly flagged). */
-export async function buildArReminders(orgId: string): Promise<ArReminderDraft[]> {
+ *  than flipping to OVERDUE automatically) and OVERDUE (explicitly flagged).
+ *  `invoiceIds` narrows the draft to specific invoices — one customer's
+ *  reminder about one overdue invoice, same template and send path as the
+ *  full cadence run. */
+export async function buildArReminders(orgId: string, opts: { invoiceIds?: string[] } = {}): Promise<ArReminderDraft[]> {
+  const only = opts.invoiceIds && opts.invoiceIds.length ? new Set(opts.invoiceIds) : null;
   const rows = await sql`
-    select c.id as customer_id, c.name, c.email, c.phone, c.preferred_locale,
+    select i.id, c.id as customer_id, c.name, c.email, c.phone, c.preferred_locale,
            i.number, i.amount, i.due_at, i.status
     from invoices i
     join customers c on c.id = i.customer_id
@@ -157,6 +161,7 @@ export async function buildArReminders(orgId: string): Promise<ArReminderDraft[]
   type Acc = Omit<ArReminderDraft, "text">;
   const byCustomer = new Map<string, Acc>();
   for (const r of rows) {
+    if (only && !only.has(String(r.id))) continue;
     let acc = byCustomer.get(r.customer_id);
     if (!acc) {
       acc = {
