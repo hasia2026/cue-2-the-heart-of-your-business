@@ -38,8 +38,8 @@ export default async function ExecutePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="page-title">Execute</h1>
-        <p className="page-sub">Turn decisions into workflows, tasks, and outcomes. The human stays in control.</p>
+        <h1 className="page-title">{t("execute.title")}</h1>
+        <p className="page-sub">{t("execute.subtitle")}</p>
       </div>
       <ExecuteClient
         tasks={tasks as unknown as TaskRow[]}

@@ -1,4 +1,5 @@
 import PublicHeader from "@/components/PublicHeader";
+import PublicFooter from "@/components/PublicFooter";
 import { getT } from "@/lib/locale";
 import { LogoMark } from "@/components/NavClient";
 import type { DictKey } from "@/lib/i18n";
@@ -12,7 +13,7 @@ const ROWS: { cap: DictKey; crm: string; cue: string }[] = [
   { cap: "cmp.finds", crm: "✗", cue: "✓" },
   { cap: "cmp.evidence", crm: "✗", cue: "✓" },
   { cap: "cmp.approve", crm: "—", cue: "✓" },
-  { cap: "cmp.replaces", crm: "✗", cue: "✗" },
+  { cap: "cmp.replaces", crm: "—", cue: "✓" },
 ];
 
 export default async function ComparePage() {
@@ -64,6 +65,7 @@ export default async function ComparePage() {
         </div>
       </div>
     </div>
+    <PublicFooter />
     </>
   );
 }

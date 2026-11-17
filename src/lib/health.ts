@@ -1,6 +1,10 @@
 // Business Health — deterministic, explainable, computed from actual records.
 // Not scientific: every dimension returns score → evidence → reasoning → confidence.
 import { sql } from "./db";
+import { normalizeIndustry } from "./vocab";
+
+/** "1 customer" / "3 customers" — evidence must read right at n = 1. */
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export type Dimension = {
   key: string;
@@ -48,6 +52,12 @@ async function counts(organizationId: string): Promise<OrgCounts> {
 
 export async function computeHealth(organizationId: string): Promise<Health> {
   const c = await counts(organizationId);
+  // Pack-aware wording keeps vertical demos honest (a salon has a retail
+  // shelf, not vehicles on a lot). The scoring math itself stays identical.
+  const [profile] = await sql`select industry from business_profiles where organization_id = ${organizationId}`;
+  const industry = normalizeIndustry(profile?.industry);
+  const isSalon = industry === "SALON";
+  const isRepair = industry === "AUTO_REPAIR";
   const dims: Dimension[] = [];
   const push = (key: string, label: string, score: number | null, evidence: string, reasoning: string, confidence: number) => {
     dims.push({
@@ -72,7 +82,7 @@ export async function computeHealth(organizationId: string): Promise<Health> {
     const rate = inv.total ? inv.paid / inv.total : 0;
     const score = 100 * rate - (inv.overdue ?? 0) * 5;
     push("revenue", "Revenue", score,
-      `${inv.paid}/${inv.total} invoices paid; ${inv.overdue ?? 0} overdue; $${Math.round(inv.collected)} collected.`,
+      `${inv.paid}/${inv.total} ${plural(inv.total, "invoice")} paid; ${inv.overdue ?? 0} overdue; $${Math.round(inv.collected)} collected.`,
       "Collection rate drives the score; each overdue invoice subtracts.", 0.9);
   } else {
     push("revenue", "Revenue", null, "No invoices recorded yet.", "Score neutral until billing data exists.", 0.2);
@@ -84,16 +94,26 @@ export async function computeHealth(organizationId: string): Promise<Health> {
       select
         sum(case when status = 'WON' then 1 else 0 end)::int as won,
         sum(case when status = 'PENDING_FINANCE' then 1 else 0 end)::int as pending,
-        sum(case when status in ('NEGOTIATING','PENDING_FINANCE') then amount else 0 end)::float as activeValue,
-        (select count(*) from leads where organization_id = ${organizationId} and status = 'NEW' and created_at < now() - interval '7 days')::int as staleLeads
+        sum(case when status in ('NEGOTIATING','PENDING_FINANCE') then amount else 0 end)::float as "activeValue",
+        (select count(*) from leads where organization_id = ${organizationId} and status = 'NEW' and created_at < now() - interval '7 days')::int as "staleLeads"
       from deals where organization_id = ${organizationId}`;
     const stale = d.staleLeads ?? 0;
     const score = 55 + (d.won ?? 0) * 6 - stale * 4 - (d.pending ?? 0) * 2 + Math.min(15, (d.activeValue ?? 0) / 20000);
-    push("pipeline", "Sales pipeline", score,
-      `${d.won ?? 0} won · ${d.pending ?? 0} in finance · $${Math.round(d.activeValue ?? 0)} active · ${stale} stale leads (>7d untouched).`,
-      "Won deals raise it; untouched leads and stuck finance deals lower it.", 0.75);
+    push("pipeline", isSalon ? "Bookings & repeat clients" : isRepair ? "Estimate pipeline" : "Sales pipeline", score,
+      isSalon
+        ? `${d.won ?? 0} won · ${d.pending ?? 0} awaiting confirmation · $${Math.round(d.activeValue ?? 0)} open · ${plural(stale, "stale enquiry", "stale enquiries")} (>7d untouched).`
+        : isRepair
+          ? `${d.won ?? 0} approved · ${d.pending ?? 0} awaiting approval · $${Math.round(d.activeValue ?? 0)} open · ${plural(stale, "stale enquiry", "stale enquiries")} (>7d untouched).`
+          : `${d.won ?? 0} won · ${d.pending ?? 0} in finance · $${Math.round(d.activeValue ?? 0)} active · ${plural(stale, "stale lead")} (>7d untouched).`,
+      isSalon
+        ? "Booked packages raise it; unanswered enquiries lower it."
+        : isRepair
+          ? "Approved estimates raise it; untouched enquiries lower it."
+          : "Won deals raise it; untouched leads and stuck finance deals lower it.", 0.75);
   } else {
-    push("pipeline", "Sales pipeline", null, "No deals or leads recorded yet.", "Neutral until sales data exists.", 0.2);
+    push("pipeline", isSalon ? "Bookings & repeat clients" : isRepair ? "Estimate pipeline" : "Sales pipeline", null,
+      isSalon ? "No bookings or enquiries recorded yet." : isRepair ? "No estimates or service enquiries recorded yet." : "No deals or leads recorded yet.",
+      "Neutral until sales data exists.", 0.2);
   }
 
   // Operations: service billing discipline (dealership fixed-ops proxy)
@@ -102,17 +122,19 @@ export async function computeHealth(organizationId: string): Promise<Health> {
       select
         count(*)::int as total,
         sum(case when status = 'COMPLETED' and invoiced_at is null then 1 else 0 end)::int as unbilled,
-        coalesce(sum(case when status = 'COMPLETED' and invoiced_at is null then amount else 0 end), 0)::float as unbilledValue,
-        avg(case when completed_at is not null and invoiced_at is not null then extract(epoch from (invoiced_at - completed_at))/3600 end)::float as avgBillHours
+        coalesce(sum(case when status = 'COMPLETED' and invoiced_at is null then amount else 0 end), 0)::float as "unbilledValue",
+        avg(case when completed_at is not null and invoiced_at is not null then extract(epoch from (invoiced_at - completed_at))/3600 end)::float as "avgBillHours"
       from service_orders where organization_id = ${organizationId}`;
     const unbilled = s.unbilled ?? 0;
     const billPenalty = s.avgBillHours != null ? Math.min(30, s.avgBillHours) : 10;
     const score = 90 - unbilled * 8 - billPenalty;
     push("operations", "Operations", score,
-      `${s.total} service orders · ${unbilled} completed-but-unbilled ($${Math.round(s.unbilledValue ?? 0)}) · avg billing lag ${s.avgBillHours ? s.avgBillHours.toFixed(1) + "h" : "n/a"}.`,
+      `${plural(s.total, isSalon ? "service ticket" : isRepair ? "repair order" : "service order")} · ${unbilled} completed-but-unbilled ($${Math.round(s.unbilledValue ?? 0)}) · avg billing lag ${s.avgBillHours ? s.avgBillHours.toFixed(1) + "h" : "n/a"}.`,
       "Unbilled completed work and slow billing directly reduce the score.", 0.9);
   } else {
-    push("operations", "Operations", null, "No service orders recorded yet.", "Neutral until fixed-ops data exists.", 0.2);
+    push("operations", "Operations", null,
+      isSalon ? "No service tickets recorded yet." : isRepair ? "No repair orders recorded yet." : "No service orders recorded yet.",
+      "Neutral until service data exists.", 0.2);
   }
 
   // Inventory health (dealership): aging stock
@@ -120,16 +142,26 @@ export async function computeHealth(organizationId: string): Promise<Health> {
     const [v] = await sql`
       select count(*)::int as available,
         sum(case when listed_at < now() - interval '60 days' then 1 else 0 end)::int as aging,
-        coalesce(sum(case when listed_at < now() - interval '60 days' then list_price else 0 end), 0)::float as agingValue
+        coalesce(sum(case when listed_at < now() - interval '60 days' then list_price else 0 end), 0)::float as "agingValue"
       from vehicles where organization_id = ${organizationId} and status = 'AVAILABLE'`;
     const aging = v.aging ?? 0;
     const ratio = v.available ? aging / v.available : 0;
     const score = 90 - ratio * 60 - aging * 2;
-    push("inventory", "Inventory", score,
-      `${v.available} available units · ${aging} past 60 days on lot ($${Math.round(v.agingValue ?? 0)}).`,
-      "Aging stock ties up floorplan capital; ratio drives the score.", 0.8);
+    push("inventory", isSalon ? "Retail shelf" : isRepair ? "Parts shelf" : "Inventory", score,
+      isSalon
+        ? `${plural(v.available, "retail product")} · ${aging} past 60 days on the shelf ($${Math.round(v.agingValue ?? 0)}).`
+        : isRepair
+          ? `${plural(v.available, "part")} · ${aging} past 60 days on the shelf ($${Math.round(v.agingValue ?? 0)}).`
+          : `${plural(v.available, "available unit")} · ${aging} past 60 days on lot ($${Math.round(v.agingValue ?? 0)}).`,
+      isSalon
+        ? "Slow-moving retail ties up cash; a curated shelf lifts every ticket."
+        : isRepair
+          ? "Slow-moving parts tie up cash; a focused shelf keeps bays moving."
+          : "Aging stock ties up floorplan capital; ratio drives the score.", 0.8);
   } else {
-    push("inventory", "Inventory", null, "No vehicles recorded yet.", "Neutral until inventory data exists.", 0.2);
+    push("inventory", isSalon ? "Retail shelf" : isRepair ? "Parts shelf" : "Inventory", null,
+      isSalon ? "No retail products tracked yet." : isRepair ? "No parts inventory tracked yet." : "No vehicles recorded yet.",
+      "Neutral until inventory data exists.", 0.2);
   }
 
   // Customers: base growth + overdue receivables
@@ -137,10 +169,11 @@ export async function computeHealth(organizationId: string): Promise<Health> {
     const [cu] = await sql`
       select count(*)::int as total,
         (select count(*) from communications where organization_id = ${organizationId})::int as touches,
-        (select count(*) from invoices where organization_id = ${organizationId} and status = 'OVERDUE')::int as overdueInvoices`;
+        (select count(*) from invoices where organization_id = ${organizationId} and status = 'OVERDUE')::int as "overdueInvoices"
+      from customers where organization_id = ${organizationId}`;
     const score = 60 + Math.min(20, cu.touches) - (cu.overdueInvoices ?? 0) * 4;
     push("customers", "Customers", score,
-      `${cu.total} customers · ${cu.touches} logged interactions · ${cu.overdueInvoices ?? 0} overdue invoices.`,
+      `${plural(cu.total, "customer")} · ${plural(cu.touches, "logged interaction")} · ${plural(cu.overdueInvoices ?? 0, "overdue invoice")}.`,
       "Engagement history raises the score; unpaid invoices lower it.", 0.7);
   } else {
     push("customers", "Customers", null, "No customers recorded yet.", "Neutral until customer data exists.", 0.2);
@@ -151,10 +184,11 @@ export async function computeHealth(organizationId: string): Promise<Health> {
     const [e] = await sql`
       select count(*)::int as total,
         (select count(distinct department_id) from employees where organization_id = ${organizationId} and department_id is not null)::int as depts,
-        (select count(*) from training_assignments ta join employees e2 on e2.id = ta.employee_id where e2.organization_id = ${organizationId})::int as assignments`;
+        (select count(*) from training_assignments ta join employees e2 on e2.id = ta.employee_id where e2.organization_id = ${organizationId})::int as assignments
+      from employees where organization_id = ${organizationId}`;
     const score = 55 + Math.min(25, e.depts * 5) + Math.min(20, e.assignments * 3);
     push("team", "Team", score,
-      `${e.total} employees across ${e.depts} departments · ${e.assignments} training assignments.`,
+      `${plural(e.total, "employee")} across ${plural(e.depts, "department")} · ${plural(e.assignments, "training assignment")}.`,
       "Departmental structure and active training lift the score.", 0.65);
   } else {
     push("team", "Team", null, "No employees recorded yet.", "Neutral until people data exists.", 0.2);
@@ -164,7 +198,7 @@ export async function computeHealth(organizationId: string): Promise<Health> {
   {
     const score = Math.min(100, c.documents * 8 + c.knowledgeItems * 6);
     push("data", "Data & knowledge", score,
-      `${c.documents} documents captured · ${c.knowledgeItems} knowledge items.`,
+      `${plural(c.documents, "document")} captured · ${plural(c.knowledgeItems, "knowledge item")}.`,
       "Captured, classified information makes every other score more trustworthy.", c.knowledgeItems > 5 ? 0.8 : 0.4);
   }
 

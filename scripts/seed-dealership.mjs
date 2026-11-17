@@ -24,27 +24,31 @@ async function main() {
       insert into organizations (name, is_demo) values (${DEMO_ORG}, true) returning id`;
     const orgId = org.id;
 
+    const demoHash = (p) => {
+      const salt = randomBytes(16).toString("hex");
+      return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
+    };
+
     // Owner is upserted too: deleting the demo org cascades members but not
     // users, so a plain insert would trip users_email_key on every rerun.
+    // Seeded with the documented demo password like every other role account —
+    // a fresh seed must produce a working login, no smoke run required.
     const [ownerUser] = await sql`
       insert into users (email, name, password_hash)
-      values ('demo@northgate.example', 'Dana Whitfield (Demo)', ${"seeded-demo-no-login"})
-      on conflict (email) do update set name = excluded.name
+      values ('demo@northgate.example', 'Dana Whitfield (Demo)', ${demoHash("northgate-demo-2026")})
+      on conflict (email) do update set name = excluded.name, password_hash = excluded.password_hash
       returning id`;
     const existingMember = await sql`select id from members where organization_id = ${orgId} and user_id = ${ownerUser.id}`;
     if (!existingMember.length) {
       await sql`insert into members (organization_id, user_id, role) values (${orgId}, ${ownerUser.id}, 'OWNER')`;
     }
 
-    // Role demo accounts — hashed with the real scheme so placeholders can
+    // Role demo accounts — hashed with the real scheme so a wrong password can
     // never authenticate. Stable demo credentials (documented in PRODUCT-TOUR):
+    //   OWNER   demo@northgate.example   / northgate-demo-2026
     //   ADMIN   marcus@northgate.example / northgate-demo-2026
     //   MANAGER rachel@northgate.example / northgate-mgr-2026
     //   MEMBER  tom@northgate.example   / northgate-staff-2026
-    const demoHash = (p) => {
-      const salt = randomBytes(16).toString("hex");
-      return `s1:${salt}:${scryptSync(p, salt, 64).toString("hex")}`;
-    };
     // Upsert by email so rerunning the seed against a live DB never trips
     // the users_email_key constraint on prior demo accounts.
     const [adminUser] = await sql`

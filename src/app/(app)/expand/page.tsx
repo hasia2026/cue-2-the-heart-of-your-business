@@ -80,6 +80,7 @@ export default async function ExpandPage() {
         <p className="page-sub">{t("expand.subtitle")}</p>
       </div>
 
+      <div id="academy">
       <Academy
         industry={(profile?.industry as string) ?? ""}
         mission={(profile?.mission as string) ?? ""}
@@ -92,7 +93,9 @@ export default async function ExpandPage() {
         members={memberRows.map((m) => ({ id: m.id, name: m.name }))}
         team={assignRows.map((r) => ({ id: r.id, name: r.name, track: r.track as string, done: Number(r.done) }))}
       />
+      </div>
 
+      <div id="training-library">
       <TrainingLibrary
         labels={buildLabels(LIBRARY_LABEL_KEYS, t)}
         canImport={session.role !== "MEMBER"}
@@ -109,9 +112,10 @@ export default async function ExpandPage() {
           };
         })}
       />
+      </div>
 
       {/* Scal³ — Revenue Intelligence */}
-      <section className="card p-5">
+      <section id="scal3" className="card p-5">
         <div className="flex items-center gap-2">
           <h2 className="bg-gradient-to-r from-cue-blue via-cue-purple to-cue-orange bg-clip-text text-lg font-bold text-transparent">Scal³</h2>
           <span className="badge-purple">Revenue Intelligence</span>

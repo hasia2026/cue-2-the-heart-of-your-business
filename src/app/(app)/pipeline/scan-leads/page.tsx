@@ -20,7 +20,7 @@ export default async function ScanLeadsPage() {
   const canEdit = session.role !== "MEMBER" && session.role !== "MANAGER";
 
   const leads = await sql`
-    select id, name, shop, phone, email, source, status, note, created_at
+    select id, name, shop, phone, email, source, status, note, preferred_time, created_at
     from scan_leads
     order by case status when 'NEW' then 0 when 'CALLED' then 1 when 'BOOKED' then 2 else 3 end,
       created_at asc
@@ -35,6 +35,7 @@ export default async function ScanLeadsPage() {
 
   const n = (d: Date | string) =>
     new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const requestedSlot = (value: string) => value.replace(/\s*\(requested\)\s*$/i, "");
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -56,6 +57,11 @@ export default async function ScanLeadsPage() {
                 <a href={`tel:${String(l.phone)}`} className="underline decoration-white/20">{String(l.phone)}</a>
               </span>
               {l.email && <span className="text-xs text-navy-300">{String(l.email)}</span>}
+              {l.preferred_time && (
+                <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[11px] font-medium text-violet-200">
+                  Requested: {requestedSlot(String(l.preferred_time))}
+                </span>
+              )}
               <span className="badge ml-auto">{String(l.source)}</span>
               <span className="text-xs text-navy-300">{n(l.created_at as string)}</span>
             </div>

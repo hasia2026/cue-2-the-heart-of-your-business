@@ -228,10 +228,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           ))}
           {topTasks.length === 0 && (
             <li className="muted text-sm">
-              {pending?.n > 0
-                ? `${pending.n} × ${t("dash.pendingDecisions")} → `
-                : t("dash.noTasks")}
-              {!pending?.n && <a href="/understand" className="text-cyan-300 hover:underline">Understand</a>}
+              {pending?.n > 0 ? (
+                <>
+                  {pending.n} × {t("dash.pendingDecisions")} —{" "}
+                  <a href="/execute" className="text-cyan-300 hover:underline">open Execute →</a>
+                </>
+              ) : (
+                <>
+                  {t("dash.noTasks")}{" "}
+                  <a href="/understand" className="text-cyan-300 hover:underline">Open Understand →</a>
+                </>
+              )}
             </li>
           )}
         </ul>

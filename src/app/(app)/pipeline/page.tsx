@@ -256,7 +256,7 @@ export default async function PipelinePage() {
       <section className="card p-5">
         <h2 className="section-title mb-1">Add a job or estimate for an existing customer</h2>
         <p className="muted mb-3 text-xs">Type their new address right here — it saves to the customer, no detour. Leave it blank to keep the address on file. Adding a visit puts it on the schedule in the shop's timezone.</p>
-        <NewJobForm customers={jobCustomers as never} suggestions={suggestions} />
+        <NewJobForm customers={jobCustomers as never} suggestions={suggestions} isAuto={vocab.packId === "AUTO_DEALERSHIP"} />
       </section>
 
       {/* Quote decisions: what customers clicked on multi-option (accept/

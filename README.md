@@ -26,25 +26,65 @@ It connects the people, knowledge, workflows, and systems that keep a business m
 ```bash
 npm install
 cp .env.example .env        # fill in DATABASE_URL + CUE_SESSION_SECRET
-npm run db:setup            # applies scripts/schema.sql (33 tables)
+npm run db:setup            # applies scripts/schema.sql + every migrate-*.sql
 npm run db:seed             # Northgate Auto Group — auto dealership demo
 npm run dev                 # http://localhost:3210
 ```
 
-**Pilot demo login** (after seeding):
-- Email: `demo@northgate.example`
-- Password: `northgate-demo-2026`
+**Demo logins** (after seeding — all accounts have working passwords):
+
+| Org | Role | Email | Password |
+|---|---|---|---|
+| Northgate Auto Group | OWNER | `demo@northgate.example` | `northgate-demo-2026` |
+| Northgate Auto Group | ADMIN | `marcus@northgate.example` | `northgate-demo-2026` |
+| Northgate Auto Group | MANAGER | `rachel@northgate.example` | `northgate-mgr-2026` |
+| Northgate Auto Group | MEMBER | `tom@northgate.example` | `northgate-staff-2026` |
+| Summit Air Heating & Cooling | OWNER | `demo@summitair.example` | `summit-demo-2026` |
+| Summit Air Heating & Cooling | ADMIN | `rita@summitair.example` | `summit-admin-2026` |
+| Summit Air Heating & Cooling | MANAGER | `sam@summitair.example` | `summit-mgr-2026` |
+| Summit Air Heating & Cooling | MEMBER | `chris@summitair.example` | `summit-staff-2026` |
+| Lotus Nail Studio (salon, Garden Grove) | OWNER | `demo@lotusnails.example` | `lotus-demo-2026` |
+| Lotus Nail Studio (salon, Garden Grove) | ADMIN | `mai@lotusnails.example` | `lotus-admin-2026` |
+| Lotus Nail Studio (salon, Garden Grove) | MANAGER | `kim@lotusnails.example` | `lotus-mgr-2026` |
+| Lotus Nail Studio (salon, Garden Grove) | MEMBER | `vy@lotusnails.example` | `lotus-staff-2026` |
+| Harbor Auto Repair (independent shop, Costa Mesa) | OWNER | `demo@harborauto.example` | `harbor-demo-2026` |
+| Harbor Auto Repair (independent shop, Costa Mesa) | ADMIN | `nina@harborauto.example` | `harbor-admin-2026` |
+| Harbor Auto Repair (independent shop, Costa Mesa) | MANAGER | `ray@harborauto.example` | `harbor-mgr-2026` |
+| Harbor Auto Repair (independent shop, Costa Mesa) | MEMBER | `tomas@harborauto.example` | `harbor-staff-2026` |
+
+`.example` addresses cannot receive mail — reset demo passwords with
+`node --env-file=.env scripts/rotate-demo-passwords.mjs` instead of the
+forgot-password flow.
 
 The demo org ships with real business problems CUE detects: 7 unbilled completed service
 orders, 14 stale leads, 5 vehicles past the 60-day aging threshold, deals stuck in finance,
 and overdue invoices — each with evidence, a recommendation, and an approval path.
 
+A third pack seeds a Vietnamese-owned nail salon in Garden Grove (Orange County) with
+salon vocabulary, a retail shelf, and clients who prefer Vietnamese or Spanish:
+`npm run db:seed:salon`.
+
+A fourth pack seeds an independent auto-repair shop in Costa Mesa with repair-order
+language, a parts-and-labor menu, and service enquiries that go stale:
+`npm run db:seed:auto-repair`.
+
+**Existing databases:** `db:setup` applies the Field Ops/Housecall Pro migrations
+on a fresh setup. Before enabling Field Ops on an older database, run
+`scripts/migrate-field-ops-housecall.sql`,
+`scripts/migrate-appointment-confirmation.sql` (explicit confirmation records
+plus customer `/confirm/<token>` links), and
+`scripts/migrate-housecall-appointments.sql` (appointment external IDs, job
+linkage, timing fields), then verify with
+`scripts/verify-field-ops-schema.sql` — see DEPLOY.md and PRODUCTION-CHECKLIST.md.
+
 ## Scripts
 
 | Command | What it does |
 |---|---|
-| `npm run db:setup` | Applies `scripts/schema.sql` (add `--fresh` to reset) |
+| `npm run db:setup` | Applies `scripts/schema.sql` and every `scripts/migrate-*.sql` patch, including Field Ops/Housecall Pro (add `--fresh` to reset) |
 | `npm run db:seed` | Seeds the auto-dealership demo org |
+| `npm run db:seed:salon` | Seeds the nail-salon demo org (Lotus Nail Studio, Orange County) |
+| `npm run db:seed:auto-repair` | Seeds the independent auto-repair demo org (Harbor Auto Repair, Costa Mesa) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | Production build |
 | `node --env-file=.env scripts/smoke-auth.mjs` | E2E smoke test (17 checks) |

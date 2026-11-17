@@ -7,6 +7,8 @@
 // owner's direct address so routing never depends on remembering to set a var.
 // pilots@hasi.tech becomes deliverable once the hasi.tech sending domain is
 // verified in Resend — see docs/resend-domain-dns.md.
+import type { SendResult } from "./mailer";
+
 const DEFAULT_PILOT_INBOX = "shannon102501@gmail.com";
 
 /** Inbox list, trimmed and de-duplicated, in configured order. */
@@ -30,7 +32,17 @@ export type PilotRequest = {
   phone: string;
   email?: string;
   source?: string;
+  preferredTime?: string;
 };
+
+function cleanSlot(value: string): string {
+  return value.replace(/\s*\(requested\)\s*$/i, "").replace(/\s+/g, " ").trim();
+}
+
+function escapeHtml(value: string): string {
+  const map: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  return value.replace(/[&<>"']/g, (ch) => map[ch] ?? ch);
+}
 
 function requestText(req: PilotRequest): string {
   const source = req.source ?? "FLYER";
@@ -41,9 +53,95 @@ function requestText(req: PilotRequest): string {
     `Shop:  ${req.shop}`,
     `Phone: ${req.phone}`,
     `Email: ${req.email ?? "(none given)"}`,
+    ...(req.preferredTime ? [`Requested: ${cleanSlot(req.preferredTime)}`] : []),
     ``,
     `Inbox of record: Pipeline → Scan records. Follow up within one business day.`,
   ].join("\n");
+}
+
+export type BookingConfirmation = {
+  name: string;
+  email: string;
+  shop: string;
+  preferredTime: string;
+};
+
+function confirmationText(req: BookingConfirmation, slot: string): string {
+  return [
+    `Hi ${req.name},`,
+    ``,
+    `We received your request for a free 20-minute CUE scan call for ${req.shop}.`,
+    ``,
+    `Requested slot: ${slot}`,
+    ``,
+    `What happens next`,
+    `1. A real person will confirm this slot by email or text within one business hour.`,
+    `2. If the time has already passed or no longer works, we'll offer the nearest available time.`,
+    `3. On the call, have one month of jobs, quotes, or invoices ready to export or photograph. We'll run the scan live on your numbers and show you where money is leaking.`,
+    `4. The call is 20 minutes, with no pitch deck. If we don't find $1,000 in documented leaks, the pilot is free.`,
+    ``,
+    `Need to change the time? Reply to this email and we'll move it.`,
+    ``,
+    `— CUE`,
+  ].join("\n");
+}
+
+function confirmationHtml(req: BookingConfirmation, slot: string): string {
+  const name = escapeHtml(req.name);
+  const shop = escapeHtml(req.shop);
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+    <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
+      <p style="margin:0 0 24px;font-size:14px;font-weight:700;letter-spacing:.08em;color:#7c3aed;">CUE</p>
+      <h1 style="margin:0 0 16px;font-size:26px;line-height:1.25;">Your scan call is requested</h1>
+      <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hi ${name},</p>
+      <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">We received your request for a free 20-minute CUE scan call for <strong>${shop}</strong>.</p>
+      <div style="margin:0 0 24px;padding:16px 20px;border:1px solid #ddd6fe;border-radius:12px;background:#f5f3ff;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6d28d9;">Requested slot</div>
+        <div style="margin-top:4px;font-size:20px;font-weight:700;color:#4c1d95;">${escapeHtml(slot)}</div>
+      </div>
+      <h2 style="margin:0 0 12px;font-size:18px;">What happens next</h2>
+      <ol style="margin:0 0 20px;padding-left:20px;font-size:15px;line-height:1.7;">
+        <li>A real person will confirm this slot by email or text within one business hour.</li>
+        <li>If the time has already passed or no longer works, we'll offer the nearest available time.</li>
+        <li>On the call, have one month of jobs, quotes, or invoices ready to export or photograph. We'll run the scan live on your numbers and show you where money is leaking.</li>
+        <li>The call is 20 minutes, with no pitch deck. If we don't find $1,000 in documented leaks, the pilot is free.</li>
+      </ol>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.6;">Need to change the time? Reply to this email and we'll move it.</p>
+      <p style="margin:24px 0 0;font-size:15px;color:#475569;">— CUE</p>
+    </div>
+  </body>
+</html>`;
+}
+
+/** Automatic visitor confirmation for a slot booking. Never blocks the saved lead. */
+export async function sendBookingConfirmation(req: BookingConfirmation): Promise<SendResult> {
+  const { sendMail, mailerConnected } = await import("@/lib/mailer");
+  if (!mailerConnected()) {
+    console.warn("booking confirmation skipped — RESEND_API_KEY not set (lead still saved)");
+    return { connected: false, sent: false, error: "RESEND_API_KEY not set" };
+  }
+
+  const slot = cleanSlot(req.preferredTime);
+  if (!slot) return { connected: true, sent: false, error: "No requested slot" };
+
+  const subject = `CUE scan call requested — ${slot}`;
+  const text = confirmationText(req, slot);
+  const html = confirmationHtml(req, slot);
+  const result = await sendMail({
+    to: req.email,
+    replyTo: pilotInboxEmail(),
+    subject,
+    text,
+    html,
+  });
+
+  if (!result.sent) {
+    console.error("booking confirmation failed:", result.error ?? "unknown mailer error");
+    if (result.connected) await enqueueFailedAlert([req.email], subject, text, result.error ?? "unknown mailer error");
+  }
+  return result;
 }
 
 /**

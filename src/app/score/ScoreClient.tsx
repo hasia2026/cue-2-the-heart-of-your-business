@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { computeLeakScore, type AnswerIndex } from "@/lib/leak-score";
 
 type Result = {
   score: number;
@@ -14,54 +15,60 @@ const money = (n: number) => `$${n.toLocaleString()}`;
 export default function ScoreClient({
   questions,
   brackets,
-  scanMailto,
 }: {
   questions: { id: string; text: string; options: string[] }[];
   brackets: { key: string; label: string }[];
-  /** Publisher-set pilot inbox (mailto address) — server passes it down; client env is unavailable. */
-  scanMailto: string;
 }) {
-  const [step, setStep] = useState(0); // 0..4 questions, 5 = email gate, 6 = results
+  const [step, setStep] = useState(0);
   const [bracket, setBracket] = useState(brackets[1]?.key ?? brackets[0].key);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerIndex>>({});
+  const [result, setResult] = useState<Result | null>(null);
   const [email, setEmail] = useState("");
   const [biz, setBiz] = useState("");
-  const [result, setResult] = useState<Result | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [emailState, setEmailState] = useState<"idle" | "busy" | "ok" | "err">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const qIndex = step; // question i is shown at step i
-
-  async function answer(idx: number) {
-    const q = questions[qIndex];
-    const next = { ...answers, [q.id]: idx };
+  function answer(idx: number) {
+    const q = questions[step];
+    const next = { ...answers, [q.id]: idx as AnswerIndex };
     setAnswers(next);
-    setStep(qIndex + 1);
+    if (step + 1 >= questions.length) {
+      // Score instantly, before asking for anything. Email capture is optional
+      // and lives on the results screen.
+      setResult(computeLeakScore(next, bracket) as Result);
+      setStep(questions.length);
+      return;
+    }
+    setStep(step + 1);
   }
 
-  async function submit(e: React.FormEvent) {
+  async function sendBreakdown(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    if (!email) return;
+    setEmailState("busy");
     setError(null);
     try {
       const res = await fetch("/api/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, businessName: biz || undefined, revenueBracket: bracket, answers }),
+        body: JSON.stringify({
+          email,
+          businessName: biz || undefined,
+          revenueBracket: bracket,
+          answers,
+        }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Something went wrong");
-      setResult(data);
-      setStep(6);
+      setEmailState("ok");
     } catch (err) {
+      setEmailState("err");
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setBusy(false);
     }
   }
 
-  if (step <= 4) {
-    const q = questions[qIndex];
+  if (step < questions.length) {
+    const q = questions[step];
     return (
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-4 flex items-center gap-2">
@@ -70,7 +77,7 @@ export default function ScoreClient({
           ))}
         </div>
         <div className="card p-7">
-          <div className="text-xs uppercase tracking-widest text-navy-300">Question {qIndex + 1} of 5</div>
+          <div className="text-xs uppercase tracking-widest text-navy-300">Question {step + 1} of {questions.length}</div>
           <h2 className="mt-2 text-xl font-semibold text-white md:text-2xl">{q.text}</h2>
           <div className="mt-5 space-y-2.5">
             {q.options.map((opt, i) => (
@@ -83,47 +90,11 @@ export default function ScoreClient({
               </button>
             ))}
           </div>
-          {qIndex > 0 && (
-            <button onClick={() => setStep(qIndex - 1)} className="mt-4 text-xs text-navy-300 hover:text-white">
+          {step > 0 && (
+            <button onClick={() => setStep(step - 1)} className="mt-4 text-xs text-navy-300 hover:text-white">
               ← back
             </button>
           )}
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 5) {
-    return (
-      <div className="mx-auto w-full max-w-md">
-        <div className="card p-7">
-          <div className="text-xs uppercase tracking-widest text-cue-blue">Almost there</div>
-          <h2 className="mt-2 text-xl font-semibold text-white">Where should we send your score?</h2>
-          <p className="muted mt-1 text-sm">
-            Your results appear instantly on the next screen — the email is so we can send the
-            full leak breakdown and, if you want, the 20-minute scan.
-          </p>
-          <form onSubmit={submit} className="mt-5 space-y-3">
-            <div>
-              <label className="label" htmlFor="biz">Business name (optional)</label>
-              <input id="biz" value={biz} onChange={(e) => setBiz(e.target.value)} className="input" />
-            </div>
-            <div>
-              <label className="label" htmlFor="email">Work email</label>
-              <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input" />
-            </div>
-            <div>
-              <label className="label" htmlFor="bracket">Annual revenue</label>
-              <select id="bracket" value={bracket} onChange={(e) => setBracket(e.target.value)} className="input">
-                {brackets.map((b) => (
-                  <option key={b.key} value={b.key}>{b.label}</option>
-                ))}
-              </select>
-            </div>
-            {error && <div className="rounded-xl border border-cue-red/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</div>}
-            <button disabled={busy} className="btn-primary w-full">{busy ? "Scoring…" : "Show my leak score →"}</button>
-            <p className="text-center text-[11px] text-navy-300/60">No spam. One email with your breakdown, that's it.</p>
-          </form>
         </div>
       </div>
     );
@@ -170,6 +141,37 @@ export default function ScoreClient({
         </div>
       </div>
 
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold text-white">Want this breakdown in writing?</h3>
+        <p className="muted mt-1 text-sm">
+          Optional — your score is already above. Add an email and we&apos;ll send the same
+          breakdown, with the math behind each estimate.
+        </p>
+        {emailState === "ok" ? (
+          <p className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+            Sent ✓ Check your inbox.
+          </p>
+        ) : (
+          <form onSubmit={sendBreakdown} className="mt-4 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="score-email">Work email</label>
+                <input id="score-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input" />
+              </div>
+              <div>
+                <label className="label" htmlFor="score-biz">Business name (optional)</label>
+                <input id="score-biz" value={biz} onChange={(e) => setBiz(e.target.value)} className="input" />
+              </div>
+            </div>
+            {error && <div className="rounded-xl border border-cue-red/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</div>}
+            <button disabled={emailState === "busy"} className="btn-ghost">
+              {emailState === "busy" ? "Sending…" : "Email me the breakdown"}
+            </button>
+            <p className="text-[11px] text-navy-300/60">One email with your breakdown. No spam.</p>
+          </form>
+        )}
+      </div>
+
       <div className="card p-6 text-center">
         <h3 className="text-lg font-semibold text-white">Want the real number — from your actual records?</h3>
         <p className="muted mx-auto mt-1 max-w-md text-sm">
@@ -177,7 +179,7 @@ export default function ScoreClient({
           leads and invoices, live on a screen share.
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <a href={scanMailto} className="btn-primary">Book the free scan</a>
+          <a href="/book" className="btn-primary">Book the free scan</a>
           <a href="/" className="btn-ghost">Learn about CUE</a>
         </div>
       </div>

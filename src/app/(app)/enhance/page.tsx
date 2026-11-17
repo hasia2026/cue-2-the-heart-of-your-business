@@ -128,6 +128,7 @@ export default async function EnhancePage({
         <p className="page-sub">{t("enhance.subtitle")}</p>
       </div>
 
+      <div id="service-plans" className="scroll-mt-24">
       <ServicePlans
         plans={plans}
         signups={signups}
@@ -137,7 +138,9 @@ export default async function EnhancePage({
         planErr={planErr}
         actions={{ savePlan, deletePlan, convertSignup, dismissSignup }}
       />
+      </div>
 
+      <div id="pricing-studio" className="scroll-mt-24">
       <PricingStudio
         industry={(profile?.industry as string) ?? ""}
         vehicles={vehicles}
@@ -145,8 +148,9 @@ export default async function EnhancePage({
       />
 
       <PriceBookClient offerings={offerings} assemblies={assemblies} canEdit={session.role !== "MEMBER"} />
+      </div>
 
-      <section>
+      <section id="brand-studio" className="scroll-mt-24">
         <h2 className="section-title mb-3">Brand Studio</h2>
         <div className="grid gap-3 md:grid-cols-3">
           {assets.map((a) => (

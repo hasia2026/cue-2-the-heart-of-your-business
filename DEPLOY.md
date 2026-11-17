@@ -3,7 +3,7 @@
 ## 1. Supabase (once)
 
 ```bash
-# apply schema (includes both migrations below)
+# apply schema + every scripts/migrate-*.sql patch below
 node --env-file=.env scripts/db-setup.mjs
 
 # (optional) load the dealership demo — self-verifies at the end of the run
@@ -13,9 +13,9 @@ node --env-file=.env scripts/seed-dealership.mjs
 
 ### Migrations
 
-`scripts/run-sql.mjs` applies `scripts/*.sql` files (already included in
-`db-setup` when scripts/schema.sql runs; only needed on databases set up
-before these existed):
+`scripts/run-sql.mjs` applies `scripts/*.sql` files. A fresh `db-setup` already
+applies every `migrate-*.sql`; an existing database needs the relevant patches
+run explicitly before deploying code that depends on them:
 
 | Migration | What it does | Why it exists |
 |---|---|---|
@@ -24,12 +24,32 @@ before these existed):
 | `scripts/migrate-market-signals.sql` | Adds the `market_signals` table + dedupe/org indexes | Market Signals: social-listening and GBP webhooks land here (`/api/ingest/*`); every database set up before this table existed needs it |
 | `scripts/migrate-lead-alerts.sql` | Adds `lead_alert_queue` (retry ledger) + partial index on undelivered rows | Pilot-request alert emails that fail get queued and retried with backoff by the `/api/alerts/cron` Vercel cron instead of silently vanishing |
 | `scripts/migrate-lead-push.sql` | Adds `lead_push_subscriptions` (unique endpoint, key checks) | Device registrations for the real-time Web Push "whisper" when a pilot request lands |
+| `scripts/migrate-field-ops-housecall.sql` | Adds canonical external IDs + unique indexes on customers/service_orders/invoices, encrypted-key columns on integrations, `field_ops_rules`, and the Housecall Pro/ServiceTitan/Jobber connector rows | Field Ops and the Housecall Pro pull sync/webhook cannot work without these columns, indexes, and connector token rows (the sync pulls customers, jobs, appointments and invoices) |
+| `scripts/migrate-appointment-confirmation.sql` | Adds `appointment_confirmations` (token, sent/confirmed timestamps) and backfills legacy `appointments.confirmed_at` | Booking reviews count the explicit record only; `/field-ops` and `/confirm/<token>` error without the table |
+| `scripts/migrate-housecall-appointments.sql` | Adds external appointment IDs, job/service-order linkage, end time/arrival window, and explicit HCP confirmation snapshots to `appointments` | The pull sync and appointment webhooks cannot upsert visits idempotently without these columns and the unique index |
 
 ```bash
 node --env-file=.env scripts/run-sql.mjs scripts/migrate-departments-dedupe.sql
 node --env-file=.env scripts/run-sql.mjs scripts/migrate-doc-content-hash.sql
 node --env-file=.env scripts/run-sql.mjs scripts/migrate-market-signals.sql
 ```
+
+### Field Ops / Housecall Pro gate (before deploying the feature)
+
+Run these against the **direct (port 5432) production database URL**, not the
+pooled 6543 URL used by Vercel at runtime. `db:setup` on a fresh database
+already applies them; existing production databases must run them explicitly.
+
+```bash
+node --env-file=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql
+node --env-file=.env scripts/run-sql.mjs scripts/migrate-appointment-confirmation.sql
+node --env-file=.env scripts/run-sql.mjs scripts/migrate-housecall-appointments.sql
+node --env-file=.env scripts/run-sql.mjs scripts/verify-field-ops-schema.sql
+```
+
+Every value in the verification result must be `true`. Deploy the app only
+after that, then connect/sync Housecall Pro from **Ecosystem → Housecall Pro**.
+Do not enable the connector on a database that has not run these migrations.
 
 For production, rotate the database password first (Supabase → Settings → Database),
 and ideally create a dedicated role instead of using `postgres`.

@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { refreshIntelligenceAction } from "@/app/signin/actions";
+import { getT } from "@/lib/locale";
 import EvidenceDrawer from "@/components/EvidenceDrawer";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function UnderstandPage() {
   await guardWorkspaceModule();
   const session = await requireSession();
+  const { t } = await getT();
   const orgId = session.organizationId;
 
   const insights = await sql`
@@ -29,8 +31,8 @@ export default async function UnderstandPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-3">
         <div className="me-auto">
-          <h1 className="page-title">Understand</h1>
-          <p className="page-sub">Intelligence computed from your actual records — every claim carries evidence.</p>
+          <h1 className="page-title">{t("understand.title")}</h1>
+          <p className="page-sub">{t("understand.subtitle")}</p>
         </div>
         <form action={async () => {
           "use server";

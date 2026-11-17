@@ -15,7 +15,7 @@ function SubmitBtn({ ready }: { ready: boolean }) {
   );
 }
 
-export default function NewJobForm({ customers, suggestions }: { customers: Customer[]; suggestions: string[] }) {
+export default function NewJobForm({ customers, suggestions, isAuto }: { customers: Customer[]; suggestions: string[]; isAuto: boolean }) {
   const [state, setState] = useState<{ ok: boolean; msg: string } | null>(null);
   const [customerId, setCustomerId] = useState(customers[0]?.id ?? "");
   const customer = customers.find((c) => c.id === customerId);
@@ -74,7 +74,7 @@ export default function NewJobForm({ customers, suggestions }: { customers: Cust
           <option value="SERVICE">Service</option>
           <option value="MEETING">Meet / walk-through</option>
           <option value="DELIVERY">Delivery</option>
-          <option value="TEST_DRIVE">Test drive</option>
+          {isAuto && <option value="TEST_DRIVE">Test drive</option>}
         </select>
       </div>
       <div className="md:col-span-2 flex flex-wrap items-center gap-3">

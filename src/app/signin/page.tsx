@@ -3,7 +3,12 @@ import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import PasswordInput from "@/components/PasswordInput";
 import PublicHeader from "@/components/PublicHeader";
+import PublicFooter from "@/components/PublicFooter";
 import { signInAction } from "./actions";
+
+// The error redirect renders this page again; never let a previously cached
+// RSC payload (e.g. from a Spanish session) decide the language.
+export const dynamic = "force-dynamic";
 
 export default async function SignInPage({
   searchParams,
@@ -37,7 +42,7 @@ export default async function SignInPage({
           </div>
           <div>
             <label className="label" htmlFor="password">{t("signin.password")}</label>
-            <PasswordInput id="password" name="password" required autoComplete="current-password" />
+            <PasswordInput id="password" name="password" required autoComplete="current-password" showLabel={t("auth.show")} hideLabel={t("auth.hide")} />
           </div>
           <button className="btn-primary w-full">{t("signin.submit")}</button>
         </form>
@@ -49,6 +54,7 @@ export default async function SignInPage({
         </p>
       </div>
     </div>
+    <PublicFooter />
     </>
   );
 }

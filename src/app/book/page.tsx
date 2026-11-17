@@ -1,6 +1,7 @@
 import PublicHeader from "@/components/PublicHeader";
+import PublicFooter from "@/components/PublicFooter";
 import { LogoMark } from "@/components/NavClient";
-import { pilotInboxEmail } from "@/lib/leads";
+import BookingForm from "./BookingForm";
 
 export const metadata = {
   title: "Book a CUE walkthrough",
@@ -38,18 +39,7 @@ export default function BookPage() {
             <script src="https://assets.calendly.com/assets/external/widget.js" async />
           </>
         ) : (
-          <div className="p-8 text-center">
-            <div className="font-semibold text-white">Booking opens in one step</div>
-            <p className="muted mx-auto mt-2 max-w-md text-sm">
-              The live calendar is being connected. In the meantime, email
-              {" "}
-              <a className="text-violet-300 underline" href={`mailto:${pilotInboxEmail()}?subject=CUE%20scan%20call`}>
-                {pilotInboxEmail()}
-              </a>{" "}
-              with two times that work and you'll get a slot within the hour.
-            </p>
-            <a href="/score" className="btn-primary mt-6">Take the free Revenue Leak Score first →</a>
-          </div>
+          <BookingForm />
         )}
       </div>
 
@@ -57,6 +47,7 @@ export default function BookPage() {
         Prefer to self-serve? Run the <a className="text-violet-300 underline" href="/score">Revenue Leak Score</a> — free, 60 seconds.
       </p>
     </div>
+    <PublicFooter />
     </>
   );
 }

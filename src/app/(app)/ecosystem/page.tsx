@@ -3,6 +3,8 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { whatsappConnected } from "@/lib/whatsapp";
+import WebhookToken from "./WebhookToken";
+import HousecallProConnect from "./HousecallProConnect";
 
 export const dynamic = "force-dynamic";
 
@@ -14,22 +16,23 @@ export default async function EcosystemPage() {
   await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
+  // webhook_secret is read only to know whether a token exists — its value is
+  // never serialized into the page. Reveal/rotate go through server actions.
   const integrations = await sql`
-    select id, key, name, category, status, data_available, capabilities, webhook_secret
+    select id, key, name, category, status, data_available, capabilities, webhook_secret, last_sync_at,
+           (api_key_enc is not null) as key_saved, account_name
     from integrations where organization_id = ${orgId} order by category, name`;
 
-  // ReferPro ingest URL — shown here so the owner can hand it to ReferPro
-  // without touching the database. The secret is in the query because
-  // webhook senders (like calendar clients) cannot sign in or set headers.
-  const host = (await headers()).get("x-forwarded-host") ?? (await headers()).get("host") ?? "localhost:3210";
-  const proto = (await headers()).get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
-  // Ingest URLs for token-authed webhook integrations — shown here so the
-  // owner can paste them into ReferPro / Zapier / Make / n8n without touching
-  // the database. The secret is in the query because webhook senders cannot
-  // sign in or set headers.
-  const hookUrl = (ref: { key: string; webhook_secret: string | null } | undefined) =>
-    ref?.webhook_secret && (ref.key === "referpro" || ref.key === "webhook")
-      ? `${proto}://${host}/api/ingest/${ref.key}?token=${ref.webhook_secret}`
+  // Ingest URLs for token-authed webhook integrations. Webhook senders cannot
+  // sign in or set headers, so the token lives in the query — but the page
+  // only ever shows it masked, so a screenshot or shared screen cannot leak it.
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3210";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+  const INGEST_PATH: Record<string, string> = { housecall_pro: "housecall" };
+  const maskedHookUrl = (ref: { key: string; webhook_secret: string | null } | undefined) =>
+    ref?.webhook_secret && ["referpro", "webhook", "housecall_pro"].includes(ref.key)
+      ? `${proto}://${host}/api/ingest/${INGEST_PATH[ref.key] ?? ref.key}?token=${"•".repeat(16)}`
       : null;
 
   // WhatsApp status is computed live from env — never fabricated from the seed row.
@@ -46,12 +49,12 @@ export default async function EcosystemPage() {
       <div className="card p-4 text-sm text-navy-300">
         <span className="badge-orange me-2">DEMO</span> sample data for the pilot &nbsp;·&nbsp;
         <span className="badge-blue me-2">AVAILABLE</span> architecture ready, credentials pending &nbsp;·&nbsp;
-        <span className="badge-green me-2">CONNECTED</span> live two-way integration
+        <span className="badge-green me-2">CONNECTED</span> live authenticated connection
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         {integrations.map((i) => {
-          const hook = hookUrl(i as { key: string; webhook_secret: string | null });
+          const hook = maskedHookUrl(i as { key: string; webhook_secret: string | null });
           return (
           <div key={i.id} className="card p-5">
             <div className="flex items-center gap-2">
@@ -70,18 +73,26 @@ export default async function EcosystemPage() {
             {hook && i.key === "referpro" && (
               <div className="mt-3 rounded-lg bg-white/[0.04] p-2.5 text-xs">
                 <div className="font-semibold text-navy-100">Your webhook URL — paste into ReferPro:</div>
-                <code className="mt-1 block break-all text-[11px] text-violet-200" style={{ wordBreak: "break-all" }}>{hook}</code>
+                <WebhookToken integrationKey={i.key} maskedUrl={hook} />
                 <div className="mt-1 text-navy-300/70">Leads arrive in Pipeline tagged REFERPRO the moment ReferPro posts an event.</div>
               </div>
             )}
             {hook && i.key === "webhook" && (
               <div className="mt-3 rounded-lg bg-white/[0.04] p-2.5 text-xs">
                 <div className="font-semibold text-navy-100">Your webhook URL — paste into Zapier / Make / n8n:</div>
-                <code className="mt-1 block break-all text-[11px] text-violet-200" style={{ wordBreak: "break-all" }}>{hook}</code>
+                <WebhookToken integrationKey={i.key} maskedUrl={hook} />
                 <div className="mt-3 text-navy-100 font-medium">In your automation, POST JSON like:</div>
                 <code className="mt-1 block break-all text-[11px] text-cyan-200">&#123; "title": "Estate job needs backup pump", "text": "Cathy called about the aging system", "source": "zapier", "url": "https://…" &#125;</code>
-                <div className="mt-1 text-navy-300/70">Batch arrays (&#123;"signals":[&#8230;]&#125;) work too — each push lands in Market Signals, classified and deduped. Open the URL in a browser once (GET) to verify the token before wiring it in.</div>
+                <div className="mt-1 text-navy-300/70">Batch arrays (&#123;"signals":[&#8230;]&#125;) work too — each push lands in Market Signals, classified and deduped. Reveal the URL once to verify the token before wiring it in.</div>
               </div>
+            )}
+            {i.key === "housecall_pro" && (
+              <HousecallProConnect
+                saved={Boolean(i.key_saved)}
+                accountName={(i.account_name as string | null) ?? null}
+                lastSyncAt={i.last_sync_at ? new Date(i.last_sync_at as string).toISOString() : null}
+                maskedUrl={hook}
+              />
             )}
           </div>
           );

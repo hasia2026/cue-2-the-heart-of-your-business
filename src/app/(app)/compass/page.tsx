@@ -3,10 +3,20 @@ import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { computeHealth } from "@/lib/health";
 import { getT } from "@/lib/locale";
-import { getVocab } from "@/lib/vocab";
+import { getVocab, normalizeIndustry } from "@/lib/vocab";
 import type { DictKey } from "@/lib/i18n";
 import BusinessLibrary from "./BusinessLibrary";
 import { QUESTIONS, SECTION_ORDER, type LibraryQuestion } from "./questions";
+
+// Friendly pack names for the profile card — never the raw stored enum.
+const INDUSTRY_DISPLAY: Record<string, string> = {
+  AUTO_DEALERSHIP: "Auto Dealership",
+  AUTO_REPAIR: "Auto Repair",
+  HOME_SERVICES: "Home Services (HVAC)",
+  RETAIL: "Retail",
+  SALON: "Salon",
+  OTHER: "Custom / other",
+};
 
 const DIM_LABELS: Record<string, DictKey> = {
   revenue: "compass.dim.revenue",
@@ -28,6 +38,13 @@ export default async function CompassPage() {
   const health = await computeHealth(orgId);
   const vocab = await getVocab(orgId);
   const [profile] = await sql`select * from business_profiles where organization_id = ${orgId}`;
+  // Pack label for the profile card. normalizeIndustry() also repairs legacy
+  // values like "HOME SERVICES" that the old free-text field stored.
+  const industryKey = normalizeIndustry(profile?.industry);
+  const industryLabel = industryKey
+    ? INDUSTRY_DISPLAY[industryKey] ??
+      industryKey.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    : null;
   const goals = profile
     ? await sql`select title, detail, horizon, status from goals where profile_id = ${profile.id} and status = 'ACTIVE'`
     : [];
@@ -109,7 +126,7 @@ export default async function CompassPage() {
           {profile ? (
             <dl className="space-y-2 text-sm">
               {[
-                [t("settings.industry"), profile.industry?.replace("_", " ")],
+                [t("settings.industry"), industryLabel],
                 [t("settings.size"), profile.size],
                 [t("settings.locations"), profile.locations],
                 [t("settings.businessModel"), profile.business_model],

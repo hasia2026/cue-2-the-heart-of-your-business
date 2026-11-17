@@ -7,7 +7,7 @@ import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import { MODULES, FIXED_MODULES } from "@/lib/modules";
 import WorkspaceStudioForm from "./WorkspaceStudioForm";
 import AvatarUpload from "@/components/AvatarUpload";
-import { getVocab, VOCAB_LABELS } from "@/lib/vocab";
+import { getVocab, VOCAB_LABELS, normalizeIndustry } from "@/lib/vocab";
 import VocabForm from "./VocabForm";
 import IndustryPackForm from "./IndustryPackForm";
 import TextSizePicker from "@/components/TextSizePicker";
@@ -17,6 +17,17 @@ import { getT } from "@/lib/locale";
 import type { DictKey } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
+
+// Same canonical choices the signup form offers — the profile editor used to
+// be free text, which is how "HOME SERVICES" (with a space) silently fell back
+// to the generic pack instead of the home-services one.
+const INDUSTRY_CHOICES = [
+  { value: "AUTO_DEALERSHIP", label: "Auto Dealership" },
+  { value: "HOME_SERVICES", label: "Home Services (HVAC)" },
+  { value: "RETAIL", label: "Retail" },
+  { value: "SALON", label: "Salon" },
+  { value: "OTHER", label: "Custom / other (generic pack)" },
+];
 
 export default async function SettingsPage({
   searchParams,
@@ -44,6 +55,10 @@ export default async function SettingsPage({
   const calendarUrl = calendarToken ? `${appUrl}/api/calendar/ics?token=${calendarToken}` : null;
 
   const [ai] = await sql`select * from ai_settings where organization_id = ${orgId}`;
+  // Model ids offered by the configured provider — a datalist, so the field
+  // suggests real ids instead of inviting an email address.
+  const providerModels = PROVIDERS.find((p) => p.id === (ai?.ambassador_provider as string))?.models ?? [];
+  const industryValue = normalizeIndustry(profile?.industry) ?? "";
   const team = await sql`
     select u.name, u.email, m.role from members m join users u on u.id = m.user_id
     where m.organization_id = ${orgId} order by m.created_at`;
@@ -75,8 +90,18 @@ export default async function SettingsPage({
       <section className="card p-6">
         <h2 className="section-title mb-4">{t("settings.profile")}</h2>
         <form action={updateProfile} className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="industry">{t("settings.industry")}</label>
+            <select id="industry" name="industry" defaultValue={industryValue} className="input">
+              {INDUSTRY_CHOICES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+              {industryValue && !INDUSTRY_CHOICES.some((c) => c.value === industryValue) && (
+                <option value={industryValue}>{industryValue.replace(/_/g, " ")}</option>
+              )}
+            </select>
+          </div>
           {[
-            ["industry", t("settings.industry"), profile?.industry?.replace("_", " ") ?? ""],
             ["size", t("settings.size"), profile?.size ?? ""],
             ["locations", t("settings.locations"), profile?.locations ?? ""],
             ["businessModel", t("settings.businessModel"), profile?.business_model ?? ""],
@@ -103,7 +128,7 @@ export default async function SettingsPage({
             <input id="values" name="values" defaultValue={profile?.values_text ?? ""} className="input" />
           </div>
           <div>
-            <label className="label" htmlFor="tz-select">Calendar timezone — stays fixed no matter where you are (Toni&apos;s travel fix)</label>
+            <label className="label" htmlFor="tz-select">Calendar timezone — stays fixed no matter where you travel</label>
             <input
               id="tz-select"
               name="timezone"
@@ -129,7 +154,7 @@ export default async function SettingsPage({
           scheduled visit (2-hour duration, shop timezone) then appears there. */}
       <section className="card p-6">
         <h2 className="section-title mb-1">Calendar subscription link</h2>
-        <p className="muted mb-3 text-xs">Subscribe once in any calendar app — new visits, and every change to them, stream in automatically and always show in the shop's timezone (the travel fix).</p>
+        <p className="muted mb-3 text-xs">Subscribe once in any calendar app — new visits, and every change to them, stream in automatically and always show in the shop's timezone.</p>
         {calendarUrl ? (
           <>
             <code className="block rounded-lg bg-white/[0.05] px-3 py-2 text-xs break-all" style={{ wordBreak: "break-all" }}>{calendarUrl}</code>
@@ -317,7 +342,13 @@ export default async function SettingsPage({
           </div>
           <div>
             <label className="label" htmlFor="ambModel">{t("settings.model")}</label>
-            <input id="ambModel" name="model" defaultValue={(ai?.ambassador_model as string) ?? ""} className="input" placeholder={t("settings.modelPlaceholder")} />
+            <input id="ambModel" name="model" list="ambModelOptions" defaultValue={(ai?.ambassador_model as string) ?? ""} className="input" placeholder={t("settings.modelPlaceholder")} />
+            <datalist id="ambModelOptions">
+              {providerModels.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            <p className="muted mt-1 text-xs">A model id from your provider (for example gpt-4o-mini). Leave blank to use the provider default.</p>
           </div>
           <div className="md:col-span-2">
             <label className="label" htmlFor="apiKey">

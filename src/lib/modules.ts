@@ -12,6 +12,7 @@ export type ModuleKey =
   | "knowledge"
   | "enhance"
   | "execute"
+  | "fieldOps"
   | "pipeline"
   | "report"
   | "people"
@@ -36,6 +37,7 @@ export const MODULES: ModuleDef[] = [
   { key: "knowledge", href: "/knowledge", defaultLabel: "Knowledge" },
   { key: "enhance", href: "/enhance", defaultLabel: "Enhance" },
   { key: "execute", href: "/execute", defaultLabel: "Execute" },
+  { key: "fieldOps", href: "/field-ops", defaultLabel: "Field Ops" },
   { key: "pipeline", href: "/pipeline", defaultLabel: "Pipeline" },
   { key: "report", href: "/report", defaultLabel: "Report" },
   { key: "people", href: "/people", defaultLabel: "People" },

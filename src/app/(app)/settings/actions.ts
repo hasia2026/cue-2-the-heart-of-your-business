@@ -6,7 +6,7 @@ import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { encryptSecret } from "@/lib/secretbox";
 import { PROVIDERS } from "@/lib/ambassador";
-import { VOCAB_LABELS, INDUSTRY_PACKS } from "@/lib/vocab";
+import { VOCAB_LABELS, INDUSTRY_PACKS, normalizeIndustry } from "@/lib/vocab";
 import {
   getWorkspaceProfile, upsertWorkspaceProfile, validAccent,
   type AmbassadorTone,
@@ -27,7 +27,7 @@ export async function updateProfile(formData: FormData) {
 
   await sql`
     update business_profiles set
-      industry = ${g("industry")}, size = ${g("size")}, locations = ${g("locations")},
+      industry = ${normalizeIndustry(g("industry"))}, size = ${g("size")}, locations = ${g("locations")},
       business_model = ${g("businessModel")}, offerings = ${g("offerings")},
       target_customers = ${g("targetCustomers")}, mission = ${g("mission")},
       values_text = ${g("values")}, operational_priorities = ${g("priorities")},
@@ -197,7 +197,11 @@ export async function saveAmbassadorSettings(formData: FormData) {
   const orgId = session.organizationId;
 
   const providerRaw = String(formData.get("provider") ?? "").trim();
-  const model = String(formData.get("model") ?? "").trim() || null;
+  // A model id, not contact details. An @ or whitespace means an email/name
+  // got pasted into the field — ignore it and fall back to the provider
+  // default instead of storing a non-model in ambassador_model.
+  const rawModel = String(formData.get("model") ?? "").trim();
+  const model = rawModel && rawModel.length <= 120 && !/[@\s]/.test(rawModel) ? rawModel : null;
   const apiKey = String(formData.get("apiKey") ?? "").trim();
   const remove = formData.get("remove") === "on";
 

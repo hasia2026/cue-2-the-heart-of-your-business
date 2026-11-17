@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getT } from "@/lib/locale";
 import PasswordInput from "@/components/PasswordInput";
 import PublicHeader from "@/components/PublicHeader";
+import PublicFooter from "@/components/PublicFooter";
 import { signUpAction } from "@/app/signin/actions";
 
 export default async function SignUpPage({
@@ -53,7 +54,7 @@ export default async function SignUpPage({
           </div>
           <div>
             <label className="label" htmlFor="password">{t("signup.password")}</label>
-            <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" />
+            <PasswordInput id="password" name="password" required minLength={8} autoComplete="new-password" showLabel={t("auth.show")} hideLabel={t("auth.hide")} />
           </div>
           <button className="btn-primary w-full">{t("signup.submit")}</button>
         </form>
@@ -62,6 +63,7 @@ export default async function SignUpPage({
         </p>
       </div>
     </div>
+    <PublicFooter />
     </>
   );
 }

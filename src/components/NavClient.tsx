@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ThemeToggle from "./ThemeToggle";
 
 export type NavChild = { href: string; label: string };
-export type NavItem = { href: string; label: string; icon: string; pulse?: number; children?: NavChild[] };
+export type NavItem = { href: string; label: string; icon: string; pulse?: number; step?: number; children?: NavChild[] };
 
 export type NavGroup = { title: string; items: NavItem[] };
 
@@ -25,6 +25,15 @@ export default function NavClient({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Section links (e.g. /enhance#brand-studio) keep their sub-item highlighted
+  // once the browser lands on that section — pathname alone can't see the hash.
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash);
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
 
   // What the pulse means, per loop — shown as the badge tooltip.
   const toastFor = (item: NavItem) => {
@@ -91,7 +100,10 @@ export default function NavClient({
                       }`}
                     >
                       <span className="w-5 text-center text-base leading-none">{item.icon}</span>
-                      <span className="flex-1">{item.label}</span>
+                      <span className="flex-1">
+                        {item.step ? <span className="me-1.5 text-[10px] tabular-nums text-navy-300/50">{item.step}</span> : null}
+                        {item.label}
+                      </span>
                       {(item.pulse ?? 0) > 0 && (
                         <span
                           className="ms-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-cue-red/90 px-1.5 text-[10px] font-bold leading-none text-white"
@@ -104,7 +116,10 @@ export default function NavClient({
                     {children.length > 0 && (
                       <div className="mb-1 ms-[19px] mt-0.5 space-y-0.5 border-s border-white/[0.08] ps-3">
                         {children.map((c) => {
-                          const active = pathname === c.href || pathname.startsWith(c.href + "/");
+                          const [childPath, childHash] = c.href.split("#");
+                          const active = childHash
+                            ? pathname === childPath && hash === `#${childHash}`
+                            : pathname === c.href || pathname.startsWith(c.href + "/");
                           return (
                             <Link
                               key={c.href}

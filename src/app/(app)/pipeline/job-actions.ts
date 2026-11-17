@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireSessionAction } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { getVocab } from "@/lib/vocab";
 
 const VALID_APPT_KINDS = ["TEST_DRIVE", "SERVICE", "DELIVERY", "MEETING"] as const;
 
@@ -48,9 +49,14 @@ export async function addJobOrEstimate(formData: FormData) {
   const address = String(formData.get("address") ?? "").trim();
   const area = String(formData.get("area") ?? "").trim().slice(0, 80) || null;
   const when = String(formData.get("when") ?? "").trim(); // datetime-local
-  const apptKind = VALID_APPT_KINDS.includes(formData.get("apptKind") as (typeof VALID_APPT_KINDS)[number])
+  const requestedKind = VALID_APPT_KINDS.includes(formData.get("apptKind") as (typeof VALID_APPT_KINDS)[number])
     ? (formData.get("apptKind") as (typeof VALID_APPT_KINDS)[number])
     : "SERVICE";
+  // Test drive is dealership vocabulary — never persist it for HVAC, salon or
+  // generic orgs, even if a stale form posts it.
+  const apptKind = requestedKind === "TEST_DRIVE" && (await getVocab(orgId)).packId !== "AUTO_DEALERSHIP"
+    ? "SERVICE"
+    : requestedKind;
 
   if (!customerId || !title) return { ok: false, error: "Pick a customer and name the job." };
   if (amount === null) return { ok: false, error: "Enter the job value ($)." };

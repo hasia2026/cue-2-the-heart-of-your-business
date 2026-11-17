@@ -13,6 +13,7 @@
 - [x] i18n EN/ES/VI/AR with RTL Arabic
 - [x] Auto-dealership Industry Pack demo (Northgate Auto Group)
 - [x] Migrations shipped and idempotent: `migrate-departments-dedupe.sql` (unique `(organization_id, name)` folder index) and `migrate-doc-content-hash.sql` (`documents.content_hash` + org/hash index) — see DEPLOY.md
+- [x] Field Ops / Housecall Pro migrations shipped and idempotent: `migrate-field-ops-housecall.sql` (external IDs + indexes, connector rows, `field_ops_rules`), `migrate-appointment-confirmation.sql` (`appointment_confirmations` records + legacy backfill), and `migrate-housecall-appointments.sql` (appointment external IDs, job linkage, timing fields) — see DEPLOY.md
 - [x] Text-size accessibility with **Large (112.5%) as the default** for new sessions (Standard / XL / Huge options; Settings + header `Aa` control, cookie-applied before first paint)
 - [x] Display accessibility toggles beside text size: Reduce motion, High contrast, Strong focus outlines (cookie-driven, server-applied classes)
 - [x] Capture duplicate detector: exact content hash, legacy name+size fallback, and fuzzy near-duplicate pass (title & note-text similarity over the last 90 days, with a "Save anyway" escape hatch)
@@ -48,6 +49,31 @@
       Supabase → Settings → Backups → enable PITR (Pro plan+) or verify the
       included daily backup reached last-green state. Postgres best practice:
       restore into a scratch DB once to prove the backup is usable, not just present
+
+## 🧩 Field Ops / Housecall Pro production gate
+
+Run this before deploying the Field Ops code or enabling the Housecall Pro
+connector. `db:setup` applies every migration on a fresh database; an existing
+production database needs these explicitly. Use the **direct (port 5432)** URL
+for DDL, not the pooled 6543 URL used by Vercel at runtime.
+
+- [ ] Apply the Field Ops, confirmation and appointment-sync migrations:
+      `node --env-file=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql`
+      then `node --env-file=.env scripts/run-sql.mjs scripts/migrate-appointment-confirmation.sql`
+      then `node --env-file=.env scripts/run-sql.mjs scripts/migrate-housecall-appointments.sql`
+- [ ] Verify every value is `true`:
+      `node --env-file=.env scripts/run-sql.mjs scripts/verify-field-ops-schema.sql`
+- [ ] Deploy the app only after verification passes.
+- [ ] Connect Housecall Pro in **Ecosystem → Housecall Pro**, run one sync, and
+      confirm customers, jobs, appointments and invoices land in Pipeline/Field Ops
+      before inviting the co-founder. HCP only marks a visit confirmed when its API
+      returns an explicit confirmation signal; scheduled jobs stay unconfirmed.
+- [ ] Open **Field Ops → Technician Workday**, send a customer confirmation
+      link, confirm from that public link, and verify the **Unconfirmed visits**
+      count drops. Sending alone must not decrement it.
+
+Do not enable the connector on a database that has not run these migrations;
+`/field-ops` depends on the new columns and `field_ops_rules` table.
 
 ## 🚀 Pilot hardening (first 5 dealerships)
 - [ ] Replace seeded demo evidence refs with live DMS export (CSV ingest in Capture)

@@ -26,6 +26,14 @@
 html.light .cue-hero-dark { display: none; }
 html.light .cue-hero-light { display: block; mix-blend-mode: multiply; }
 
+/* The dark splash art has a square black canvas — feather its edges so it
+   blends into the page instead of showing a hard box. */
+.cue-hero-dark {
+  -webkit-mask-image: radial-gradient(closest-side, #000 58%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 58%, transparent 100%);
+}
+.cue-hero-light { border-radius: 1.75rem; }
+
 /* ── Light theme — flipped by the ThemeToggle (html.light) ─────────────
    The ink and navy palettes are variable-driven, so every ink/navy utility
    in the app re-maps automatically; the rules below catch the remaining

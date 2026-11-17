@@ -1,7 +1,7 @@
 # CUE — Product Tour
 
 **CUE is the AI Business Operating System for small businesses.**
-Built by HASI Technologies · *The Heart of Your Business* · Demo industry: auto dealership · Available in **English, Spanish, Vietnamese, Arabic (full RTL)**.
+Built by HASI Technologies · *The Heart of Your Business* · Demo industries: auto dealership · auto repair · HVAC · nail salon · Available in **English, Spanish, Vietnamese, Arabic (full RTL)**.
 
 Everything in CUE hangs off one operating loop:
 
@@ -245,7 +245,7 @@ The weekly digest email itself carries the chase list, the overdue-aging buckets
 Two demo organizations ship side by side — pick the vertical that matches the prospect:
 
 **Northgate Auto Group (auto dealership)**
-- OWNER: `demo@northgate.example` — placeholder, **cannot log in** by design (see demo-owner caveat below)
+- OWNER: `demo@northgate.example` / `northgate-demo-2026`
 - ADMIN: `marcus@northgate.example` / `northgate-demo-2026`
 - MANAGER: `rachel@northgate.example` / `northgate-mgr-2026`
 - MEMBER: `tom@northgate.example` / `northgate-staff-2026`
@@ -255,6 +255,18 @@ Two demo organizations ship side by side — pick the vertical that matches the 
 - ADMIN: `rita@summitair.example` / `summit-admin-2026`
 - MANAGER: `sam@summitair.example` / `summit-mgr-2026`
 - MEMBER: `chris@summitair.example` / `summit-staff-2026`
+
+**Lotus Nail Studio (nail salon — Garden Grove, Orange County)**
+- OWNER: `demo@lotusnails.example` / `lotus-demo-2026`
+- ADMIN: `mai@lotusnails.example` / `lotus-admin-2026`
+- MANAGER: `kim@lotusnails.example` / `lotus-mgr-2026`
+- MEMBER: `vy@lotusnails.example` / `lotus-staff-2026`
+
+**Harbor Auto Repair (independent shop — Costa Mesa, Orange County)**
+- OWNER: `demo@harborauto.example` / `harbor-demo-2026`
+- ADMIN: `nina@harborauto.example` / `harbor-admin-2026`
+- MANAGER: `ray@harborauto.example` / `harbor-mgr-2026`
+- MEMBER: `tomas@harborauto.example` / `harbor-staff-2026`
 
 What each role can do (worst for best):
 - **MEMBER** — staff: view Capture, Pipeline, Execute tasks, and the weekly schedule; read-only everywhere it counts (no approvals, no AR sends, no imports, no document edits, no schedule edits).
@@ -267,11 +279,13 @@ Walk-in-ready demo features (both industries):
 - **People → Weekly schedule** — clickable AM/PM/DBL/off grid; managers edit, everyone sees.
 - **Capture → Assign re-read** — after a policy edit, assign Everyone or a department; outstanding reads track on **People → Reading queue**.
 
-Demo-owner caveat: freshly seeded, the dealership OWNER account's hash is a placeholder and does not log in. `scripts/smoke-auth.mjs` provisions it with the `northgate-demo-2026` password as part of a smoke run, so that login works immediately after running the smoke script (or re-run the script when needed — it re-upserts).
+Every account above has a working password straight from the seed — no smoke run or extra provisioning step. `.example` addresses cannot receive mail, so password-reset links never arrive for the demo accounts; reset them with `node --env-file=.env scripts/rotate-demo-passwords.mjs` (all eight at once) instead.
 
-60-second path (either org): Dashboard → **Enhance → Pricing Studio** (send a price for approval) → **Execute → Approvals** (approve it) → **Create workflow** → task assigned → **Expand → Academy** (mark a lesson done, assign a track).
+**For Vietnamese-speaking prospects:** click **VI** in the header and the whole app renders in Vietnamese. Lotus and Harbor clients carry `vi` and `es` preferred languages, so quotes and payment reminders go out in the client's own language too. Each pack labels its own work in its own terms — salon bookings and retail shelf, repair orders and estimates, never dealership terms.
 
-Re-seeding: `node --env-file=.env scripts/seed-dealership.mjs` / `scripts/seed-hvac.mjs` — each wipes and rebuilds only its own org. Rerunning a seed wipes that org's demo state (audit chain, Academy progress).
+60-second path (any org): Dashboard → **Enhance → Pricing Studio** (send a price for approval) → **Execute → Approvals** (approve it) → **Create workflow** → task assigned → **Expand → Academy** (mark a lesson done, assign a track).
+
+Re-seeding: `node --env-file=.env scripts/seed-dealership.mjs` / `scripts/seed-hvac.mjs` / `scripts/seed-salon.mjs` / `scripts/seed-auto-repair.mjs` — each wipes and rebuilds only its own org. Rerunning a seed wipes that org's demo state (audit chain, Academy progress) and resets its four demo passwords to the values above.
 
 ---
 
