@@ -1,7 +1,6 @@
 -- Workspace Studio — one profile row per org: Ambassador persona, branding,
 -- module toggles/labels, and guided-setup completion flags. Absent row =
 -- stock behavior, so nothing breaks for existing orgs (lazy create on save).
--- Comments are full-line-only because scripts/run-sql.mjs splits on semicolons.
 
 create table if not exists workspace_profiles (
   id uuid primary key default gen_random_uuid(),

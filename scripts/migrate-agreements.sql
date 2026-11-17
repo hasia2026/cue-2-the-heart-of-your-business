@@ -1,6 +1,5 @@
 -- Maintenance agreements + customer quote language preference
--- (preferred_locale drives localized quotes). Comments are full-line-only
--- because scripts/run-sql.mjs splits on semicolons.
+-- (preferred_locale drives localized quotes).
 -- Preferred quote language per customer (en|es|ar|vi). NULL = org default.
 alter table customers
   add column if not exists preferred_locale text;

@@ -15,36 +15,38 @@ if (!url) {
   process.exit(1);
 }
 const fresh = process.argv.includes("--fresh");
-const sql = postgres(url, { max: 1, connect_timeout: 20 });
+const sql = postgres(url, { max: 1, connect_timeout: 20, onnotice: () => {} });
 
+let step = "initial setup";
 try {
   if (fresh) {
+    step = "drop public schema";
     console.log("Dropping public schema (fresh reset)…");
     await sql.unsafe(`drop schema public cascade; create schema public;`);
   }
+
+  step = "schema.sql";
   const ddl = readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
   await sql.unsafe(ddl);
 
+  step = "list migrations";
   const migrations = readdirSync(fileURLToPath(new URL(".", import.meta.url)))
     .filter((f) => /^migrate-.*\.sql$/.test(f))
     .sort();
   for (const m of migrations) {
+    step = m;
     const patch = readFileSync(new URL(`./${m}`, import.meta.url), "utf8");
-    try {
-      await sql.unsafe(patch);
-      console.log(`  ✔ ${m}`);
-    } catch (e) {
-      // A patch that failed on a live table shouldn't abort the rest of setup —
-      // but surface it loudly instead of swallowing.
-      console.error(`  ✗ ${m}: ${e.message}`);
-      process.exitCode = 1;
-    }
+    await sql.unsafe(patch);
+    console.log(`  ✔ ${m}`);
   }
 
+  step = "table count";
   const [row] = await sql`select count(*)::int as tables from information_schema.tables where table_schema = 'public'`;
   console.log(`Schema applied. ${row.tables} tables in public.`);
 } catch (e) {
-  console.error("FAILED:", e.message);
+  // Stop at the first failure: continuing would apply later migrations against
+  // a schema that already failed, hiding the real breakage.
+  console.error(`FAILED (${step}): ${e.message}`);
   process.exitCode = 1;
 } finally {
   await sql.end();

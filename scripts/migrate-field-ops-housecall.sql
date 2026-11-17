@@ -1,10 +1,10 @@
 -- Field Ops + field-service connector layer.
 --
 -- CUE stays the intelligence/recovery layer above dispatch. Housecall Pro is
--- the first fully wired connector: API-key pull sync for customers/jobs/
--- invoices, plus a per-org webhook for live job/customer/invoice events.
--- ServiceTitan and Jobber rows are registered as AVAILABLE so the connector
--- surface is provider-agnostic from day one.
+-- the first fully wired connector: API-key pull sync for customers, jobs,
+-- appointments and invoices, plus a per-org webhook for live customer, job,
+-- appointment and invoice events. ServiceTitan and Jobber rows are registered
+-- as AVAILABLE so the connector surface is provider-agnostic from day one.
 
 alter table integrations add column if not exists api_key_enc text;
 alter table integrations add column if not exists account_name text;
@@ -41,7 +41,7 @@ create table if not exists field_ops_rules (
 
 insert into integrations (organization_id, key, name, category, status, data_available, capabilities, webhook_secret)
 select o.id, 'housecall_pro', 'Housecall Pro', 'FIELD_SERVICE', 'AVAILABLE',
-       'Customers, jobs, schedules, invoices, job statuses',
+       'Customers, jobs, appointments, schedules, invoices, job statuses',
        'API-key pull sync for customers, jobs, appointments and invoices, plus a per-org webhook for customer/job/appointment/invoice events. CUE layers Field Ops, leak detection and recovery on top — it does not replace dispatch.',
        gen_random_uuid()::text
 from organizations o

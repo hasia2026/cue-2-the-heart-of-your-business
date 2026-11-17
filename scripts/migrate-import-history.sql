@@ -1,7 +1,7 @@
 -- Import history: one row per committed spreadsheet import so an owner can see
 -- what entered CUE, from which file, when and by whom. Written by the CSV
 -- commit action (session context); import rows themselves stay in their
--- entity tables. Comments are full-line-only (run-sql splits on semicolons).
+-- entity tables.
 create table if not exists import_history (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,

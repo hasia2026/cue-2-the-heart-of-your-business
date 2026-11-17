@@ -55,6 +55,27 @@ create table if not exists business_profiles (
   reminder_template text
 );
 
+-- Workspace Studio: one row per org, created lazily on first save.
+-- Kept in the baseline because earlier migrations alter this table.
+create table if not exists workspace_profiles (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null unique references organizations(id) on delete cascade,
+  ambassador_name text,
+  ambassador_avatar text,
+  ambassador_tone text check (ambassador_tone in ('friendly','formal','concise','enthusiastic')),
+  ambassador_greeting text,
+  brand_name text,
+  brand_logo_url text,
+  brand_accent text,
+  brand_contact_phone text,
+  brand_contact_email text,
+  theme_default text check (theme_default in ('system','light','dark')),
+  modules jsonb not null default '{}'::jsonb,
+  setup_completed jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists goals (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references business_profiles(id) on delete cascade,
@@ -125,23 +146,6 @@ create table if not exists employee_shifts (
 );
 create unique index if not exists employee_shifts_unique on employee_shifts(employee_id, day_of_week);
 create index if not exists employee_shifts_org_idx on employee_shifts(organization_id, day_of_week);
-
--- Policy-update acknowledgment loop: re-reads assigned after an SOP change.
-create table if not exists reading_assignments (
-  id uuid primary key default gen_random_uuid(),
-  organization_id uuid not null references organizations(id) on delete cascade,
-  document_id uuid not null references documents(id) on delete cascade,
-  employee_id uuid not null references employees(id) on delete cascade,
-  status text not null default 'ASSIGNED', -- ASSIGNED | READ
-  note text,
-  assigned_by uuid references users(id) on delete set null,
-  assigned_at timestamptz not null default now(),
-  read_at timestamptz
-);
-create unique index if not exists reading_assignments_doc_emp_unique
-  on reading_assignments(document_id, employee_id);
-create index if not exists reading_assignments_org_status_idx
-  on reading_assignments(organization_id, status);
 
 create table if not exists departments (
   id uuid primary key default gen_random_uuid(),
@@ -345,6 +349,24 @@ create index if not exists documents_org_idx on documents(organization_id);
 alter table documents add column if not exists content_hash text;
 create index if not exists documents_org_hash_idx on documents(organization_id, content_hash);
 
+-- Policy-update acknowledgment loop: re-reads assigned after an SOP change.
+-- Keep this after documents: document_id has a real foreign key.
+create table if not exists reading_assignments (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references organizations(id) on delete cascade,
+  document_id uuid not null references documents(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  status text not null default 'ASSIGNED', -- ASSIGNED | READ
+  note text,
+  assigned_by uuid references users(id) on delete set null,
+  assigned_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create unique index if not exists reading_assignments_doc_emp_unique
+  on reading_assignments(document_id, employee_id);
+create index if not exists reading_assignments_org_status_idx
+  on reading_assignments(organization_id, status);
+
 create table if not exists knowledge_items (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
@@ -543,6 +565,7 @@ create table if not exists integrations (
   status text not null default 'DEMO', -- CONNECTED | DEMO | AVAILABLE
   data_available text,
   capabilities text,
+  webhook_secret text,
   last_sync_at timestamptz,
   unique (organization_id, key)
 );
@@ -602,3 +625,17 @@ create table if not exists score_leads (
   contacted boolean not null default false
 );
 create index if not exists score_leads_created_idx on score_leads(created_at desc);
+
+-- ───────── GROWTH: public scan-call requests ─────────
+-- Captured from the flyer QR landing page. Kept in the baseline because
+-- earlier migrations add columns/status fields to this table.
+create table if not exists scan_leads (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  shop text not null,
+  phone text not null,
+  email text,
+  source text not null default 'FLYER',
+  created_at timestamptz not null default now()
+);
+create index if not exists scan_leads_created_idx on scan_leads(created_at);

@@ -3,8 +3,7 @@
 -- service_plans = owner-curated catalog shown on the public /plans page;
 -- plan_signups = pending customer requests, converted one-click into
 -- maintenance_agreements. source/source_ref attribute each submission to the
--- email surface that carried the link. Comments are full-line-only because
--- scripts/run-sql.mjs splits on semicolons.
+-- email surface that carried the link.
 
 create table if not exists service_plans (
   id uuid primary key default gen_random_uuid(),
