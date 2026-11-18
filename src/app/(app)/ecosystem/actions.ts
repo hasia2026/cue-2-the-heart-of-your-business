@@ -7,6 +7,7 @@ import { sql } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { decryptSecret, encryptSecret } from "@/lib/secretbox";
 import { syncHousecallPro, testHousecallPro } from "@/lib/housecall";
+import { replayHousecallWebhookEvent as replayHousecallEvent } from "@/lib/housecall-webhook";
 
 // Webhook tokens are bearer credentials: anyone holding the URL can post
 // records into this org. They are never rendered into the page by default —
@@ -111,6 +112,53 @@ export async function connectHousecallPro(
   return { ok: true, account: test.name };
 }
 
+/** Store the HCP webhook signing secret encrypted; never return it to the page. */
+export async function saveHousecallSigningSecret(
+  secret: string,
+): Promise<{ ok: boolean; configured?: boolean; error?: string }> {
+  const session = await requireSessionAction();
+  if (!TOKEN_WRITERS.has(session.role)) {
+    return { ok: false, error: "Only owners, admins and managers can change the signing secret." };
+  }
+  const trimmed = secret.trim();
+  if (trimmed && trimmed.length < 8) return { ok: false, error: "That signing secret looks too short." };
+  if (trimmed.length > 500) return { ok: false, error: "That signing secret is too long." };
+
+  const [row] = await sql`
+    update integrations
+    set webhook_signing_secret_enc = ${trimmed ? encryptSecret(trimmed) : null}
+    where organization_id = ${session.organizationId} and key = 'housecall_pro'
+    returning key`;
+  if (!row) return { ok: false, error: "Connect Housecall Pro first." };
+
+  await logAudit({
+    organizationId: session.organizationId,
+    actorId: session.user.id,
+    action: "HOUSECALL_PRO_SIGNING_SECRET_SAVED",
+    detail: trimmed
+      ? "Housecall Pro webhook signing secret saved — deliveries now require Api-Signature verification"
+      : "Housecall Pro webhook signing secret cleared — token authentication only",
+  });
+  revalidatePath("/ecosystem");
+  return { ok: true, configured: Boolean(trimmed) };
+}
+
+export async function replayHousecallWebhookEvent(
+  eventId: string,
+): Promise<{ ok: boolean; error?: string; status?: string }> {
+  const session = await requireSessionAction();
+  if (!TOKEN_WRITERS.has(session.role)) {
+    return { ok: false, error: "Only owners, admins and managers can replay webhook events." };
+  }
+  const result = await replayHousecallEvent(session.organizationId, eventId, session.user.id);
+  if (result.ok) {
+    revalidatePath("/ecosystem");
+    revalidatePath("/field-ops");
+    revalidatePath("/pipeline");
+  }
+  return { ok: result.ok, status: result.status, error: result.error };
+}
+
 /** Pull customers, jobs and invoices now. Safe to run repeatedly — upserts. */
 export async function syncHousecallProNow(): Promise<{
   ok: boolean;
@@ -153,7 +201,7 @@ export async function disconnectHousecallPro(): Promise<{ ok: boolean; error?: s
   }
   await sql`
     update integrations
-    set api_key_enc = null, account_name = null, status = 'AVAILABLE'
+    set api_key_enc = null, webhook_signing_secret_enc = null, account_name = null, status = 'AVAILABLE'
     where organization_id = ${session.organizationId} and key = 'housecall_pro'`;
   await logAudit({
     organizationId: session.organizationId,

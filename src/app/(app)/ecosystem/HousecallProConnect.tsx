@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import WebhookToken from "./WebhookToken";
-import { connectHousecallPro, disconnectHousecallPro, syncHousecallProNow } from "./actions";
+import HousecallWebhookLog from "./HousecallWebhookLog";
+import { connectHousecallPro, disconnectHousecallPro, saveHousecallSigningSecret, syncHousecallProNow } from "./actions";
+import type { HousecallWebhookLogItem } from "@/lib/housecall-webhook";
 
 const DOCS = "https://docs.housecallpro.com/";
 const KEYS = "https://help.housecallpro.com/en/articles/8505035-api-overview";
@@ -13,11 +15,15 @@ export default function HousecallProConnect({
   accountName,
   lastSyncAt,
   maskedUrl,
+  signingSecretSaved,
+  events,
 }: {
   saved: boolean;
   accountName: string | null;
   lastSyncAt: string | null;
   maskedUrl: string | null;
+  signingSecretSaved: boolean;
+  events: HousecallWebhookLogItem[];
 }) {
   const router = useRouter();
   const [key, setKey] = useState("");
@@ -25,6 +31,8 @@ export default function HousecallProConnect({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [signingSecret, setSigningSecret] = useState("");
+  const [signingConfigured, setSigningConfigured] = useState(signingSecretSaved);
 
   async function connect() {
     setBusy(true);
@@ -67,6 +75,24 @@ export default function HousecallProConnect({
       setNote("Disconnected. Records already synced remain available in Field Ops.");
       router.refresh();
     }
+  }
+
+  async function saveSecret(value: string) {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    const res = await saveHousecallSigningSecret(value);
+    setBusy(false);
+    if (!res.ok) {
+      setError(res.error ?? "Could not save the signing secret.");
+      return;
+    }
+    setSigningSecret("");
+    setSigningConfigured(Boolean(res.configured));
+    setNote(res.configured
+      ? "Signing secret saved. New deliveries must pass Api-Signature verification."
+      : "Signing secret cleared. The webhook falls back to its URL token.");
+    router.refresh();
   }
 
   return (
@@ -135,6 +161,51 @@ export default function HousecallProConnect({
           </div>
         </div>
       )}
+
+      {maskedUrl && (
+        <div className="mt-3 rounded-lg bg-white/[0.04] p-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-semibold text-navy-100">Webhook signing secret</div>
+            <span className={signingConfigured ? "badge-green" : "badge-orange"}>
+              {signingConfigured ? "SIGNATURE VERIFIED" : "TOKEN ONLY"}
+            </span>
+          </div>
+          <p className="mt-1 text-navy-300/70">
+            Paste the signing secret from the Housecall Pro webhook settings. Once saved, every delivery must
+            present a valid <code>Api-Timestamp</code> and <code>Api-Signature</code>.
+          </p>
+          <div className="mt-2 flex flex-wrap items-start gap-2">
+            <input
+              type="password"
+              value={signingSecret}
+              onChange={(e) => setSigningSecret(e.target.value)}
+              placeholder="Housecall Pro webhook signing secret"
+              autoComplete="off"
+              className="min-w-[220px] flex-1 rounded-lg border border-white/10 bg-ink-950/60 px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400/60"
+            />
+            <button
+              type="button"
+              onClick={() => saveSecret(signingSecret)}
+              disabled={busy || !signingSecret.trim()}
+              className="btn-primary !px-3 !py-1.5 text-xs"
+            >
+              {busy ? "Saving…" : signingConfigured ? "Replace secret" : "Save secret"}
+            </button>
+            {signingConfigured && (
+              <button
+                type="button"
+                onClick={() => saveSecret("")}
+                disabled={busy}
+                className="btn-ghost !px-3 !py-1.5 text-xs"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {maskedUrl && <HousecallWebhookLog events={events} />}
 
       {error && <p className="mt-2 text-red-300">{error}</p>}
       {note && <p className="mt-2 text-emerald-300">{note}</p>}

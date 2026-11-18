@@ -5,6 +5,7 @@ import { guardWorkspaceModule } from "@/lib/guard";
 import { whatsappConnected } from "@/lib/whatsapp";
 import WebhookToken from "./WebhookToken";
 import HousecallProConnect from "./HousecallProConnect";
+import { listHousecallWebhookEvents } from "@/lib/housecall-webhook";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,10 @@ export default async function EcosystemPage() {
   // never serialized into the page. Reveal/rotate go through server actions.
   const integrations = await sql`
     select id, key, name, category, status, data_available, capabilities, webhook_secret, last_sync_at,
-           (api_key_enc is not null) as key_saved, account_name
+           (api_key_enc is not null) as key_saved, (webhook_signing_secret_enc is not null) as signing_secret_saved,
+           account_name
     from integrations where organization_id = ${orgId} order by category, name`;
+  const housecallEvents = await listHousecallWebhookEvents(orgId);
 
   // Ingest URLs for token-authed webhook integrations. Webhook senders cannot
   // sign in or set headers, so the token lives in the query — but the page
@@ -92,6 +95,8 @@ export default async function EcosystemPage() {
                 accountName={(i.account_name as string | null) ?? null}
                 lastSyncAt={i.last_sync_at ? new Date(i.last_sync_at as string).toISOString() : null}
                 maskedUrl={hook}
+                signingSecretSaved={Boolean(i.signing_secret_saved)}
+                events={housecallEvents}
               />
             )}
           </div>
