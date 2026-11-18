@@ -2,6 +2,10 @@
 
 ## 1. Supabase (once)
 
+Set `MIGRATION_DATABASE_URL` in `.env` to the direct or session-mode
+(port 5432) database URL. `db-setup` and `run-sql` refuse Supabase's pooled
+port 6543 for schema changes.
+
 ```bash
 # apply schema + every scripts/migrate-*.sql patch below
 node --env-file=.env scripts/db-setup.mjs
@@ -15,7 +19,8 @@ node --env-file=.env scripts/seed-dealership.mjs
 
 `scripts/run-sql.mjs` applies `scripts/*.sql` files. A fresh `db-setup` already
 applies every `migrate-*.sql`; an existing database needs the relevant patches
-run explicitly before deploying code that depends on them:
+run explicitly before deploying code that depends on them. Both scripts use
+`MIGRATION_DATABASE_URL` when present and reject pooled connections.
 
 | Migration | What it does | Why it exists |
 |---|---|---|
@@ -73,7 +78,8 @@ Push this repo to GitHub (e.g. `hasia2026/cue-2-the-heart-of-your-business`).
 
    Notes:
    - Use the **pooled** (port 6543) URL on Vercel — serverless functions need pooling.
-   - Keep the **direct** (port 5432) URL in local `.env` for `db:setup` / seeding / DDL.
+   - Keep `MIGRATION_DATABASE_URL` (direct or session-mode port 5432) in local
+     `.env`/CI for `db:setup` / seeding / DDL. Never add it to Vercel.
    - `postgres.js` runs with `prepare: false`, which is pgbouncer/Supavisor-safe.
 
 3. Deploy. Framework preset: Next.js (auto-detected). Build command: `next build`.

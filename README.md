@@ -68,6 +68,10 @@ A fourth pack seeds an independent auto-repair shop in Costa Mesa with repair-or
 language, a parts-and-labor menu, and service enquiries that go stale:
 `npm run db:seed:auto-repair`.
 
+Set `MIGRATION_DATABASE_URL` to the direct or session-mode (5432) database URL;
+`db:setup` and `run-sql` reject the pooled 6543 URL. A non-local `--fresh` reset
+requires `--confirm-fresh`.
+
 **Existing databases:** `db:setup` applies the Field Ops/Housecall Pro migrations
 on a fresh setup. Before enabling Field Ops on an older database, run
 `scripts/migrate-field-ops-housecall.sql`,
@@ -81,7 +85,7 @@ linkage, timing fields), then verify with
 
 | Command | What it does |
 |---|---|
-| `npm run db:setup` | Applies `scripts/schema.sql` and every `scripts/migrate-*.sql` patch, including Field Ops/Housecall Pro (add `--fresh` to reset) |
+| `npm run db:setup` | Applies `scripts/schema.sql` and every `scripts/migrate-*.sql` patch, including Field Ops/Housecall Pro (add `--fresh` to reset; non-local resets also need `--confirm-fresh`) |
 | `npm run db:seed` | Seeds the auto-dealership demo org |
 | `npm run db:seed:salon` | Seeds the nail-salon demo org (Lotus Nail Studio, Orange County) |
 | `npm run db:seed:auto-repair` | Seeds the independent auto-repair demo org (Harbor Auto Repair, Costa Mesa) |

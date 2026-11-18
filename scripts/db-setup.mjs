@@ -3,18 +3,26 @@
 // every scripts/migrate-*.sql patch (all idempotent) so a rebuilt database
 // can't drift from the code's expectations. New columns/tables added as
 // migrations are picked up automatically here.
-// Usage: node --env-file=.env scripts/db-setup.mjs [--fresh]
+// Usage: node --env-file=.env scripts/db-setup.mjs [--fresh [--confirm-fresh]]
 //   --fresh: drops the public schema first (destructive — demo/dev only).
+//   --confirm-fresh: required for --fresh against a non-local database.
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { assertFreshAllowed, resolveMigrationUrl } from "./migration-target.mjs";
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  console.error("DATABASE_URL is not set. Copy .env.example to .env and fill it in.");
+const fresh = process.argv.includes("--fresh");
+const confirmFresh = process.argv.includes("--confirm-fresh");
+
+let url;
+try {
+  url = resolveMigrationUrl();
+  if (fresh) assertFreshAllowed(new URL(url), confirmFresh);
+} catch (e) {
+  console.error(`FAILED: ${e.message}`);
   process.exit(1);
 }
-const fresh = process.argv.includes("--fresh");
+
 const sql = postgres(url, { max: 1, connect_timeout: 20, onnotice: () => {} });
 
 let step = "initial setup";

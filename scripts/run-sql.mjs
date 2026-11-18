@@ -9,8 +9,12 @@
 //
 // --require-all-true is for verification queries: every boolean value returned
 // must be true, otherwise the process exits non-zero.
+//
+// Schema changes use MIGRATION_DATABASE_URL (direct/session-mode 5432), not the
+// pooled runtime DATABASE_URL. Pooled connections are rejected before running.
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
+import { resolveMigrationUrl } from "./migration-target.mjs";
 
 const args = process.argv.slice(2);
 const file = args.find((arg) => !arg.startsWith("--"));
@@ -20,12 +24,15 @@ if (!file) {
   console.error("Usage: node --env-file=.env scripts/run-sql.mjs <file.sql> [--require-all-true]");
   process.exit(1);
 }
-if (!process.env.DATABASE_URL) {
-  console.error("DATABASE_URL is not set.");
+let url;
+try {
+  url = resolveMigrationUrl();
+} catch (e) {
+  console.error(`✖ ${e.message}`);
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1, connect_timeout: 20, onnotice: () => {} });
+const sql = postgres(url, { max: 1, connect_timeout: 20, onnotice: () => {} });
 
 try {
   const result = await sql.unsafe(readFileSync(file, "utf8"));

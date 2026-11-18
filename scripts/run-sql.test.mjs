@@ -20,6 +20,9 @@ test("run-sql preserves semicolons inside SQL syntax and comments", async () => 
   const database = `cue_run_sql_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const dbUrl = new URL(baseUrl);
   dbUrl.pathname = `/${database}`;
+  // The runner rejects Supabase's pooled port for DDL. Session mode on 5432
+  // is the DDL-safe equivalent of the same database.
+  if (dbUrl.port === "6543") dbUrl.port = "5432";
 
   const admin = postgres(baseUrl, { max: 1, prepare: false });
   const dir = await mkdtemp(join(tmpdir(), "cue-run-sql-"));
@@ -68,7 +71,7 @@ values (5, 'after;do');
       ["scripts/run-sql.mjs", fixture],
       {
         cwd: process.cwd(),
-        env: { ...process.env, DATABASE_URL: dbUrl.toString() },
+        env: { ...process.env, DATABASE_URL: baseUrl, MIGRATION_DATABASE_URL: dbUrl.toString() },
         encoding: "utf8",
       },
     );

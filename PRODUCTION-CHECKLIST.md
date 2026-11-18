@@ -54,8 +54,10 @@
 
 Run this before deploying the Field Ops code or enabling the Housecall Pro
 connector. `db:setup` applies every migration on a fresh database; an existing
-production database needs these explicitly. Use the **direct (port 5432)** URL
-for DDL, not the pooled 6543 URL used by Vercel at runtime.
+production database needs these explicitly. Use `MIGRATION_DATABASE_URL` with
+the **direct or session-mode (port 5432)** URL for DDL; `db-setup` and
+`run-sql` reject the pooled 6543 URL used by Vercel at runtime. Keep this
+variable in local/CI environments only — never add it to Vercel.
 
 - [ ] Apply the Field Ops, confirmation and appointment-sync migrations:
       `node --env-file=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql`
