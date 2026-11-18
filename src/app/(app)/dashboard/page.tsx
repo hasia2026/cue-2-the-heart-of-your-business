@@ -5,6 +5,7 @@ import { getT } from "@/lib/locale";
 import { getVocab } from "@/lib/vocab";
 import { getWorkspaceProfile } from "@/lib/workspace-profile";
 import EvidenceDrawer from "@/components/EvidenceDrawer";
+import WelcomeTour from "@/components/WelcomeTour";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +152,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-4">
+      {/* One-time welcome tour: owners/admins/managers get the 3-step card,
+          staff get a one-line ⌘K tip. Dashboard-only so it does not follow the
+          user through every page; the shell stays navigation-only. */}
+      {!ws.setupCompleted.tour && (
+        <WelcomeTour
+          variant={session.role === "MEMBER" ? "oneline" : "steps"}
+          ambassadorName={ws.ambassadorName}
+        />
+      )}
+
       {/* Workspace Studio setup checklist — dismiss-free (state-derived), links to the wizard */}
       {showSetupCard && (
         <section className="card card-hover border-l-2 border-l-violet-400/70 p-4">
