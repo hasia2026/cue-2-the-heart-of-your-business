@@ -130,6 +130,84 @@ with checks(label, ok) as (
         where table_schema = 'public' and table_name = 'integrations' and column_name = 'account_name')),
     ('integrations.webhook_secret',
       exists (select 1 from information_schema.columns
-        where table_schema = 'public' and table_name = 'integrations' and column_name = 'webhook_secret'))
+        where table_schema = 'public' and table_name = 'integrations' and column_name = 'webhook_secret')),
+    ('integrations.webhook_signing_secret_enc',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'integrations' and column_name = 'webhook_signing_secret_enc')),
+
+    ('housecall_webhook_events table',
+      to_regclass('public.housecall_webhook_events') is not null),
+    ('housecall_webhook_events.organization_id',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'organization_id')),
+    ('housecall_webhook_events.provider_event_id',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'provider_event_id')),
+    ('housecall_webhook_events.event_name',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'event_name')),
+    ('housecall_webhook_events.entity_type',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'entity_type')),
+    ('housecall_webhook_events.entity_external_id',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'entity_external_id')),
+    ('housecall_webhook_events.company_id',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'company_id')),
+    ('housecall_webhook_events.event_occurred_at',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'event_occurred_at')),
+    ('housecall_webhook_events.signature_status',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'signature_status')),
+    ('housecall_webhook_events.signature_verified',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'signature_verified')),
+    ('housecall_webhook_events.status',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'status')),
+    ('housecall_webhook_events.attempts',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'attempts')),
+    ('housecall_webhook_events.last_error',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'last_error')),
+    ('housecall_webhook_events.raw_body',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'raw_body')),
+    ('housecall_webhook_events.payload',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'payload')),
+    ('housecall_webhook_events.headers',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'headers')),
+    ('housecall_webhook_events.counts',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'counts')),
+    ('housecall_webhook_events.reconciliation',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'reconciliation')),
+    ('housecall_webhook_events.received_at',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'received_at')),
+    ('housecall_webhook_events.last_attempt_at',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'last_attempt_at')),
+    ('housecall_webhook_events.processed_at',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'processed_at')),
+    ('housecall_webhook_events.replayed_at',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'replayed_at')),
+    ('housecall_webhook_events.replayed_by',
+      exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'housecall_webhook_events' and column_name = 'replayed_by')),
+    ('housecall_webhook_events unique delivery',
+      to_regclass('public.housecall_webhook_events_organization_id_provider_event_id_key') is not null),
+    ('housecall_webhook_events org time index',
+      to_regclass('public.housecall_webhook_events_org_time_idx') is not null),
+    ('housecall_webhook_events org status index',
+      to_regclass('public.housecall_webhook_events_org_status_idx') is not null)
 )
 select label, ok from checks order by label;

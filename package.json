@@ -9,7 +9,7 @@
     "start": "next start -p 3210",
     "typecheck": "tsc --noEmit",
     "db:setup": "node --env-file-if-exists=.env scripts/db-setup.mjs",
-    "db:field-ops": "node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-appointment-confirmation.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-housecall-appointments.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-booking-rules.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/verify-field-ops-schema.sql --require-all-true",
+    "db:field-ops": "node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-appointment-confirmation.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-housecall-appointments.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-booking-rules.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/migrate-housecall-webhook-hardening.sql && node --env-file-if-exists=.env scripts/run-sql.mjs scripts/verify-field-ops-schema.sql --require-all-true",
     "db:seed": "node scripts/seed-dealership.mjs",
     "db:seed:salon": "node scripts/seed-salon.mjs",
     "db:seed:auto-repair": "node scripts/seed-auto-repair.mjs",
