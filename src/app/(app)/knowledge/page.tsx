@@ -2,6 +2,8 @@ import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import SopRecorder from "./SopRecorder";
+import ConfirmSubmit from "@/components/ConfirmSubmit";
+import { deleteKnowledge, updateKnowledge } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
   await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
+  const canEdit = session.role !== "MEMBER";
   const { q } = await searchParams;
   const query = (q ?? "").trim();
 
@@ -64,8 +67,51 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Pr
               </div>
               <p className="muted mt-1 line-clamp-2 text-xs">{k.content}</p>
             </summary>
-            <div className="mt-3 border-t border-white/[0.06] pt-3 text-sm text-navy-100/90">{k.content}</div>
+            <div className="mt-3 whitespace-pre-line border-t border-white/[0.06] pt-3 text-sm text-navy-100/90">{k.content}</div>
             {k.tags && <div className="mt-2 text-xs text-navy-300/70">Tags: {k.tags}</div>}
+            {canEdit && (
+              <div className="mt-3 flex flex-wrap items-start gap-2 border-t border-white/[0.06] pt-3">
+                <details className="min-w-[16rem] flex-1">
+                  <summary className="cursor-pointer text-xs font-semibold text-violet-300 hover:text-violet-200">Edit entry</summary>
+                  <form action={updateKnowledge} className="mt-2 grid gap-2 md:grid-cols-2">
+                    <input type="hidden" name="id" value={k.id} />
+                    <div className="md:col-span-2">
+                      <label className="label">Title</label>
+                      <input name="title" defaultValue={k.title} className="input" required />
+                    </div>
+                    <div>
+                      <label className="label">Category</label>
+                      <select name="category" defaultValue={k.category} className="input">
+                        {Object.keys(CATEGORY_BADGE).map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Status</label>
+                      <select name="status" defaultValue={k.status} className="input">
+                        {["FACT", "ASSUMPTION", "RECOMMENDATION", "DECISION"].map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="label">Tags</label>
+                      <input name="tags" defaultValue={k.tags ?? ""} className="input" placeholder="comma,separated" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="label">Content</label>
+                      <textarea name="content" rows={6} defaultValue={k.content} className="input" required />
+                    </div>
+                    <div className="md:col-span-2">
+                      <button className="btn-primary !py-1.5 text-xs">Save changes</button>
+                    </div>
+                  </form>
+                </details>
+                <form action={deleteKnowledge}>
+                  <input type="hidden" name="id" value={k.id} />
+                  <ConfirmSubmit message={`Delete “${k.title}”? This cannot be undone.`} className="btn-ghost !px-2 !py-1 text-xs text-red-300">
+                    Delete entry
+                  </ConfirmSubmit>
+                </form>
+              </div>
+            )}
           </details>
         ))}
         {items.length === 0 && (
