@@ -43,6 +43,7 @@ export default async function TrainingLibraryPage() {
       <TrainingLibrary
         labels={buildLabels(LIBRARY_LABEL_KEYS, t)}
         canImport={canManage}
+        canManage={canManage}
         team={teamRows.map((r) => ({ name: r.name, email: r.email, attempts: r.attempts, avgScore: Number(r.avgScore), lastAt: r.lastAt }))}
         modules={libRows.map((m) => {
           const mine = typeof m.mine === "string" ? m.mine.split(":") : null;
