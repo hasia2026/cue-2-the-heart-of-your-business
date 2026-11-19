@@ -78,7 +78,10 @@ on a fresh setup. Before enabling Field Ops on an older database, run
 `scripts/migrate-appointment-confirmation.sql` (explicit confirmation records
 plus customer `/confirm/<token>` links), and
 `scripts/migrate-housecall-appointments.sql` (appointment external IDs, job
-linkage, timing fields), then verify with
+linkage, timing fields), `scripts/migrate-booking-rules.sql` (24-hour
+confirmation runner and first-time deposit gate), and
+`scripts/migrate-housecall-webhook-hardening.sql` (signed webhook ledger and
+replay), then verify with
 `scripts/verify-field-ops-schema.sql` — see DEPLOY.md and PRODUCTION-CHECKLIST.md.
 
 ## Scripts

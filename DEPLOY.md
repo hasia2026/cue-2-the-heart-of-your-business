@@ -32,6 +32,8 @@ run explicitly before deploying code that depends on them. Both scripts use
 | `scripts/migrate-field-ops-housecall.sql` | Adds canonical external IDs + unique indexes on customers/service_orders/invoices, encrypted-key columns on integrations, `field_ops_rules`, and the Housecall Pro/ServiceTitan/Jobber connector rows | Field Ops and the Housecall Pro pull sync/webhook cannot work without these columns, indexes, and connector token rows (the sync pulls customers, jobs, appointments and invoices) |
 | `scripts/migrate-appointment-confirmation.sql` | Adds `appointment_confirmations` (token, sent/confirmed timestamps) and backfills legacy `appointments.confirmed_at` | Booking reviews count the explicit record only; `/field-ops` and `/confirm/<token>` error without the table |
 | `scripts/migrate-housecall-appointments.sql` | Adds external appointment IDs, job/service-order linkage, end time/arrival window, and explicit HCP confirmation snapshots to `appointments` | The pull sync and appointment webhooks cannot upsert visits idempotently without these columns and the unique index |
+| `scripts/migrate-booking-rules.sql` | Adds confirmation-runner attempt fields and `booking_deposits` | The 24-hour confirmation cadence and first-time deposit gate cannot run without these fields/table |
+| `scripts/migrate-housecall-webhook-hardening.sql` | Adds encrypted HCP signing-secret storage and `housecall_webhook_events` raw-delivery log | Signature verification, event-ID dedupe, failure inspection and replay cannot work without the secret column and event ledger |
 
 ```bash
 node --env-file=.env scripts/run-sql.mjs scripts/migrate-departments-dedupe.sql
@@ -41,20 +43,22 @@ node --env-file=.env scripts/run-sql.mjs scripts/migrate-market-signals.sql
 
 ### Field Ops / Housecall Pro gate (before deploying the feature)
 
-Run these against the **direct (port 5432) production database URL**, not the
-pooled 6543 URL used by Vercel at runtime. `db:setup` on a fresh database
-already applies them; existing production databases must run them explicitly.
+Run these with `MIGRATION_DATABASE_URL` set to the **direct or session-mode
+(port 5432) production database URL**, not the pooled 6543 URL used by Vercel at
+runtime. `db:setup` on a fresh database already applies them; existing
+production databases must run them explicitly.
 
 ```bash
-node --env-file=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql
-node --env-file=.env scripts/run-sql.mjs scripts/migrate-appointment-confirmation.sql
-node --env-file=.env scripts/run-sql.mjs scripts/migrate-housecall-appointments.sql
-node --env-file=.env scripts/run-sql.mjs scripts/verify-field-ops-schema.sql
+npm run db:field-ops
 ```
 
-Every value in the verification result must be `true`. Deploy the app only
-after that, then connect/sync Housecall Pro from **Ecosystem → Housecall Pro**.
-Do not enable the connector on a database that has not run these migrations.
+This applies the Field Ops, appointment-confirmation, appointment-sync,
+booking-rules and webhook-hardening migrations, then runs the schema gate. It
+exits non-zero unless every check is `true`. Deploy the app only after it passes,
+then connect/sync Housecall Pro
+from **Ecosystem → Housecall Pro**. Do not enable the connector on a database
+that has not run these migrations. The schema gate passes on an empty database;
+connector rows are created per organization when the connector is configured.
 
 For production, rotate the database password first (Supabase → Settings → Database),
 and ideally create a dedicated role instead of using `postgres`.

@@ -59,17 +59,61 @@ the **direct or session-mode (port 5432)** URL for DDL; `db-setup` and
 `run-sql` reject the pooled 6543 URL used by Vercel at runtime. Keep this
 variable in local/CI environments only — never add it to Vercel.
 
-- [ ] Apply the Field Ops, confirmation and appointment-sync migrations:
-      `node --env-file=.env scripts/run-sql.mjs scripts/migrate-field-ops-housecall.sql`
-      then `node --env-file=.env scripts/run-sql.mjs scripts/migrate-appointment-confirmation.sql`
-      then `node --env-file=.env scripts/run-sql.mjs scripts/migrate-housecall-appointments.sql`
-- [ ] Verify every value is `true`:
-      `node --env-file=.env scripts/run-sql.mjs scripts/verify-field-ops-schema.sql`
-- [ ] Deploy the app only after verification passes.
-- [ ] Connect Housecall Pro in **Ecosystem → Housecall Pro**, run one sync, and
-      confirm customers, jobs, appointments and invoices land in Pipeline/Field Ops
-      before inviting the co-founder. HCP only marks a visit confirmed when its API
-      returns an explicit confirmation signal; scheduled jobs stay unconfirmed.
+### Housecall Pro prerequisites
+
+Complete these in the Housecall Pro account before connecting it in CUE:
+
+- [ ] HCP account is on the **MAX** plan. Both the public API and the Webhooks
+      app require MAX.
+- [ ] An HCP **Admin** creates a company API key: **My Apps → All Apps → API
+      Key Management → Generate API Key**. Name it `CUE` and choose
+      **Read-only** — CUE only performs GET requests, so Full access is not
+      required.
+- [ ] In CUE, open **Ecosystem → Housecall Pro**, paste the key, and click
+      **Save & test**. A valid key shows `Connected as <company>`. A 401/403
+      means the key is wrong, the account is not on MAX, or the key was not
+      created by an Admin.
+- [ ] In CUE, reveal the **Webhook URL** on the same card. Treat it as a
+      password; anyone with the URL can post records into this organization.
+- [ ] In HCP, open **My Apps → All Apps → Webhooks**, enable the app, paste the
+      CUE URL, and save. HCP returns a signing secret; paste that secret into
+      **Ecosystem → Housecall Pro → Webhook signing secret**. CUE then requires
+      a valid `Api-Timestamp`/`Api-Signature` HMAC on every delivery. The URL
+      token remains a routing fallback only; never share either credential.
+- [ ] Enable these HCP events:
+      `customer.created`, `customer.updated`;
+      `job.created`, `job.updated`, `job.scheduled`, `job.started`,
+      `job.completed`, `job.canceled`, `job.paid`;
+      `job.appointment.scheduled`, `job.appointment.rescheduled`;
+      `invoice.created`, `invoice.sent`, `invoice.amount_updated`,
+      `invoice.paid`, `invoice.payment.succeeded`, `invoice.payment.failed`,
+      `invoice.canceled`, `invoice.voided`, `invoice.refund.succeeded`.
+      Do not enable delete or discarded events until CUE handles deletions;
+      the connector currently upserts and never deletes.
+      HCP docs: [API keys](https://help.housecallpro.com/en/articles/8505035-api-overview) ·
+      [webhook setup](https://help.housecallpro.com/en/articles/5683520-how-to-enable-webhooks).
+
+- [ ] Apply the Field Ops, confirmation, appointment-sync and webhook-hardening migrations and
+      verify the schema in one step (exits non-zero unless every check passes):
+      `npm run db:field-ops`
+- [ ] Deploy the app only after `db:field-ops` passes.
+- [ ] Confirm **Ecosystem → Housecall Pro** shows `SIGNATURE VERIFIED`, then
+      send a test event from HCP and confirm it appears in the Webhook event log.
+      A failed or skipped delivery can be replayed there; rejected signatures
+      are logged but cannot be replayed.
+- [ ] Run the first sync from **Ecosystem → Housecall Pro**. A successful run
+      shows:
+      - `Connected as <company>` and a fresh `last sync` timestamp
+      - `Synced X customers, Y jobs, Z appointments and N invoices.` Counts are
+        touched rows, not created rows; 0 is valid for empty sections.
+      - Customers and invoices in **Pipeline**, and upcoming HCP appointments
+        in **Field Ops → Technician Workday / Unconfirmed visits** (next 7 days)
+      - Re-running the sync does not duplicate customers, jobs, appointments
+        or invoices.
+      HCP only marks a visit confirmed when its API returns an explicit
+      confirmation signal; scheduled jobs stay unconfirmed.
+- [ ] Webhook smoke test: edit a customer or job in HCP, then confirm the
+      matching CUE record and `last sync` update within a minute.
 - [ ] Open **Field Ops → Technician Workday**, send a customer confirmation
       link, confirm from that public link, and verify the **Unconfirmed visits**
       count drops. Sending alone must not decrement it.
