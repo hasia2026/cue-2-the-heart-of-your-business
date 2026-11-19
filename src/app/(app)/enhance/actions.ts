@@ -39,6 +39,7 @@ export async function requestPriceApproval(fd: FormData): Promise<void> {
   });
   revalidatePath("/execute");
   revalidatePath("/enhance");
+  revalidatePath("/enhance/pricing-studio");
 }
 
 export type ActionResult = { ok: boolean; error?: string };
@@ -85,6 +86,7 @@ export async function savePlan(fd: FormData): Promise<ActionResult> {
     throw e;
   }
   revalidatePath("/enhance");
+  revalidatePath("/enhance/service-plans");
   return { ok: true };
 }
 
@@ -102,6 +104,7 @@ export async function deletePlan(fd: FormData): Promise<ActionResult> {
     action: "PLAN_DELETED", targetType: "ServicePlan", targetId: id, detail: String(rows[0]!.name),
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/service-plans");
   return { ok: true };
 }
 
@@ -112,15 +115,15 @@ export async function convertSignup(fd: FormData): Promise<void> {
   const session = await requirePlanEditor();
   const orgId = session.organizationId;
   const signupId = String(fd.get("signupId") ?? "").trim();
-  if (!signupId) redirect(`/enhance?planErr=${encodeURIComponent("Sign-up id missing.")}`);
+  if (!signupId) redirect(`/enhance/service-plans?planErr=${encodeURIComponent("Sign-up id missing.")}`);
 
   const [s] = await sql`
     select id, plan_name, plan_id, contact_name, contact_email, contact_phone, address, customer_id, status, source, source_ref
     from plan_signups
     where id = ${signupId} and organization_id = ${orgId}`;
   const signup = s as Record<string, unknown> | undefined;
-  if (!signup) redirect(`/enhance?planErr=${encodeURIComponent("Sign-up not found in your organization.")}`);
-  if (signup.status !== "PENDING") redirect(`/enhance?planErr=${encodeURIComponent("This request was already decided.")}`);
+  if (!signup) redirect(`/enhance/service-plans?planErr=${encodeURIComponent("Sign-up not found in your organization.")}`);
+  if (signup.status !== "PENDING") redirect(`/enhance/service-plans?planErr=${encodeURIComponent("This request was already decided.")}`);
 
   // Customer: use the matched one, else match by email, else create.
   let customerId = signup.customer_id as string | null;
@@ -161,7 +164,7 @@ export async function convertSignup(fd: FormData): Promise<void> {
     agreementId = a!.id as string;
   } catch (e) {
     if ((e as { code?: string }).code === "23505") {
-      redirect(`/enhance?planErr=${encodeURIComponent("This customer already has a live agreement — resolve or cancel that one first.")}`);
+      redirect(`/enhance/service-plans?planErr=${encodeURIComponent("This customer already has a live agreement — resolve or cancel that one first.")}`);
     }
     throw e;
   }
@@ -177,6 +180,7 @@ export async function convertSignup(fd: FormData): Promise<void> {
     detail: `${signup.contact_name as string} → active agreement "${signup.plan_name as string}"`,
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/service-plans");
   revalidatePath("/pipeline");
 }
 
@@ -185,15 +189,16 @@ export async function dismissSignup(fd: FormData): Promise<void> {
   const session = await requirePlanEditor();
   const orgId = session.organizationId;
   const signupId = String(fd.get("signupId") ?? "").trim();
-  if (!signupId) redirect(`/enhance?planErr=${encodeURIComponent("Sign-up id missing.")}`);
+  if (!signupId) redirect(`/enhance/service-plans?planErr=${encodeURIComponent("Sign-up id missing.")}`);
   const rows = await sql`
     update plan_signups set status = 'DISMISSED', decided_at = now(), decided_by = ${session.user.id}
     where id = ${signupId} and organization_id = ${orgId} and status = 'PENDING'
     returning id`;
-  if (!rows.length) redirect(`/enhance?planErr=${encodeURIComponent("Sign-up not found or already decided.")}`);
+  if (!rows.length) redirect(`/enhance/service-plans?planErr=${encodeURIComponent("Sign-up not found or already decided.")}`);
   await logAudit({
     organizationId: orgId, actorId: session.user.id, actorType: "USER",
     action: "SIGNUP_DISMISSED", targetType: "PlanSignup", targetId: signupId,
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/service-plans");
 }

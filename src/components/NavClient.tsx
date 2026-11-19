@@ -25,8 +25,8 @@ export default function NavClient({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  // Section links (e.g. /enhance#brand-studio) keep their sub-item highlighted
-  // once the browser lands on that section — pathname alone can't see the hash.
+  // Section links that still use a hash keep their sub-item highlighted once
+  // the browser lands on that section — pathname alone can't see the hash.
   const [hash, setHash] = useState("");
   useEffect(() => {
     const sync = () => setHash(window.location.hash);
@@ -85,7 +85,18 @@ export default function NavClient({
               {g.items.map((item) => {
                 const selfActive = pathname === item.href || pathname.startsWith(item.href + "/");
                 const children = item.children ?? [];
-                const childActive = children.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"));
+                // Pick only the deepest matching child. Nested links such as
+                // /pipeline and /pipeline/customers must not both light up.
+                const activeChildHref = children.reduce<string | null>((best, c) => {
+                  const [childPath, childHash] = c.href.split("#");
+                  const matches = childHash
+                    ? pathname === childPath && hash === `#${childHash}`
+                    : pathname === childPath || pathname.startsWith(childPath + "/");
+                  if (!matches) return best;
+                  if (!best) return c.href;
+                  return childPath.length > best.split("#")[0].length ? c.href : best;
+                }, null);
+                const childActive = activeChildHref !== null;
                 return (
                   <div key={item.href}>
                     <Link
@@ -116,10 +127,7 @@ export default function NavClient({
                     {children.length > 0 && (
                       <div className="mb-1 ms-[19px] mt-0.5 space-y-0.5 border-s border-white/[0.08] ps-3">
                         {children.map((c) => {
-                          const [childPath, childHash] = c.href.split("#");
-                          const active = childHash
-                            ? pathname === childPath && hash === `#${childHash}`
-                            : pathname === c.href || pathname.startsWith(c.href + "/");
+                          const active = c.href === activeChildHref;
                           return (
                             <Link
                               key={c.href}

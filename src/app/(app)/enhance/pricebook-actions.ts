@@ -35,6 +35,7 @@ export async function createOffering(formData: FormData) {
     detail: `${name} — standalone $${rateStandalone}/h, add-on $${rateAddon}/h${partsCost ? `, parts $${partsCost}` : ""}`,
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/pricing-studio");
   return { ok: true as const };
 }
 
@@ -58,6 +59,7 @@ export async function updateOfferingRates(
     detail: `${offering.name}: standalone → $${rateStandalone}/h, add-on → $${rateAddon}/h`,
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/pricing-studio");
   return { ok: true };
 }
 
@@ -93,6 +95,7 @@ export async function createAssembly(formData: FormData) {
     metadata: { lines: offeringIds.length },
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/pricing-studio");
   return { ok: true as const };
 }
 
@@ -110,5 +113,6 @@ export async function deleteAssembly(assemblyId: string): Promise<{ ok: boolean;
     detail: `${asm.name} deleted`,
   });
   revalidatePath("/enhance");
+  revalidatePath("/enhance/pricing-studio");
   return { ok: true };
 }

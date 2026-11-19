@@ -1,10 +1,8 @@
+import Link from "next/link";
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
 import { getT } from "@/lib/locale";
-import { ACADEMY_LABEL_KEYS, LIBRARY_LABEL_KEYS, buildLabels } from "@/lib/i18nKeys";
-import Academy from "./Academy";
-import TrainingLibrary from "./TrainingLibrary";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +11,7 @@ export default async function ExpandPage() {
   const session = await requireSession();
   const { t } = await getT();
   const orgId = session.organizationId;
-  const [profile] = await sql`select industry, mission, offerings, target_customers from business_profiles where organization_id = ${orgId}`;
 
-  // Scal³ — revenue intelligence strip: money in motion + recovered through CUE workflows
   const [scal] = await sql`
     select
       (select coalesce(sum(amount),0) from invoices where organization_id = ${orgId} and status='PAID')::float as collected,
@@ -25,39 +21,11 @@ export default async function ExpandPage() {
         where i.organization_id = ${orgId} and i.status='PAID' and s.invoiced_at is not null
         and s.completed_at is not null and i.issued_at - s.completed_at > interval '48 hours')::float as recovered_late
   `;
+  const [counts] = await sql`
+    select
+      (select count(*)::int from academy_assignments where organization_id = ${orgId}) as assignments,
+      (select count(*)::int from training_modules where organization_id = ${orgId}) as modules`;
 
-  const libRows = await sql`
-    select m.id, m.title, m.summary, m.category, m.content_url as "contentUrl", m.content, m.quiz,
-      (select count(*) from training_attempts a where a.module_id = m.id)::int as attempts,
-      (select coalesce(round(avg(a.score::numeric / greatest(a.total, 1) * 100)), 0)::int from training_attempts a where a.module_id = m.id) as "avgScore",
-      (select (a.score || ':' || a.total) from training_attempts a where a.module_id = m.id and a.user_id = ${session.user.id} order by a.created_at desc limit 1) as mine
-    from training_modules m
-    where m.organization_id = ${orgId} and m.source = 'IMPORTED'
-    order by m.created_at desc`;
-  const teamRows = await sql`
-    select u.name, u.email, count(*)::int as attempts,
-      coalesce(round(avg(a.score::numeric / greatest(a.total, 1) * 100)), 0)::int as "avgScore",
-      max(a.created_at)::text as "lastAt"
-    from training_attempts a join users u on u.id = a.user_id
-    where a.organization_id = ${orgId}
-    group by u.name, u.email
-    order by "avgScore" desc nulls last`;
-  const myProgressRows = await sql`
-    select track, lesson from academy_progress
-    where organization_id = ${orgId} and user_id = ${session.user.id}`;
-  const myAssignedRows = await sql`
-    select track from academy_assignments
-    where organization_id = ${orgId} and user_id = ${session.user.id}`;
-  const memberRows = await sql`
-    select u.id, u.name from members m join users u on u.id = m.user_id
-    where m.organization_id = ${orgId} order by u.name`;
-  const assignRows = await sql`
-    select aa.id, aa.track, u.name,
-      (select count(*) from academy_progress p
-        where p.organization_id = aa.organization_id and p.user_id = aa.user_id and p.track = aa.track)::int as done
-    from academy_assignments aa join users u on u.id = aa.user_id
-    where aa.organization_id = ${orgId}
-    order by aa.assigned_at desc`;
   const trainings = await sql`
     select t.id, t.title, t.summary, t.category, t.source,
       (select count(*) from training_assignments ta where ta.training_id = t.id)::int as assigned,
@@ -73,6 +41,30 @@ export default async function ExpandPage() {
       (select count(*) from tasks t where t.workflow_id = w.id)::int as total
     from workflows w where w.organization_id = ${orgId} order by w.created_at desc limit 6`;
 
+  const tools = [
+    {
+      href: "/expand/scal3",
+      label: "Scal³",
+      description: "See the money in motion — collected, pipeline, overdue, and billable work that slipped past 48 hours.",
+      count: `$${Math.round(Number(scal?.overdue ?? 0)).toLocaleString()} overdue`,
+      icon: "↑",
+    },
+    {
+      href: "/expand/academy",
+      label: "Academy",
+      description: "Role-based tracks, assignments, and lesson progress that turn your playbook into team capability.",
+      count: `${Number(counts?.assignments ?? 0)} assigned`,
+      icon: "◇",
+    },
+    {
+      href: "/expand/training-library",
+      label: "Training Library",
+      description: "Imported playbooks, quizzes, and team results — the source material behind consistent delivery.",
+      count: `${Number(counts?.modules ?? 0)} module${Number(counts?.modules ?? 0) === 1 ? "" : "s"}`,
+      icon: "▤",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -80,68 +72,29 @@ export default async function ExpandPage() {
         <p className="page-sub">{t("expand.subtitle")}</p>
       </div>
 
-      <div id="academy">
-      <Academy
-        industry={(profile?.industry as string) ?? ""}
-        mission={(profile?.mission as string) ?? ""}
-        customers={(profile?.target_customers as string) ?? ""}
-        offerings={(profile?.offerings as string) ?? ""}
-        labels={buildLabels(ACADEMY_LABEL_KEYS, t)}
-        myProgress={myProgressRows.map((r) => `${r.track}.${r.lesson}`)}
-        assignedTracks={myAssignedRows.map((r) => r.track as string)}
-        canManage={session.role !== "MEMBER"}
-        members={memberRows.map((m) => ({ id: m.id, name: m.name }))}
-        team={assignRows.map((r) => ({ id: r.id, name: r.name, track: r.track as string, done: Number(r.done) }))}
-      />
+      <div className="grid gap-3 md:grid-cols-3">
+        {tools.map((tool) => (
+          <Link
+            key={tool.href}
+            href={tool.href}
+            className="card group p-5 transition hover:border-violet-400/30 hover:bg-white/[0.05]"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-lg text-violet-200">
+                {tool.icon}
+              </span>
+              <span className="badge-low ms-auto">{tool.count}</span>
+            </div>
+            <h2 className="mt-3 font-semibold text-white">{tool.label}</h2>
+            <p className="muted mt-1 text-sm">{tool.description}</p>
+            <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-violet-300">
+              Open {tool.label} <span aria-hidden>→</span>
+            </span>
+          </Link>
+        ))}
       </div>
 
-      <div id="training-library">
-      <TrainingLibrary
-        labels={buildLabels(LIBRARY_LABEL_KEYS, t)}
-        canImport={session.role !== "MEMBER"}
-        team={teamRows.map((r) => ({ name: r.name, email: r.email, attempts: r.attempts, avgScore: Number(r.avgScore), lastAt: r.lastAt }))}
-        modules={libRows.map((m) => {
-          const mine = typeof m.mine === "string" ? m.mine.split(":") : null;
-          return {
-            id: m.id, title: m.title, summary: m.summary, category: m.category,
-            contentUrl: m.contentUrl, content: m.content,
-            quiz: (m.quiz ?? []) as { q: string; choices: string[]; answer: number }[],
-            attempts: m.attempts, avgScore: Number(m.avgScore),
-            myScore: mine ? Number(mine[0]) : null,
-            myTotal: mine ? Number(mine[1]) : null,
-          };
-        })}
-      />
-      </div>
-
-      {/* Scal³ — Revenue Intelligence */}
-      <section id="scal3" className="card p-5">
-        <div className="flex items-center gap-2">
-          <h2 className="bg-gradient-to-r from-cue-blue via-cue-purple to-cue-orange bg-clip-text text-lg font-bold text-transparent">Scal³</h2>
-          <span className="badge-purple">Revenue Intelligence</span>
-          <span className="muted ms-auto text-xs">Money in motion — computed from your records</span>
-        </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-white/[0.06] p-4">
-            <div className="text-xs uppercase tracking-widest text-navy-300">Collected</div>
-            <div className="kpi mt-1 text-emerald-300">${Math.round(scal?.collected ?? 0).toLocaleString()}</div>
-          </div>
-          <div className="rounded-xl border border-white/[0.06] p-4">
-            <div className="text-xs uppercase tracking-widest text-navy-300">Pipeline (open leads)</div>
-            <div className="kpi mt-1">${Math.round(scal?.pipeline ?? 0).toLocaleString()}</div>
-          </div>
-          <div className="rounded-xl border border-white/[0.06] p-4">
-            <div className="text-xs uppercase tracking-widest text-navy-300">Overdue</div>
-            <div className="kpi mt-1 text-cue-orange">${Math.round(scal?.overdue ?? 0).toLocaleString()}</div>
-          </div>
-          <div className="rounded-xl border border-white/[0.06] p-4">
-            <div className="text-xs uppercase tracking-widest text-navy-300">Billed late (fixable)</div>
-            <div className="kpi mt-1 text-cue-blue">${Math.round(scal?.recovered_late ?? 0).toLocaleString()}</div>
-          </div>
-        </div>
-      </section>
-
-      <section>
+      <section id="training-from-knowledge" className="scroll-mt-24">
         <h2 className="section-title mb-3">Training from your knowledge</h2>
         <div className="grid gap-3 md:grid-cols-2">
           {trainings.map((t) => {
@@ -164,7 +117,7 @@ export default async function ExpandPage() {
         </div>
       </section>
 
-      <section>
+      <section id="growth-opportunities" className="scroll-mt-24">
         <h2 className="section-title mb-3">Growth opportunities</h2>
         <div className="grid gap-3 md:grid-cols-2">
           {opportunities.map((o) => (
@@ -180,7 +133,7 @@ export default async function ExpandPage() {
         </div>
       </section>
 
-      <section>
+      <section id="outcome-tracking" className="scroll-mt-24">
         <h2 className="section-title mb-3">Outcome tracking — did actions work?</h2>
         <div className="space-y-2">
           {outcomes.map((w, i) => (

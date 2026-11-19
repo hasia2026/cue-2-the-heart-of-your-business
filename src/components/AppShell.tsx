@@ -22,6 +22,9 @@ const ITEM_MODULE: Record<string, string> = {
   "/compass": "compass",
   "/knowledge": "knowledge",
   "/enhance": "enhance",
+  "/enhance/service-plans": "enhance",
+  "/enhance/pricing-studio": "enhance",
+  "/enhance/brand-studio": "enhance",
   "/execute": "execute",
   "/pipeline": "pipeline",
   "/pipeline/customers": "pipeline",
@@ -30,6 +33,10 @@ const ITEM_MODULE: Record<string, string> = {
   "/report": "report",
   "/people": "people",
   "/expand": "expand",
+  "/expand/scal3": "expand",
+  "/expand/academy": "expand",
+  "/expand/training-library": "expand",
+  "/expand/reviews": "expand",
   "/lab": "lab",
   "/ecosystem": "ecosystem",
   "/settings": "settings",
@@ -120,9 +127,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
           children: [
             { href: "/knowledge", label: t("nav.knowledge") },
             { href: "/expand/reviews", label: t("nav.reviews") },
-            { href: "/enhance#service-plans", label: t("nav.servicePlans") },
-            { href: "/enhance#pricing-studio", label: t("nav.pricingStudio") },
-            { href: "/enhance#brand-studio", label: t("nav.brandStudio") },
+            { href: "/enhance/service-plans", label: t("nav.servicePlans") },
+            { href: "/enhance/pricing-studio", label: t("nav.pricingStudio") },
+            { href: "/enhance/brand-studio", label: t("nav.brandStudio") },
           ],
         },
         {
@@ -148,9 +155,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
           icon: "↑",
           step: 5,
           children: [
-            { href: "/expand#scal3", label: "Scal³" },
-            { href: "/expand#academy", label: t("nav.academy") },
-            { href: "/expand#training-library", label: t("nav.trainingLibrary") },
+            { href: "/expand/scal3", label: "Scal³" },
+            { href: "/expand/academy", label: t("nav.academy") },
+            { href: "/expand/training-library", label: t("nav.trainingLibrary") },
             { href: "/lab", label: t("nav.lab") },
             { href: "/report", label: t("nav.report") },
             { href: "/ecosystem", label: t("nav.ecosystem") },
@@ -190,12 +197,12 @@ export default async function AppShell({ children }: { children: React.ReactNode
             )}
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 md:px-8">
+        <main className="flex-1 px-4 pt-6 pb-36 md:px-8 lg:pb-6">
           {children}
         </main>
         {/* Type-what-you-want bar: desktop pill floats in the top bar, mobile FAB bottom-right */}
         <CommandBar signedIn={!!session} />
-        <footer className="border-t border-white/[0.06] px-6 py-4 text-xs text-navy-300/60">
+        <footer className="border-t border-white/[0.06] px-6 pt-4 pb-36 text-xs text-navy-300/60 lg:pb-4">
           <div className="flex items-center gap-2">
             <LogoMark className="h-4 w-4" /> CUE — Built by HASI Technologies
             <ReviMark className="ms-2 h-5 w-5" />
