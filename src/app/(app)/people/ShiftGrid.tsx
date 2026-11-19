@@ -84,8 +84,40 @@ export default function ShiftGrid({
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-separate border-spacing-1 text-xs">
+    <div>
+      <div className="space-y-2 md:hidden">
+        {employees.map((e) => (
+          <div key={e.id} className="rounded-xl border border-white/[0.06] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium text-navy-100">{e.name}</div>
+                <div className="text-[11px] text-navy-300/70">{e.title}</div>
+              </div>
+              <div className="shrink-0 text-[11px] text-navy-300/80">{summary(e.id)}</div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {DAYS.map((d) => {
+                const s = (cells[`${e.id}:${d.dow}`] ?? "OFF") as ShiftValue;
+                return (
+                  <button
+                    key={d.dow}
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => set(e.id, d.dow, nextShift(s))}
+                    className={`flex min-h-11 items-center justify-between rounded-lg border px-2 text-xs font-medium transition ${CELL_STYLE[s]} ${canEdit ? "cursor-pointer hover:outline hover:outline-1 hover:outline-white/25" : "cursor-default"}`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wider opacity-75">{d.label}</span>
+                    <span>{s === "DOUBLE" ? "DBL" : s === "OFF" ? "—" : s}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {employees.length === 0 && <p className="muted text-sm">No employees yet.</p>}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[640px] border-separate border-spacing-1 text-xs">
         <thead>
           <tr>
             <th className="w-56 text-start font-medium text-navy-300">Employee</th>
@@ -121,7 +153,8 @@ export default function ShiftGrid({
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <div className="mt-3 flex items-center gap-3">
         {canEdit && employees.length > 0 ? (

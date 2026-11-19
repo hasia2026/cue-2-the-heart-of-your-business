@@ -200,15 +200,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           ))}
           <span className="ms-auto muted text-xs">tiles reflect the selected window · scorecard below is all-time</span>
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 pe-20 sm:grid-cols-2 lg:grid-cols-3 lg:pe-0 xl:grid-cols-6">
           {kpiTiles.map((s) => {
             const tint = TINT[s.tint];
             return (
               <div key={s.label} className="card relative min-w-0 overflow-hidden p-3.5">
                 <div className={`pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full ${tint.glow} blur-2xl`} />
-                <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-navy-300">
-                  <span aria-hidden className={`text-sm ${tint.text}`}>{s.icon}</span>
-                  <span className="truncate">{s.label}</span>
+                <div className="flex min-h-[2rem] items-start gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-navy-300">
+                  <span aria-hidden className={`mt-0.5 shrink-0 text-sm ${tint.text}`}>{s.icon}</span>
+                  <span className="min-w-0 flex-1 leading-tight">{s.label}</span>
                 </div>
                 <div className="kpi mt-1.5 !text-3xl">{s.value}</div>
                 <div className="muted mt-1 truncate text-[11px]">{s.sub}</div>
@@ -304,9 +304,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {strip.map((s) => (
               <div key={s.label} className="card p-4">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-navy-300">
-                  <span className={`text-base ${s.dot}`}>{s.icon}</span>
-                  <span className="truncate">{s.label}</span>
+                <div className="flex min-h-[2rem] items-start gap-2 text-[10px] uppercase tracking-[0.16em] text-navy-300">
+                  <span className={`mt-0.5 shrink-0 text-base ${s.dot}`}>{s.icon}</span>
+                  <span className="min-w-0 flex-1 leading-tight">{s.label}</span>
                 </div>
                 <div className="kpi mt-2 !text-3xl">{s.value}</div>
                 <div className="muted mt-1 truncate text-[11px]">{s.cap}</div>

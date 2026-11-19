@@ -175,7 +175,29 @@ export default function UnscheduledBoard({
           {/* Monthly report: unscheduled backlog by month created */}
           <div className="mt-4">
             <h3 className="text-sm font-semibold text-navy-100">{t("board.monthly", "Monthly unscheduled report")}</h3>
-            <div className="mt-2 overflow-x-auto">
+            <div className="mt-2 space-y-2 md:hidden">
+              {months.map((m) => {
+                const areaCounts = new Map<string, number>();
+                for (const j of m.jobs) areaCounts.set(j.area ?? "—", (areaCounts.get(j.area ?? "—") ?? 0) + 1);
+                const heavy = Array.from(areaCounts.entries())
+                  .sort((x, y) => y[1] - x[1])
+                  .slice(0, 3)
+                  .map(([a, n]) => `${a} (${n})`)
+                  .join(", ");
+                return (
+                  <div key={m.month} className="rounded-xl border border-white/[0.06] p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-navy-100">{m.month}</span>
+                      <span className="font-semibold text-cue-green">${m.value.toLocaleString()}</span>
+                    </div>
+                    <div className="mt-1 text-navy-300">
+                      {m.count} {t("board.countCol", "Jobs").toLowerCase()} · {heavy || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 hidden overflow-x-auto md:block">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-navy-300/70">

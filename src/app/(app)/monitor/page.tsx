@@ -59,23 +59,42 @@ export default async function MonitorPage() {
         {errors.length === 0 ? (
           <div className="muted text-sm">No errors captured yet — the instrumentation hook and client digest reporter are live.</div>
         ) : (
-          <table className="w-full text-xs">
-            <thead><tr className="text-navy-300 text-left">
-              <th className="py-2">Message</th><th>Digest</th><th>Path</th><th>Src</th><th>Count</th><th>Last seen</th>
-            </tr></thead>
-            <tbody>
+          <>
+            <div className="space-y-2 md:hidden">
               {errors.map((e, i) => (
-                <tr key={i} className="border-t border-navy-800/60">
-                  <td className="py-2 pe-3 text-navy-100">{e.message}</td>
-                  <td className="text-navy-300">{e.digest ?? "—"}</td>
-                  <td className="text-navy-300">{e.path ?? "—"}</td>
-                  <td className="text-navy-300">{e.source}</td>
-                  <td className="text-navy-100">{e.occurrences}</td>
-                  <td className="text-navy-300 whitespace-nowrap">{new Date(e.lastSeen).toLocaleString()}</td>
-                </tr>
+                <div key={i} className="rounded-xl border border-navy-800/60 p-3 text-xs">
+                  <div className="break-words font-medium text-navy-100">{e.message}</div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-navy-300">
+                    <span>{e.source}</span>
+                    <span>{e.occurrences}×</span>
+                    <span>{new Date(e.lastSeen).toLocaleString()}</span>
+                  </div>
+                  {(e.digest || e.path) && (
+                    <div className="mt-1 break-all text-[11px] text-navy-300/70">{[e.digest, e.path].filter(Boolean).join(" · ")}</div>
+                  )}
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-xs">
+                <thead><tr className="text-navy-300 text-left">
+                  <th className="py-2">Message</th><th>Digest</th><th>Path</th><th>Src</th><th>Count</th><th>Last seen</th>
+                </tr></thead>
+                <tbody>
+                  {errors.map((e, i) => (
+                    <tr key={i} className="border-t border-navy-800/60">
+                      <td className="py-2 pe-3 text-navy-100">{e.message}</td>
+                      <td className="text-navy-300">{e.digest ?? "—"}</td>
+                      <td className="text-navy-300">{e.path ?? "—"}</td>
+                      <td className="text-navy-300">{e.source}</td>
+                      <td className="text-navy-100">{e.occurrences}</td>
+                      <td className="text-navy-300 whitespace-nowrap">{new Date(e.lastSeen).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -84,22 +103,41 @@ export default async function MonitorPage() {
         {beats.length === 0 ? (
           <div className="muted text-sm">No heartbeat rows yet.</div>
         ) : (
-          <table className="w-full text-xs">
-            <thead><tr className="text-navy-300 text-left">
-              <th className="py-2">At</th><th>DB</th><th>New errors</th><th>Alerted</th><th>Detail</th>
-            </tr></thead>
-            <tbody>
+          <>
+            <div className="space-y-2 md:hidden">
               {beats.map((b, i) => (
-                <tr key={i} className="border-t border-navy-800/60">
-                  <td className="py-2 text-navy-100 whitespace-nowrap">{new Date(b.checkedAt).toLocaleString()}</td>
-                  <td className={b.dbUp ? "text-emerald-400" : "text-rose-400"}>{b.dbUp ? "up" : "down"}</td>
-                  <td className="text-navy-100">{b.newErrors}</td>
-                  <td className="text-navy-300">{b.alerted ? "yes" : "no"}</td>
-                  <td className="text-navy-300">{b.detail ?? ""}</td>
-                </tr>
+                <div key={i} className="rounded-xl border border-navy-800/60 p-3 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-navy-100">{new Date(b.checkedAt).toLocaleString()}</span>
+                    <span className={b.dbUp ? "text-emerald-400" : "text-rose-400"}>{b.dbUp ? "up" : "down"}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-navy-300">
+                    <span>New errors {b.newErrors}</span>
+                    <span>Alerted {b.alerted ? "yes" : "no"}</span>
+                  </div>
+                  {b.detail && <div className="mt-1 break-words text-[11px] text-navy-300/70">{b.detail}</div>}
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-xs">
+                <thead><tr className="text-navy-300 text-left">
+                  <th className="py-2">At</th><th>DB</th><th>New errors</th><th>Alerted</th><th>Detail</th>
+                </tr></thead>
+                <tbody>
+                  {beats.map((b, i) => (
+                    <tr key={i} className="border-t border-navy-800/60">
+                      <td className="py-2 text-navy-100 whitespace-nowrap">{new Date(b.checkedAt).toLocaleString()}</td>
+                      <td className={b.dbUp ? "text-emerald-400" : "text-rose-400"}>{b.dbUp ? "up" : "down"}</td>
+                      <td className="text-navy-100">{b.newErrors}</td>
+                      <td className="text-navy-300">{b.alerted ? "yes" : "no"}</td>
+                      <td className="text-navy-300">{b.detail ?? ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

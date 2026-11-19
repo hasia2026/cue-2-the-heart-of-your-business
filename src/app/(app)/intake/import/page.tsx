@@ -71,7 +71,29 @@ export default async function ImportPage({
           <section className="rounded-xl border border-white/[0.06] p-4">
           <h2 className="text-sm font-medium text-navy-100">Recent imports</h2>
           <p className="muted mb-3 text-xs">Every committed file, its counts, and who ran it. ↓ CSV downloads the same kind of records back out — diff it against your original export to reconcile.</p>
-          <div className="overflow-x-auto">
+          <div className="space-y-2 md:hidden">
+            {history.map((h) => (
+              <div key={h.id} className="rounded-xl border border-white/[0.06] p-3 text-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-navy-100" title={h.file_name}>{h.file_name}</div>
+                    <div className="mt-0.5 text-navy-300">
+                      {new Date(h.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </div>
+                  </div>
+                  <ExportBtn kind={h.kind} label="↓ CSV" />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-navy-300">
+                  <span>{KIND_LABELS[h.kind as keyof typeof KIND_LABELS] ?? h.kind.toLowerCase()}</span>
+                  <span>{h.row_count} rows</span>
+                  <span className="text-emerald-300">{h.imported} imported</span>
+                  {(h.skipped + h.excluded_user) > 0 && <span>{h.skipped + h.excluded_user} skipped</span>}
+                </div>
+                <div className="mt-1 text-[11px] text-navy-300/70">By {h.actor_name ?? "—"}</div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-xs">
               <thead className="muted uppercase tracking-widest">
                 <tr>
