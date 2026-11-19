@@ -1,12 +1,13 @@
 import { sql } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { guardWorkspaceModule } from "@/lib/guard";
-import { logReview, requestReview } from "./actions";
+import ConfirmSubmit from "@/components/ConfirmSubmit";
+import { deleteReview, logReview, requestReview, updateReview } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type Review = {
-  id: string; rating: number | null; channel: string; comment: string | null;
+  id: string; customerId: string | null; rating: number | null; channel: string; comment: string | null;
   status: string; requestedAt: string; receivedAt: string | null; customer: string | null;
 };
 
@@ -14,9 +15,10 @@ export default async function ReviewsPage() {
   await guardWorkspaceModule();
   const session = await requireSession();
   const orgId = session.organizationId;
+  const canEdit = session.role !== "MEMBER";
 
   const rows = await sql`
-    select r.id, r.rating, r.channel, r.comment, r.status,
+    select r.id, r.customer_id as "customerId", r.rating, r.channel, r.comment, r.status,
       r.requested_at as "requestedAt", r.received_at as "receivedAt", c.name as customer
     from reviews r left join customers c on c.id = r.customer_id
     where r.organization_id = ${orgId}
@@ -110,17 +112,68 @@ export default async function ReviewsPage() {
         <h2 className="section-title mb-3">Review log</h2>
         <div className="space-y-2">
           {reviews.map((r) => (
-            <div key={r.id} className="card flex flex-wrap items-center gap-3 p-4">
-              <span className="text-lg text-amber-300">{r.rating ? "★".repeat(r.rating) : "—"}</span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-navy-100">{r.customer ?? "Anonymous"}</div>
-                {r.comment && <p className="muted mt-0.5 text-xs">{r.comment}</p>}
+            <div key={r.id} className="card p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-lg text-amber-300">{r.rating ? "★".repeat(r.rating) : "—"}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-navy-100">{r.customer ?? "Anonymous"}</div>
+                  {r.comment && <p className="muted mt-0.5 text-xs">{r.comment}</p>}
+                </div>
+                <span className="badge-blue">{r.channel.replace("_", " ")}</span>
+                <span className={`badge ${r.status === "RECEIVED" ? "badge-green" : "badge-low"}`}>{r.status}</span>
+                <span className="text-[11px] text-navy-300">
+                  {new Date(r.receivedAt ?? r.requestedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </span>
               </div>
-              <span className="badge-blue">{r.channel.replace("_", " ")}</span>
-              <span className={`badge ${r.status === "RECEIVED" ? "badge-green" : "badge-low"}`}>{r.status}</span>
-              <span className="text-[11px] text-navy-300">
-                {new Date(r.receivedAt ?? r.requestedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </span>
+              {canEdit && (
+                <div className="mt-3 border-t border-white/[0.06] pt-3">
+                  <details>
+                    <summary className="cursor-pointer text-xs font-semibold text-violet-300 hover:text-violet-200">Edit review</summary>
+                    <form action={updateReview} className="mt-2 grid gap-2 md:grid-cols-2">
+                      <input type="hidden" name="id" value={r.id} />
+                      <div>
+                        <label className="label">Client</label>
+                        <select name="customerId" defaultValue={r.customerId ?? ""} className="input">
+                          <option value="">Anonymous</option>
+                          {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label">Rating</label>
+                        <select name="rating" defaultValue={r.rating ?? ""} className="input">
+                          <option value="">No rating</option>
+                          {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} ★</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label">Where</label>
+                        <select name="channel" defaultValue={r.channel} className="input">
+                          <option value="GOOGLE">Google</option>
+                          <option value="SMS">Text</option>
+                          <option value="EMAIL">Email</option>
+                          <option value="IN_PERSON">In person</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="label">What they said</label>
+                        <textarea name="comment" rows={2} defaultValue={r.comment ?? ""} className="input" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <button className="btn-primary !py-1.5 text-xs">Save changes</button>
+                      </div>
+                    </form>
+                    <form action={deleteReview} className="mt-1">
+                      <input type="hidden" name="id" value={r.id} />
+                      <ConfirmSubmit
+                        message="Delete this review from the log? This cannot be undone."
+                        className="btn-ghost !px-2 !py-1 text-xs text-red-300"
+                      >
+                        Delete review
+                      </ConfirmSubmit>
+                    </form>
+                  </details>
+                </div>
+              )}
             </div>
           ))}
           {reviews.length === 0 && <div className="card p-6 muted">No reviews tracked yet. Log a request after a visit, or add one that came in.</div>}
