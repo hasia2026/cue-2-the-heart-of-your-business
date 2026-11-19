@@ -167,23 +167,44 @@ export default function Academy({ industry, mission, customers, offerings, label
           <div className="mt-4 border-t border-white/[0.06] pt-3">
             <div className="text-sm font-semibold text-white">{t("training.team")}</div>
             {team.length > 0 ? (
-              <table className="mt-2 w-full text-left text-sm">
-                <tbody>
+              <>
+                <div className="mt-2 space-y-2 md:hidden">
                   {team.map((r) => (
-                    <tr key={r.id} className="border-t border-white/[0.05]">
-                      <td className="py-2 text-navy-100">{r.name}</td>
-                      <td className="py-2 text-navy-300">{t(("training." + r.track + ".title") as DictKey)}</td>
-                      <td className="py-2 text-emerald-300">{t("training.ofDone").replace("{done}", String(r.done))}</td>
-                      <td className="py-2 text-end">
+                    <div key={r.id} className="rounded-xl border border-white/[0.06] p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-medium text-navy-100">{r.name}</div>
+                          <div className="text-xs text-navy-300">{t(("training." + r.track + ".title") as DictKey)}</div>
+                        </div>
                         <form action={unassignTrack}>
                           <input type="hidden" name="id" value={r.id} />
-                          <button className="btn-ghost !py-0.5 !text-[11px]">{t("training.unassign")}</button>
+                          <button className="btn-ghost !px-2 !py-1 !text-[11px]">{t("training.unassign")}</button>
                         </form>
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="mt-2 text-xs text-emerald-300">{t("training.ofDone").replace("{done}", String(r.done))}</div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+                <div className="hidden md:block">
+                  <table className="mt-2 w-full text-left text-sm">
+                    <tbody>
+                      {team.map((r) => (
+                        <tr key={r.id} className="border-t border-white/[0.05]">
+                          <td className="py-2 text-navy-100">{r.name}</td>
+                          <td className="py-2 text-navy-300">{t(("training." + r.track + ".title") as DictKey)}</td>
+                          <td className="py-2 text-emerald-300">{t("training.ofDone").replace("{done}", String(r.done))}</td>
+                          <td className="py-2 text-end">
+                            <form action={unassignTrack}>
+                              <input type="hidden" name="id" value={r.id} />
+                              <button className="btn-ghost !py-0.5 !text-[11px]">{t("training.unassign")}</button>
+                            </form>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : (
               <p className="muted mt-2 text-sm">{t("training.teamEmpty")}</p>
             )}

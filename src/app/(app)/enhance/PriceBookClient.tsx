@@ -132,7 +132,26 @@ export default function PriceBookClient({
       )}
 
       {/* Services with dual labor rates */}
-      <div className="overflow-x-auto">
+      <div className="space-y-2 md:hidden">
+        {offerings.map((o) => (
+          <OfferingCard
+            key={o.id}
+            o={o}
+            canEdit={canEdit}
+            busy={busy}
+            onReprice={reprice}
+            saveLabel={t("pricebook.saveRates")}
+            labels={{
+              parts: t("pricebook.parts"),
+              hours: t("pricebook.hours"),
+              standalone: t("pricebook.rateStandalone"),
+              addon: t("pricebook.rateAddon"),
+            }}
+          />
+        ))}
+        {offerings.length === 0 && <p className="muted text-sm">{t("pricebook.noServices")}</p>}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs uppercase tracking-wider text-navy-300">
@@ -245,6 +264,71 @@ export default function PriceBookClient({
         </form>
       )}
     </section>
+  );
+}
+
+function OfferingCard({
+  o, canEdit, busy, onReprice, saveLabel, labels,
+}: {
+  o: Offering; canEdit: boolean; busy: boolean; saveLabel: string;
+  onReprice: (id: string, standalone: string, addon: string) => void;
+  labels: { parts: string; hours: string; standalone: string; addon: string };
+}) {
+  const [standalone, setStandalone] = useState(String(o.rateStandalone));
+  const [addon, setAddon] = useState(String(o.rateAddon));
+  const dirty = Number(standalone) !== o.rateStandalone || Number(addon) !== o.rateAddon;
+  return (
+    <div className="rounded-xl border border-white/[0.06] p-3">
+      <div className="font-medium text-navy-100">{o.name}</div>
+      {o.description && <div className="muted mt-0.5 text-xs">{o.description}</div>}
+      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-navy-300/70">{labels.parts}</div>
+          <div className="text-navy-300">{usd(o.partsCost)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-navy-300/70">{labels.hours}</div>
+          <div className="text-navy-300">{o.laborHours}</div>
+        </div>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-navy-300/70">{labels.standalone}</span>
+          {canEdit ? (
+            <input
+              aria-label={`${o.name} standalone rate`}
+              value={standalone}
+              onChange={(e) => setStandalone(e.target.value)}
+              className="input mt-1 !w-full !px-2 !py-1 text-xs"
+              inputMode="decimal"
+            />
+          ) : (
+            <div className="text-navy-100">{usd(o.rateStandalone)}</div>
+          )}
+        </label>
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wider text-navy-300/70">{labels.addon}</span>
+          {canEdit ? (
+            <input
+              aria-label={`${o.name} add-on rate`}
+              value={addon}
+              onChange={(e) => setAddon(e.target.value)}
+              className="input mt-1 !w-full !px-2 !py-1 text-xs"
+              inputMode="decimal"
+            />
+          ) : (
+            <div className="text-navy-100">{usd(o.rateAddon)}</div>
+          )}
+        </label>
+      </div>
+      {canEdit && dirty && (
+        <button
+          className="btn-ghost mt-2 w-full !py-2 text-xs"
+          disabled={busy}
+          onClick={() => onReprice(o.id, standalone, addon)}
+        >
+          {saveLabel}
+        </button>
+      )}
+    </div>
   );
 }
 
