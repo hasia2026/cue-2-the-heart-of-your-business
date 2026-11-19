@@ -35,7 +35,7 @@ function workspaceTimeZone(raw: unknown): string {
 }
 
 const DEFAULT_RULES: RuleRow[] = [
-  { key: "confirm_24h", label: "Prefer confirmations 24 hours ahead", hint: "Saved as a timing preference only. CUE does not send a reminder automatically.", enabled: true },
+  { key: "confirm_24h", label: "Send confirmations 24 hours ahead", hint: "Sends when a visit enters the 24-hour window; the sweep runs every six hours. If no channel is connected, a follow-up task is created.", enabled: false },
   { key: "arrival_window", label: "Prefer a 2-hour arrival window", hint: "Saved as a preference only. CUE does not currently apply it to bookings or messages.", enabled: true },
   { key: "deposit_new_customer", label: "Prefer deposits for first-time customers", hint: "Saved as a preference only. CUE does not collect or enforce a deposit yet.", enabled: false },
   { key: "no_show_fee", label: "Prefer no-show fee disclosure", hint: "Saved as a preference only. CUE does not currently add a fee to booking or confirmation copy.", enabled: false },

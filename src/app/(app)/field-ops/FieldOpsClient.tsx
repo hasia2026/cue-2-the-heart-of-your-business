@@ -321,7 +321,7 @@ export default function FieldOpsClient({
         </div>
 
         <div className="border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 text-[11px] text-navy-300">
-          Every action is role-gated and written to the audit trail. Invoices stay drafts until you release them; messages send only when you click.
+          Every action is role-gated and written to the audit trail. Invoices stay drafts until you release them. Confirmations send when you click, or automatically at the 24-hour rule when it is on.
         </div>
         {actionMessage && (
           <div className={`border-b border-white/[0.06] px-4 py-2 text-xs ${actionMessage.error ? "bg-red-500/10 text-red-200" : "bg-emerald-500/10 text-emerald-200"}`}>

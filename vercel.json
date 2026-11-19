@@ -15,6 +15,22 @@
     {
       "path": "/api/monitor/ping",
       "schedule": "17 5 * * *"
+    },
+    {
+      "path": "/api/booking-rules/cron",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/booking-rules/cron",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/booking-rules/cron",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/booking-rules/cron",
+      "schedule": "0 18 * * *"
     }
   ]
 }
