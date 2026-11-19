@@ -11,7 +11,7 @@ create table if not exists appointment_confirmations (
   organization_id uuid not null references organizations(id) on delete cascade,
   appointment_id uuid not null unique references appointments(id) on delete cascade,
   token text not null unique default gen_random_uuid()::text,
-  -- PENDING | SENT | CONFIRMED
+  -- PENDING | SENDING | SENT | CONFIRMED
   status text not null default 'PENDING',
   -- LEGACY | STAFF | EMAIL | WHATSAPP | CUSTOMER_LINK | HOUSECALL_PRO
   method text,

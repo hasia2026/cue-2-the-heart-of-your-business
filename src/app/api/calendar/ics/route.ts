@@ -5,6 +5,7 @@
 // regardless of the viewer's current timezone — the travel fix.
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { arrivalWindowDuration } from "@/lib/arrival-window-format";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
 
   const tz = typeof org.timezone === "string" && org.timezone.includes("/") ? org.timezone : "America/Chicago";
   const rows = await sql`
-    select a.title, a.scheduled_for, a.status, c.name as customer
+    select a.title, a.scheduled_for, a.status, a.arrival_window_minutes, c.name as customer
     from appointments a join customers c on c.id = a.customer_id
     where a.organization_id = ${org.id}
       and a.status = 'SCHEDULED'
@@ -66,6 +67,9 @@ export async function GET(req: NextRequest) {
   for (const r of rows) {
     const start = new Date(r.scheduled_for);
     const stamp = wallStamp(start, tz);
+    const arrival = Number(r.arrival_window_minutes) > 0
+      ? arrivalWindowDuration(Number(r.arrival_window_minutes))
+      : "";
     lines.push(
       "BEGIN:VEVENT",
       `UID:cue-appt-${start.getTime()}-${org.id}@cue`,
@@ -73,7 +77,7 @@ export async function GET(req: NextRequest) {
       `DTSTART;TZID=${tz}:${stamp}`,
       `DTEND;TZID=${tz}:${wallStamp(new Date(start.getTime() + 2 * 3600_000), tz)}`,
       `SUMMARY:${escapeIcs(`${r.title}${r.customer ? ` — ${r.customer}` : ""}`)}`,
-      `DESCRIPTION:${escapeIcs(`Scheduled in CUE · timezone ${tz}`)}`,
+      `DESCRIPTION:${escapeIcs(`Scheduled in CUE · timezone ${tz}${arrival ? ` · Arrival window: ${arrival}` : ""}`)}`,
       "END:VEVENT",
     );
   }

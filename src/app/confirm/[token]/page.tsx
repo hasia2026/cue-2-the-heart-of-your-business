@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
+import { arrivalWindowLabel } from "@/lib/arrival-window-format";
 import { confirmAppointmentByToken } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -99,7 +100,7 @@ export default async function ConfirmAppointmentPage({
 
   const [row] = (await sql`
     select ac.status as confirmation_status, ac.sent_at, ac.confirmed_at,
-           a.title, a.scheduled_for, a.status as appointment_status,
+           a.title, a.scheduled_for, a.arrival_window_minutes, a.status as appointment_status,
            c.name as customer_name, c.preferred_locale,
            o.name as organization_name,
            coalesce(nullif(bp.timezone, ''), 'America/Chicago') as timezone
@@ -110,7 +111,7 @@ export default async function ConfirmAppointmentPage({
     left join business_profiles bp on bp.organization_id = ac.organization_id
     where ac.token = ${token}`) as unknown as [{
       confirmation_status: string; sent_at: Date | null; confirmed_at: Date | null;
-      title: string; scheduled_for: Date; appointment_status: string;
+      title: string; scheduled_for: Date; arrival_window_minutes: number | null; appointment_status: string;
       customer_name: string; preferred_locale: string | null;
       organization_name: string; timezone: string;
     } | undefined];
@@ -144,6 +145,11 @@ export default async function ConfirmAppointmentPage({
         <p className="mt-2 text-sm text-[#8b93b8]">
           {copy.prepared} {row.customer_name} · {when}
         </p>
+        {row.arrival_window_minutes ? (
+          <p className="mt-1 text-sm text-[#8b93b8]">
+            {arrivalWindowLabel(locale, row.arrival_window_minutes)}
+          </p>
+        ) : null}
 
         {closed || error ? (
           <div className="mt-8 rounded-2xl border border-white/10 bg-[#141428] p-6">

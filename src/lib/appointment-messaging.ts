@@ -4,6 +4,7 @@ import { baseAppUrl } from "./plan-links";
 import { mailerConnected, sendMail } from "./mailer";
 import { sendWhatsAppText, whatsappConnected } from "./whatsapp";
 import { confirmationUrl, ensureAppointmentConfirmation } from "./appointment-confirmations";
+import { arrivalWindowLabel } from "./arrival-window-format";
 
 type ConfirmationCopy = {
   tag: string;
@@ -79,7 +80,7 @@ export async function sendAppointmentConfirmation(
   } = {},
 ): Promise<SendConfirmationResult> {
   const [appt] = (await sql`
-    select a.id, a.title, a.scheduled_for, a.status,
+    select a.id, a.title, a.scheduled_for, a.status, a.arrival_window_minutes,
            c.id as customer_id, c.name as customer_name, c.email, c.phone, c.preferred_locale,
            o.name as organization_name,
            coalesce(nullif(bp.timezone, ''), 'America/Chicago') as timezone
@@ -89,6 +90,7 @@ export async function sendAppointmentConfirmation(
     left join business_profiles bp on bp.organization_id = a.organization_id
     where a.id = ${appointmentId} and a.organization_id = ${orgId}`) as unknown as [{
     id: string; title: string; scheduled_for: Date; status: string;
+    arrival_window_minutes: number | null;
     customer_id: string; customer_name: string; email: string | null; phone: string | null;
     preferred_locale: string | null;
     organization_name: string; timezone: string;
@@ -107,62 +109,104 @@ export async function sendAppointmentConfirmation(
     return { ok: true, already: true, link };
   }
 
-  const tz = workspaceTimeZone(appt.timezone);
-  const locale = confirmationLocale(appt.preferred_locale);
-  const copy = CONFIRMATION[locale];
-  const when = new Intl.DateTimeFormat(copy.tag, {
-    timeZone: tz,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(appt.scheduled_for));
-  const customerName = appt.customer_name.trim() || "there";
-  const text = copy.text(customerName, appt.organization_name, appt.title, when, link);
-  const subject = copy.subject(appt.organization_name, appt.title, when);
-
-  let channel: "WHATSAPP" | "EMAIL" | null = null;
-  let error: string | undefined;
-  if (appt.phone && whatsappConnected()) {
-    const result = await sendWhatsAppText(String(appt.phone), text);
-    if (result.sent) channel = "WHATSAPP";
-    else error = result.error ?? "WhatsApp could not send the confirmation.";
-  }
-  if (!channel && appt.email && mailerConnected()) {
-    const result = await sendMail({ to: String(appt.email), subject, text });
-    if (result.sent) channel = "EMAIL";
-    else error = result.error ?? "Email could not send the confirmation.";
-  }
-
-  if (!channel) {
-    return {
-      ok: false,
-      error: error ?? (appt.phone || appt.email
-        ? "No messaging channel is connected. Set up WhatsApp or email first."
-        : "This customer has no phone or email on file."),
-    };
-  }
-
-  await sql`
-    insert into communications (organization_id, customer_id, channel, direction, summary)
-    values (${orgId}, ${appt.customer_id},
-      ${channel === "EMAIL" ? "EMAIL" : "SMS"}, 'OUTBOUND',
-      ${`Appointment confirmation sent via ${channel === "EMAIL" ? "email" : "WhatsApp"} (${locale}): ${appt.title} on ${when}`})`;
-  await sql`
+  // Reserve the send before touching a provider. Overlapping manual sends and
+  // the 24-hour runner then have one winner; a crashed reservation goes stale
+  // after five minutes so a later run can recover it.
+  const [reserved] = (await sql`
     update appointment_confirmations
-    set status = 'SENT', method = ${channel}, sent_at = now(), updated_at = now(),
-        auto_send_error = null
-    where id = ${confirmation.id} and confirmed_at is null`;
-  await logAudit({
-    organizationId: orgId,
-    actorType: opts.actorType ?? "USER",
-    actorId: opts.actorId ?? null,
-    action: "APPOINTMENT_CONFIRMATION_SENT",
-    targetType: "Appointment",
-    targetId: appt.id,
-    detail: `"${appt.title}" confirmation sent to ${appt.customer_name} via ${channel.toLowerCase()} in ${locale}${opts.source === "AUTO_24H" ? " (24-hour cadence)" : ""}`,
-    metadata: { channel, appointmentId: appt.id, locale, source: opts.source ?? "MANUAL", actorName: opts.actorName ?? null },
-  });
-  return { ok: true, channel, link };
+    set status = 'SENDING', updated_at = now()
+    where id = ${confirmation.id}
+      and confirmed_at is null and sent_at is null
+      and (status <> 'SENDING' or updated_at < now() - interval '5 minutes')
+    returning id`) as unknown as { id: string }[];
+  if (!reserved) {
+    return { ok: false, error: "A confirmation send is already in progress for this visit." };
+  }
+
+  let delivered = false;
+  let channel: "WHATSAPP" | "EMAIL" | null = null;
+  try {
+    const tz = workspaceTimeZone(appt.timezone);
+    const locale = confirmationLocale(appt.preferred_locale);
+    const copy = CONFIRMATION[locale];
+    const when = new Intl.DateTimeFormat(copy.tag, {
+      timeZone: tz,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(appt.scheduled_for));
+    const customerName = appt.customer_name.trim() || "there";
+    const arrival = arrivalWindowLabel(locale, appt.arrival_window_minutes);
+    const text = copy.text(customerName, appt.organization_name, appt.title, when, link)
+      + (arrival ? `\n\n${arrival}` : "");
+    const subject = copy.subject(appt.organization_name, appt.title, when);
+
+    let error: string | undefined;
+    if (appt.phone && whatsappConnected()) {
+      const result = await sendWhatsAppText(String(appt.phone), text);
+      if (result.sent) channel = "WHATSAPP";
+      else error = result.error ?? "WhatsApp could not send the confirmation.";
+    }
+    if (!channel && appt.email && mailerConnected()) {
+      const result = await sendMail({ to: String(appt.email), subject, text });
+      if (result.sent) channel = "EMAIL";
+      else error = result.error ?? "Email could not send the confirmation.";
+    }
+
+    if (!channel) {
+      return {
+        ok: false,
+        error: error ?? (appt.phone || appt.email
+          ? "No messaging channel is connected. Set up WhatsApp or email first."
+          : "This customer has no phone or email on file."),
+      };
+    }
+
+    // The provider accepted the message. From here on the record must not be
+    // reset to PENDING, or a retry would send the customer a duplicate.
+    delivered = true;
+    try {
+      await sql`
+        insert into communications (organization_id, customer_id, channel, direction, summary)
+        values (${orgId}, ${appt.customer_id},
+          ${channel === "EMAIL" ? "EMAIL" : "SMS"}, 'OUTBOUND',
+          ${`Appointment confirmation sent via ${channel === "EMAIL" ? "email" : "WhatsApp"} (${locale}): ${appt.title} on ${when}`})`;
+    } catch (e) {
+      // The message is already out; a missing activity row must not make the
+      // send retryable.
+      console.error("confirmation activity insert failed", appt.id, e);
+    }
+    await logAudit({
+      organizationId: orgId,
+      actorType: opts.actorType ?? "USER",
+      actorId: opts.actorId ?? null,
+      action: "APPOINTMENT_CONFIRMATION_SENT",
+      targetType: "Appointment",
+      targetId: appt.id,
+      detail: `"${appt.title}" confirmation sent to ${appt.customer_name} via ${channel.toLowerCase()} in ${locale}${opts.source === "AUTO_24H" ? " (24-hour cadence)" : ""}`,
+      metadata: { channel, appointmentId: appt.id, locale, source: opts.source ?? "MANUAL", actorName: opts.actorName ?? null },
+    });
+    return { ok: true, channel, link };
+  } finally {
+    if (delivered && channel) {
+      try {
+        await sql`
+          update appointment_confirmations
+          set status = 'SENT', method = ${channel}, sent_at = now(), updated_at = now(),
+              auto_send_error = null
+          where id = ${confirmation.id} and confirmed_at is null`;
+      } catch (e) {
+        // The provider send succeeded. Leave the reservation in place rather
+        // than reopening it for a duplicate send; surface it for repair.
+        console.error("confirmation send state update failed", appt.id, e);
+      }
+    } else {
+      await sql`
+        update appointment_confirmations
+        set status = 'PENDING', updated_at = now()
+        where id = ${confirmation.id} and status = 'SENDING' and sent_at is null`;
+    }
+  }
 }
