@@ -35,8 +35,13 @@ export type PilotRequest = {
   preferredTime?: string;
 };
 
-function cleanSlot(value: string): string {
-  return value.replace(/\s*\(requested\)\s*$/i, "").replace(/\s+/g, " ").trim();
+/** Normalize current and legacy slot text: "(requested)" and "Requested: …". */
+export function cleanSlot(value: string): string {
+  return value
+    .replace(/\s*\((?:requested|request)\)\s*$/i, "")
+    .replace(/^\s*requested\b\s*[:\-–—]?\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function escapeHtml(value: string): string {
@@ -44,7 +49,7 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => map[ch] ?? ch);
 }
 
-function requestText(req: PilotRequest): string {
+function requestText(req: PilotRequest, slot: string): string {
   const source = req.source ?? "FLYER";
   return [
     `New pilot request via ${source}.`,
@@ -53,7 +58,7 @@ function requestText(req: PilotRequest): string {
     `Shop:  ${req.shop}`,
     `Phone: ${req.phone}`,
     `Email: ${req.email ?? "(none given)"}`,
-    ...(req.preferredTime ? [`Requested: ${cleanSlot(req.preferredTime)}`] : []),
+    ...(slot ? [`Requested: ${slot}`] : []),
     ``,
     `Inbox of record: Pipeline → Scan records. Follow up within one business day.`,
   ].join("\n");
@@ -66,29 +71,43 @@ export type BookingConfirmation = {
   preferredTime: string;
 };
 
+const BOOKING_COPY = {
+  slotLabel: "Requested slot",
+  nextStepsHeading: "What happens next",
+  nextSteps: [
+    "A real person will confirm this slot by email or text within one business hour.",
+    "If the time has already passed or no longer works, we'll offer the nearest available time.",
+    "On the call, have one month of jobs, quotes, or invoices ready to export or photograph. We'll run the scan live on your numbers and show you where money is leaking.",
+    "The call is 20 minutes, with no pitch deck. If we don't find $1,000 in documented leaks, the pilot is free.",
+  ],
+  changeTime: "Need to change the time? Reply to this email and we'll move it.",
+  signoff: "— CUE",
+  intro: "We received your request for a free 20-minute CUE scan call for",
+} as const;
+
 function confirmationText(req: BookingConfirmation, slot: string): string {
   return [
     `Hi ${req.name},`,
     ``,
-    `We received your request for a free 20-minute CUE scan call for ${req.shop}.`,
+    `${BOOKING_COPY.intro} ${req.shop}.`,
     ``,
-    `Requested slot: ${slot}`,
+    `${BOOKING_COPY.slotLabel}: ${slot}`,
     ``,
-    `What happens next`,
-    `1. A real person will confirm this slot by email or text within one business hour.`,
-    `2. If the time has already passed or no longer works, we'll offer the nearest available time.`,
-    `3. On the call, have one month of jobs, quotes, or invoices ready to export or photograph. We'll run the scan live on your numbers and show you where money is leaking.`,
-    `4. The call is 20 minutes, with no pitch deck. If we don't find $1,000 in documented leaks, the pilot is free.`,
+    BOOKING_COPY.nextStepsHeading,
+    ...BOOKING_COPY.nextSteps.map((step, index) => `${index + 1}. ${step}`),
     ``,
-    `Need to change the time? Reply to this email and we'll move it.`,
+    BOOKING_COPY.changeTime,
     ``,
-    `— CUE`,
+    BOOKING_COPY.signoff,
   ].join("\n");
 }
 
 function confirmationHtml(req: BookingConfirmation, slot: string): string {
   const name = escapeHtml(req.name);
   const shop = escapeHtml(req.shop);
+  const nextSteps = BOOKING_COPY.nextSteps
+    .map((step) => `<li>${escapeHtml(step)}</li>`)
+    .join("\n        ");
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
@@ -96,20 +115,17 @@ function confirmationHtml(req: BookingConfirmation, slot: string): string {
       <p style="margin:0 0 24px;font-size:14px;font-weight:700;letter-spacing:.08em;color:#7c3aed;">CUE</p>
       <h1 style="margin:0 0 16px;font-size:26px;line-height:1.25;">Your scan call is requested</h1>
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hi ${name},</p>
-      <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">We received your request for a free 20-minute CUE scan call for <strong>${shop}</strong>.</p>
+      <p style="margin:0 0 20px;font-size:16px;line-height:1.6;">${BOOKING_COPY.intro} <strong>${shop}</strong>.</p>
       <div style="margin:0 0 24px;padding:16px 20px;border:1px solid #ddd6fe;border-radius:12px;background:#f5f3ff;">
-        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6d28d9;">Requested slot</div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6d28d9;">${BOOKING_COPY.slotLabel}</div>
         <div style="margin-top:4px;font-size:20px;font-weight:700;color:#4c1d95;">${escapeHtml(slot)}</div>
       </div>
-      <h2 style="margin:0 0 12px;font-size:18px;">What happens next</h2>
+      <h2 style="margin:0 0 12px;font-size:18px;">${BOOKING_COPY.nextStepsHeading}</h2>
       <ol style="margin:0 0 20px;padding-left:20px;font-size:15px;line-height:1.7;">
-        <li>A real person will confirm this slot by email or text within one business hour.</li>
-        <li>If the time has already passed or no longer works, we'll offer the nearest available time.</li>
-        <li>On the call, have one month of jobs, quotes, or invoices ready to export or photograph. We'll run the scan live on your numbers and show you where money is leaking.</li>
-        <li>The call is 20 minutes, with no pitch deck. If we don't find $1,000 in documented leaks, the pilot is free.</li>
+        ${nextSteps}
       </ol>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.6;">Need to change the time? Reply to this email and we'll move it.</p>
-      <p style="margin:24px 0 0;font-size:15px;color:#475569;">— CUE</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.6;">${escapeHtml(BOOKING_COPY.changeTime)}</p>
+      <p style="margin:24px 0 0;font-size:15px;color:#475569;">${escapeHtml(BOOKING_COPY.signoff)}</p>
     </div>
   </body>
 </html>`;
@@ -138,8 +154,10 @@ export async function sendBookingConfirmation(req: BookingConfirmation): Promise
   });
 
   if (!result.sent) {
+    // Never queue a visitor slot confirmation for retry: it is time-sensitive,
+    // and the owner-alert queue does not preserve the reply-to address. The
+    // API response tells the visitor it failed; keep the server log for follow-up.
     console.error("booking confirmation failed:", result.error ?? "unknown mailer error");
-    if (result.connected) await enqueueFailedAlert([req.email], subject, text, result.error ?? "unknown mailer error");
   }
   return result;
 }
@@ -152,10 +170,11 @@ export async function sendBookingConfirmation(req: BookingConfirmation): Promise
  * are logged (stale endpoints are pruned on 410).
  */
 export async function notifyPilotRequest(req: PilotRequest): Promise<void> {
-  const { sendMail, mailerConnected, mailFrom } = await import("@/lib/mailer");
+  const { sendMail, mailerConnected } = await import("@/lib/mailer");
   const targets = pilotInboxEmails();
-  const subject = `New CUE pilot request — ${req.name} (${req.shop})`;
-  const text = requestText(req);
+  const slot = cleanSlot(req.preferredTime ?? "");
+  const subject = `New CUE pilot request — ${req.name} (${req.shop})${slot ? ` — ${slot}` : ""}`;
+  const text = requestText(req, slot);
 
   if (!mailerConnected()) {
     console.warn("pilot request notify skipped — RESEND_API_KEY not set (lead still saved)");
@@ -176,14 +195,17 @@ export async function notifyPilotRequest(req: PilotRequest): Promise<void> {
   // Real-time whisper — best effort, logged, never blocks.
   try {
     const { pushPilotAlert } = await import("@/lib/push");
-    const pushed = await pushPilotAlert(`Pilot request: ${req.name}`, `${req.shop} · ${req.phone}${req.email ? ` · ${req.email}` : ""}`, `/pipeline/scan-leads`);
+    const title = `Pilot request: ${req.name}`;
+    const body = `${slot ? `Requested: ${slot} · ` : ""}${req.shop} · ${req.phone}${req.email ? ` · ${req.email}` : ""}`;
+    const pushed = await pushPilotAlert(title, body, `/pipeline/scan-leads`);
     if (!pushed.ok) console.warn("pilot request push inconclusive:", pushed.detail);
   } catch (e) {
     console.warn("pilot request push failed:", e instanceof Error ? e.message : String(e));
   }
 }
 
-/** Persist a failed email attempt; retry later (exponential backoff) via cron. */
+/** Persist a failed owner alert; retry later (exponential backoff) via cron.
+ *  Visitor slot confirmations are intentionally not routed here. */
 export async function enqueueFailedAlert(
   targets: string[],
   subject: string,

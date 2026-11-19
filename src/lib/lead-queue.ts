@@ -1,9 +1,10 @@
 // Retry drain + daily summary for pilot-request email alerts.
 //
-// Enqueue happens at send failure (lib/leads.ts). This module drains due rows
-// with exponential backoff (30m → 1h → 2h → … → 24h cap), abandons after the
-// 8th attempt, and compiles the daily summary the alert cron emails to the
-// pilot inbox.
+// Owner-alert enqueue happens at send failure (lib/leads.ts); visitor slot
+// confirmations are never queued because retrying them would send stale times.
+// This module drains due rows with exponential backoff (30m → 1h → 2h → … →
+// 24h cap), abandons after the 8th attempt, and compiles the daily summary the
+// alert cron emails to the pilot inbox.
 import { sql } from "@/lib/db";
 import { sendMail, mailerConnected } from "@/lib/mailer";
 

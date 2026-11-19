@@ -22,7 +22,7 @@ export async function POST() {
     const mail = await sendMail({
       to: pilotInboxEmails(),
       subject: "TEST — CUE lead alert path",
-      text: "One-time test from Pipeline → Scan-call leads. Real pilot alerts arrive as: 'New CUE pilot request — Name (Shop)'.",
+      text: "One-time test from Pipeline → Scan-call leads. Real pilot alerts arrive as: 'New CUE pilot request — Name (Shop) — Requested slot'.",
     });
     email = mail.sent ? "sent" : mail.error ?? "failed";
   } else {
